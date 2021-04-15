@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.9.2" />
+<title>coh_lib.optimisation API documentation</title>
+<meta name="description" content="Created on Mon Nov 16 13:17:41 2020 …" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>coh_lib.optimisation</code></h1>
+</header>
+<section id="section-intro">
+<p>Created on Mon Nov 16 13:17:41 2020</p>
+<p>@author: cpannetier</p>
+<p>Routines for optimising the fringe tracker</p>
+<ul>
+<li>
+<p>OptimGain: Optimise on gain PD and GD</p>
+</li>
+<li>
+<p>OptimGainMulitprocess: Multiprocessing version of OptimGain.
+Doesn't work so far (16-11-2020)</p>
+</li>
+</ul>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python"># -*- coding: utf-8 -*-
+&#34;&#34;&#34;
+Created on Mon Nov 16 13:17:41 2020
+
+@author: cpannetier
+
+Routines for optimising the fringe tracker
+
+- OptimGain: Optimise on gain PD and GD
+    
+- OptimGainMulitprocess: Multiprocessing version of OptimGain.
+    Doesn&#39;t work so far (16-11-2020)
+
+&#34;&#34;&#34;
+
+import numpy as np
+
+from . import config
+import coh_lib.skeleton as cl
+import coh_lib.coh_tools as ct
+
+from importlib import reload  # Python 3.4+ only.
+
+def OptimGainMultiprocess(GainsPD=[],GainsGD=[],optim=&#39;FC&#39;,
+                TimeBonds=100, WavelengthOfInterest=1.5, DIT=50,
+                telescopes=0):
+    
+    
+    import multiprocessing
+    
+    pool = multiprocessing.Pool()
+    
+    from .config import NIN, NC
+    
+    if len(GainsGD):
+        gainstr=&#39;GainGD&#39;
+        Ngains = len(GainsGD)
+        Gains = GainsGD
+    elif len(GainsPD):
+        gainstr=&#39;GainPD&#39;
+        Ngains = len(GainsPD)
+        Gains = GainsPD
+    else:
+        raise Exception(&#39;Need GainsPD or GainsGD.&#39;)
+        
+    print(f&#34;Start {gainstr} optimisation with sample gains={Gains}&#34;)
+    
+    # SimpleIntegrator(init=True, GainPD=Gains[0], GainGD=0)
+    
+    
+    VarOPD = np.zeros([Ngains,NIN])     # Phase variances
+    VarCP = np.zeros([Ngains, NC])      # Cosure Phase variances
+    FCArray = np.zeros([Ngains, NIN])   # Contains the fringe contrasts
+    
+    
+    minValue = 10000
+    iOptim = -1
+        
+    
+    def GiveResults(G):
+        
+        config.FT[&#39;GainPD&#39;] = G
+        
+        print(f&#39;{gainstr}={G}&#39;)
+        
+        # Launch the simulator
+        cl.loop()
+        # Load the performance observables into simu module
+        cl.ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=False)
+                
+        
+        return simu.VarOPD, simu.VarCPD, simu.VarCGD, simu.FringeContrast
+        
+       
+        # elif (Value &gt; 10*minValue) and (ig &lt; Ngains-1):
+        #     VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+        #     VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
+        #     FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+        #     break
+    
+    
+    # result = GiveResults(0.2)
+    myresult = pool.starmap(GiveResults, Gains.reshape([Ngains,1]))
+    
+    print(myresult)
+    
+    # for ig in range(Ngains):
+        
+    #     # Initialise the comparison tables
+    #     VarOPD[ig,:] = simu.VarOPD
+    #     if gainstr==&#39;GainPD&#39;:
+    #         VarCP[ig,:] = simu.VarCPD
+    #     elif gainstr==&#39;GainGD&#39;:
+    #         VarCP[ig,:] = simu.VarCGD
+    #     FCArray[ig,:] = simu.FringeContrast
+        
+    #     if optim==&#39;phase&#39;:      # Optimisation on Phase residues
+    #         if not telescopes:
+    #             Value = np.mean(VarOPD[ig,:])
+    #         elif telescopes:
+    #             itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+    #             ib = coh_tools.posk(itel1, itel2, config.NA)
+    #             Value = VarOPD[ig,ib]
+    #         if Value &lt; minValue:    
+    #             minValue = Value
+    #             iOptim = ig
+        
+    #     elif optim == &#39;FC&#39;:     # Optimisation on final fringe contrast
+    #         if not telescopes:
+    #             Value = 1-np.mean(FCArray[ig,:])
+    #         elif telescopes:
+    #             itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+    #             ib = coh_tools.posk(itel1, itel2, config.NA)
+    #             Value = 1-FCArray[ig,ib]
+    #         print(Value, minValue)
+    #         if Value &lt; minValue:
+    #             minValue = Value
+    #             iOptim = ig
+                
+    #     elif optim==&#39;CP&#39;:       # Optimisation on Closure Phase variance
+    #         if not telescopes:
+    #             Value = np.mean(VarCP[ig,:])
+    #         elif telescopes:
+    #             if len(telescopes) != 3:
+    #                 raise Exception(&#39;For defining a closure phase, telescopes must be three.&#39;)
+    #             itel1,itel2,itel3 = telescopes[0]-1, telescopes[1]-1, telescopes[2]-1
+    #             ic = coh_tools.poskfai(itel1, itel2, itel3, config.NA)
+    #             Value = VarCP[ig,ic]
+    #         if Value &lt; minValue:    
+    #             minValue = Value
+    #             iOptim = ig           
+        
+    #     elif (Value &gt; 10*minValue) and (ig &lt; Ngains-1):
+    #         VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+    #         VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
+    #         FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+    #         break
+        
+    # bestGain = Gains[iOptim]
+    
+#     print(f&#34;Best gain: {Gains[iOptim]} \n\
+# Average OPD Variance: {minValue} \n\
+# Average CPD Variance: {minValue} \n\
+# Average Fringe Contrast: {1-minValue}&#34;)
+    
+
+
+    return #bestGain, iOptim, VarOPD, VarCP, FCArray
+
+
+def OptimGain(GainsPD=[],GainsGD=[],optim=&#39;FC&#39;,
+                TimeBonds=100, WavelengthOfInterest=1.5, DIT=50,
+                telescopes=0):
+    
+    from . import simu
+    from . import config
+    
+    from .config import NIN, NC
+    
+    if len(GainsGD):
+        gainstr=&#39;GainGD&#39;
+        Ngains = len(GainsGD)
+        Gains = GainsGD
+    elif len(GainsPD):
+        gainstr=&#39;GainPD&#39;
+        Ngains = len(GainsPD)
+        Gains = GainsPD
+    else:
+        raise Exception(&#39;Need GainsPD or GainsGD.&#39;)
+        
+    print(f&#34;Start {gainstr} optimisation with sample gains={Gains}&#34;)
+    
+    # SimpleIntegrator(init=True, GainPD=Gains[0], GainGD=0)
+    
+    
+    VarOPD = np.zeros([Ngains,NIN])     # Phase variances
+    VarCP = np.zeros([Ngains, NC])      # Cosure Phase variances
+    FCArray = np.zeros([Ngains, NIN])   # Contains the fringe contrasts
+    
+    
+    minValue = 10000
+    iOptim = -1
+    
+    for ig in range(Ngains):
+        
+        G = Gains[ig]
+        
+        config.FT[gainstr] = G
+        
+        print(f&#39;{gainstr}={G}&#39;)
+        
+        # Launch the simulator
+        cl.loop()
+        # Load the performance observables into simu module
+        cl.ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=False)
+                
+        # Initialise the comparison tables
+        VarOPD[ig,:] = simu.VarOPD
+        if gainstr==&#39;GainPD&#39;:
+            VarCP[ig,:] = simu.VarCPD
+        elif gainstr==&#39;GainGD&#39;:
+            VarCP[ig,:] = simu.VarCGD
+        FCArray[ig,:] = simu.FringeContrast
+        
+        if optim==&#39;phase&#39;:      # Optimisation on Phase residues
+            if not telescopes:
+                Value = np.mean(VarOPD[ig,:])
+            elif telescopes:
+                itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+                ib = ct.posk(itel1, itel2, config.NA)
+                Value = VarOPD[ig,ib]
+            if Value &lt; minValue:    
+                minValue = Value
+                iOptim = ig
+        
+        elif optim == &#39;FC&#39;:     # Optimisation on final fringe contrast
+            if not telescopes:
+                Value = 1-np.mean(FCArray[ig,:])
+            elif telescopes:
+                itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+                ib = ct.posk(itel1, itel2, config.NA)
+                Value = 1-FCArray[ig,ib]
+            if Value &lt; minValue:
+                minValue = Value
+                iOptim = ig
+                
+        elif optim==&#39;CP&#39;:       # Optimisation on Closure Phase variance
+            if not telescopes:
+                Value = np.mean(VarCP[ig,:])
+            elif telescopes:
+                if len(telescopes) != 3:
+                    raise Exception(&#39;For defining a closure phase, telescopes must be three.&#39;)
+                itel1,itel2,itel3 = telescopes[0]-1, telescopes[1]-1, telescopes[2]-1
+                ic = ct.poskfai(itel1, itel2, itel3, config.NA)
+                Value = VarCP[ig,ic]
+            if Value &lt; minValue:    
+                minValue = Value
+                iOptim = ig           
+        
+        elif (Value &gt; 10*minValue) and (ig &lt; Ngains-1):
+            VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
+            FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            break
+        
+        print(f&#39;Current value={Value}, Minimal value={minValue}&#39;)
+        
+    bestGain = Gains[iOptim]
+    
+    
+    
+    print(f&#34;Best gain: {Gains[iOptim]} \n\
+Average OPD Variance: {minValue} \n\
+Average CPD Variance: {minValue} \n\
+Average Fringe Contrast: {1-minValue}&#34;)
+    
+    return bestGain, iOptim, VarOPD, VarCP, FCArray
+
+
+
+def OptimGain0(Ngd=40,GainsPD=np.arange(0,1,0.1), GainsGD=np.arange(0,1,0.1),display=False,base=0):
+    
+    from . import simu
+    from . import config
+    
+    NIN = config.NIN
+    
+    
+    # Create a disturbance pattern on the pupille 1
+    # coher = cl.MakeAtmosphereCoherence(ampl=5, dist=&#39;randomatm&#39;)
+    
+    # from simu import CfObj, CfDisturbance, PistonDisturbance,OPDDisturbance
+    # from simu import PistonDisturbance,PhotometryDisturbance
+    from .simu import FreqSampling, DisturbancePSD
+    
+
+    &#34;&#34;&#34;
+    Optimization of the Group-Delay tracking
+    &#34;&#34;&#34;
+    
+    GainPD=0
+    config.FT[&#39;GainPD&#39;] = 0
+    
+    Ngains = len(GainsGD)
+    rmsArrayGD = np.zeros([Ngains,NIN])
+    
+    print(f&#34;Start GD gain optimisation with sample gains={GainsGD}&#34;)
+    ig = 0
+    minRMS = 100
+    for ig in range(Ngains):
+        
+        reload(simu)
+        simu.DisturbancePSD = DisturbancePSD
+        simu.FreqSampling = FreqSampling
+        
+        GainGD = GainsGD[ig]
+        cl.SimpleIntegrator(init=True, Ngd=Ngd, GainPD=GainPD, GainGD=GainGD)
+        
+        config.FT[&#39;GainGD&#39;] = GainGD
+        print(f&#39;Gain GD={GainGD}&#39;)
+        
+        # Launch the simulator and save the data in the randomall.fits file
+        cl.loop(&#39;randomall.fits&#39;)
+        rmsOPD = calcRMS(50)
+        rmsArrayGD[ig,:] = np.transpose(rmsOPD)
+        
+        print(f&#34;RMS={np.mean(rmsOPD)}&#34;)
+        
+        if np.mean(rmsOPD) &lt; minRMS:
+            minRMS = np.mean(rmsOPD)
+            print(&#34;Better correction found for GD={GainGD}&#34;)
+        
+        elif (np.mean(rmsOPD) &gt; 10*minRMS) and (ig &lt; Ngains-1):
+            rmsArrayGD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            break
+        
+    ind = np.argmin(np.mean(rmsArrayGD,axis=1))
+    bestGD = GainsGD[ind]
+    
+    print(f&#34;The optimize gain is {GainsGD[ind]} with average OPD rms \
+          {np.mean(rmsArrayGD[ind])}&#34;)
+    
+    GainGD = GainsGD[ind]
+    
+    print(f&#34;Start PD gain optimisation with gain GD={GainGD} and sample \
+gains={GainsGD}&#34;)
+    ig = 0
+    Ngains = len(GainsPD)
+    rmsArrayPD = np.zeros([Ngains,NIN])
+    minRMS = 100
+    for ig in range(Ngains):
+        
+        reload(simu)
+        simu.DisturbancePSD = DisturbancePSD
+        simu.FreqSampling = FreqSampling
+        
+        GainPD = GainsPD[ig]
+        config.FT[&#39;GainGD&#39;] = GainGD
+        config.FT[&#39;GainPD&#39;] = GainPD
+        cl.SimpleIntegrator(init=True, Ngd=Ngd, GainPD=GainPD, GainGD=GainGD)
+        print(f&#39;Gain PD={GainPD}&#39;)
+        
+        # Launch the simulator and save the data in the randomall.fits file
+        cl.loop(&#39;randomall.fits&#39;)
+        rmsOPD = calcRMS(50)
+        rmsArrayPD[ig,:] = np.transpose(rmsOPD)
+        
+        print(f&#34;RMS={np.mean(rmsOPD)}&#34;)
+        if np.mean(rmsOPD) &lt; minRMS:
+            minRMS = np.mean(rmsOPD)
+            print(f&#34;Better correction found for PD={GainPD}&#34;)
+        
+        elif (np.mean(rmsOPD) &gt; 5*minRMS) &amp; (ig &lt; Ngains-1):
+            rmsArrayPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            break
+        
+    ind = np.argmin(np.mean(rmsArrayPD,axis=1))
+    bestPD = GainsPD[ind]
+    
+    print(f&#34;The optimize GD gain is {bestGD}&#34;)
+    print(f&#34;The optimized gains are: GD={bestGD} and PD={bestPD} with average OPD rms \
+          {np.mean(rmsArrayPD[ind])}&#34;)
+    
+    # GainPD_ = GainPD[ind]
+    # for ig in range(Ngd):
+    #     GainGD_ = GainGD[ig]
+    #     print(f&#39;Gain PD: {GainPD_}&#39;)
+    #     print(f&#39;Gain GD: {GainGD_}&#39;)
+    #     # Launch the simulator and save the data in the randomall.fits file
+    #     coh_turn_spica(&#39;randomall.fits&#39;)
+    #     rms2, rms2bis = calcRMS(110)
+    #     rmsOGD[ig] = np.transpose(rms2)
+    #     # rmsOGDbis[ig] = np.transpose(rms2bis)
+        
+    # if display:
+    #     plt.figure(config.newfig), plt.title(&#39;OPD rms function of PD gain\
+    #                                          on most critical baseline.&#39;)
+    #     plt.plot(GainPD, rmsOPD[:,base],&#39;+&#39;)
+    #     plt.ylabel(&#39;OPD rms [µm]&#39;)
+    #     plt.xlabel(&#39;Gain&#39;)
+    #     plt.show()
+    #     plt.savefig(&#39;varOPD.png&#39;)
+    #     config.newfig+=1
+        
+    #     plt.figure(config.newfig), plt.title(&#39;OPD rms function of GD gain.&#39;)
+    #     plt.plot(GainGD, rmsOGD[:,base],&#39;+&#39;)
+    #     plt.ylabel(&#39;OPD rms [µm]&#39;)
+    #     plt.xlabel(&#39;Gain&#39;)
+    #     plt.show()
+    #     plt.savefig(&#39;varOGD.png&#39;)
+    #     config.newfig+=1
+        
+    return rmsArrayGD, rmsArrayPD
+
+
+def calcRMS(startframe):
+    &#34;&#34;&#34;
+    Calculates the Standard Deviation of the OPD in micrometers.
+        
+
+    Parameters
+    ----------
+    startframe : integer
+        Starting time in the loop. An integer, not in ms for the moment.
+
+    Returns
+    -------
+    varOPD : float
+        .
+    varOGD : TYPE
+        DESCRIPTION.
+
+    &#34;&#34;&#34;
+    from .simu import OPDTrue
+    
+    rmsOPD = np.std(OPDTrue[startframe:,:],axis=0)
+    
+    return rmsOPD</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="coh_lib.optimisation.OptimGain"><code class="name flex">
+<span>def <span class="ident">OptimGain</span></span>(<span>GainsPD=[], GainsGD=[], optim='FC', TimeBonds=100, WavelengthOfInterest=1.5, DIT=50, telescopes=0)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def OptimGain(GainsPD=[],GainsGD=[],optim=&#39;FC&#39;,
+                TimeBonds=100, WavelengthOfInterest=1.5, DIT=50,
+                telescopes=0):
+    
+    from . import simu
+    from . import config
+    
+    from .config import NIN, NC
+    
+    if len(GainsGD):
+        gainstr=&#39;GainGD&#39;
+        Ngains = len(GainsGD)
+        Gains = GainsGD
+    elif len(GainsPD):
+        gainstr=&#39;GainPD&#39;
+        Ngains = len(GainsPD)
+        Gains = GainsPD
+    else:
+        raise Exception(&#39;Need GainsPD or GainsGD.&#39;)
+        
+    print(f&#34;Start {gainstr} optimisation with sample gains={Gains}&#34;)
+    
+    # SimpleIntegrator(init=True, GainPD=Gains[0], GainGD=0)
+    
+    
+    VarOPD = np.zeros([Ngains,NIN])     # Phase variances
+    VarCP = np.zeros([Ngains, NC])      # Cosure Phase variances
+    FCArray = np.zeros([Ngains, NIN])   # Contains the fringe contrasts
+    
+    
+    minValue = 10000
+    iOptim = -1
+    
+    for ig in range(Ngains):
+        
+        G = Gains[ig]
+        
+        config.FT[gainstr] = G
+        
+        print(f&#39;{gainstr}={G}&#39;)
+        
+        # Launch the simulator
+        cl.loop()
+        # Load the performance observables into simu module
+        cl.ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=False)
+                
+        # Initialise the comparison tables
+        VarOPD[ig,:] = simu.VarOPD
+        if gainstr==&#39;GainPD&#39;:
+            VarCP[ig,:] = simu.VarCPD
+        elif gainstr==&#39;GainGD&#39;:
+            VarCP[ig,:] = simu.VarCGD
+        FCArray[ig,:] = simu.FringeContrast
+        
+        if optim==&#39;phase&#39;:      # Optimisation on Phase residues
+            if not telescopes:
+                Value = np.mean(VarOPD[ig,:])
+            elif telescopes:
+                itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+                ib = ct.posk(itel1, itel2, config.NA)
+                Value = VarOPD[ig,ib]
+            if Value &lt; minValue:    
+                minValue = Value
+                iOptim = ig
+        
+        elif optim == &#39;FC&#39;:     # Optimisation on final fringe contrast
+            if not telescopes:
+                Value = 1-np.mean(FCArray[ig,:])
+            elif telescopes:
+                itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+                ib = ct.posk(itel1, itel2, config.NA)
+                Value = 1-FCArray[ig,ib]
+            if Value &lt; minValue:
+                minValue = Value
+                iOptim = ig
+                
+        elif optim==&#39;CP&#39;:       # Optimisation on Closure Phase variance
+            if not telescopes:
+                Value = np.mean(VarCP[ig,:])
+            elif telescopes:
+                if len(telescopes) != 3:
+                    raise Exception(&#39;For defining a closure phase, telescopes must be three.&#39;)
+                itel1,itel2,itel3 = telescopes[0]-1, telescopes[1]-1, telescopes[2]-1
+                ic = ct.poskfai(itel1, itel2, itel3, config.NA)
+                Value = VarCP[ig,ic]
+            if Value &lt; minValue:    
+                minValue = Value
+                iOptim = ig           
+        
+        elif (Value &gt; 10*minValue) and (ig &lt; Ngains-1):
+            VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
+            FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            break
+        
+        print(f&#39;Current value={Value}, Minimal value={minValue}&#39;)
+        
+    bestGain = Gains[iOptim]
+    
+    
+    
+    print(f&#34;Best gain: {Gains[iOptim]} \n\
+Average OPD Variance: {minValue} \n\
+Average CPD Variance: {minValue} \n\
+Average Fringe Contrast: {1-minValue}&#34;)
+    
+    return bestGain, iOptim, VarOPD, VarCP, FCArray</code></pre>
+</details>
+</dd>
+<dt id="coh_lib.optimisation.OptimGain0"><code class="name flex">
+<span>def <span class="ident">OptimGain0</span></span>(<span>Ngd=40, GainsPD=array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]), GainsGD=array([0. , 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]), display=False, base=0)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def OptimGain0(Ngd=40,GainsPD=np.arange(0,1,0.1), GainsGD=np.arange(0,1,0.1),display=False,base=0):
+    
+    from . import simu
+    from . import config
+    
+    NIN = config.NIN
+    
+    
+    # Create a disturbance pattern on the pupille 1
+    # coher = cl.MakeAtmosphereCoherence(ampl=5, dist=&#39;randomatm&#39;)
+    
+    # from simu import CfObj, CfDisturbance, PistonDisturbance,OPDDisturbance
+    # from simu import PistonDisturbance,PhotometryDisturbance
+    from .simu import FreqSampling, DisturbancePSD
+    
+
+    &#34;&#34;&#34;
+    Optimization of the Group-Delay tracking
+    &#34;&#34;&#34;
+    
+    GainPD=0
+    config.FT[&#39;GainPD&#39;] = 0
+    
+    Ngains = len(GainsGD)
+    rmsArrayGD = np.zeros([Ngains,NIN])
+    
+    print(f&#34;Start GD gain optimisation with sample gains={GainsGD}&#34;)
+    ig = 0
+    minRMS = 100
+    for ig in range(Ngains):
+        
+        reload(simu)
+        simu.DisturbancePSD = DisturbancePSD
+        simu.FreqSampling = FreqSampling
+        
+        GainGD = GainsGD[ig]
+        cl.SimpleIntegrator(init=True, Ngd=Ngd, GainPD=GainPD, GainGD=GainGD)
+        
+        config.FT[&#39;GainGD&#39;] = GainGD
+        print(f&#39;Gain GD={GainGD}&#39;)
+        
+        # Launch the simulator and save the data in the randomall.fits file
+        cl.loop(&#39;randomall.fits&#39;)
+        rmsOPD = calcRMS(50)
+        rmsArrayGD[ig,:] = np.transpose(rmsOPD)
+        
+        print(f&#34;RMS={np.mean(rmsOPD)}&#34;)
+        
+        if np.mean(rmsOPD) &lt; minRMS:
+            minRMS = np.mean(rmsOPD)
+            print(&#34;Better correction found for GD={GainGD}&#34;)
+        
+        elif (np.mean(rmsOPD) &gt; 10*minRMS) and (ig &lt; Ngains-1):
+            rmsArrayGD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            break
+        
+    ind = np.argmin(np.mean(rmsArrayGD,axis=1))
+    bestGD = GainsGD[ind]
+    
+    print(f&#34;The optimize gain is {GainsGD[ind]} with average OPD rms \
+          {np.mean(rmsArrayGD[ind])}&#34;)
+    
+    GainGD = GainsGD[ind]
+    
+    print(f&#34;Start PD gain optimisation with gain GD={GainGD} and sample \
+gains={GainsGD}&#34;)
+    ig = 0
+    Ngains = len(GainsPD)
+    rmsArrayPD = np.zeros([Ngains,NIN])
+    minRMS = 100
+    for ig in range(Ngains):
+        
+        reload(simu)
+        simu.DisturbancePSD = DisturbancePSD
+        simu.FreqSampling = FreqSampling
+        
+        GainPD = GainsPD[ig]
+        config.FT[&#39;GainGD&#39;] = GainGD
+        config.FT[&#39;GainPD&#39;] = GainPD
+        cl.SimpleIntegrator(init=True, Ngd=Ngd, GainPD=GainPD, GainGD=GainGD)
+        print(f&#39;Gain PD={GainPD}&#39;)
+        
+        # Launch the simulator and save the data in the randomall.fits file
+        cl.loop(&#39;randomall.fits&#39;)
+        rmsOPD = calcRMS(50)
+        rmsArrayPD[ig,:] = np.transpose(rmsOPD)
+        
+        print(f&#34;RMS={np.mean(rmsOPD)}&#34;)
+        if np.mean(rmsOPD) &lt; minRMS:
+            minRMS = np.mean(rmsOPD)
+            print(f&#34;Better correction found for PD={GainPD}&#34;)
+        
+        elif (np.mean(rmsOPD) &gt; 5*minRMS) &amp; (ig &lt; Ngains-1):
+            rmsArrayPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+            break
+        
+    ind = np.argmin(np.mean(rmsArrayPD,axis=1))
+    bestPD = GainsPD[ind]
+    
+    print(f&#34;The optimize GD gain is {bestGD}&#34;)
+    print(f&#34;The optimized gains are: GD={bestGD} and PD={bestPD} with average OPD rms \
+          {np.mean(rmsArrayPD[ind])}&#34;)
+    
+    # GainPD_ = GainPD[ind]
+    # for ig in range(Ngd):
+    #     GainGD_ = GainGD[ig]
+    #     print(f&#39;Gain PD: {GainPD_}&#39;)
+    #     print(f&#39;Gain GD: {GainGD_}&#39;)
+    #     # Launch the simulator and save the data in the randomall.fits file
+    #     coh_turn_spica(&#39;randomall.fits&#39;)
+    #     rms2, rms2bis = calcRMS(110)
+    #     rmsOGD[ig] = np.transpose(rms2)
+    #     # rmsOGDbis[ig] = np.transpose(rms2bis)
+        
+    # if display:
+    #     plt.figure(config.newfig), plt.title(&#39;OPD rms function of PD gain\
+    #                                          on most critical baseline.&#39;)
+    #     plt.plot(GainPD, rmsOPD[:,base],&#39;+&#39;)
+    #     plt.ylabel(&#39;OPD rms [µm]&#39;)
+    #     plt.xlabel(&#39;Gain&#39;)
+    #     plt.show()
+    #     plt.savefig(&#39;varOPD.png&#39;)
+    #     config.newfig+=1
+        
+    #     plt.figure(config.newfig), plt.title(&#39;OPD rms function of GD gain.&#39;)
+    #     plt.plot(GainGD, rmsOGD[:,base],&#39;+&#39;)
+    #     plt.ylabel(&#39;OPD rms [µm]&#39;)
+    #     plt.xlabel(&#39;Gain&#39;)
+    #     plt.show()
+    #     plt.savefig(&#39;varOGD.png&#39;)
+    #     config.newfig+=1
+        
+    return rmsArrayGD, rmsArrayPD</code></pre>
+</details>
+</dd>
+<dt id="coh_lib.optimisation.OptimGainMultiprocess"><code class="name flex">
+<span>def <span class="ident">OptimGainMultiprocess</span></span>(<span>GainsPD=[], GainsGD=[], optim='FC', TimeBonds=100, WavelengthOfInterest=1.5, DIT=50, telescopes=0)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def OptimGainMultiprocess(GainsPD=[],GainsGD=[],optim=&#39;FC&#39;,
+                TimeBonds=100, WavelengthOfInterest=1.5, DIT=50,
+                telescopes=0):
+    
+    
+    import multiprocessing
+    
+    pool = multiprocessing.Pool()
+    
+    from .config import NIN, NC
+    
+    if len(GainsGD):
+        gainstr=&#39;GainGD&#39;
+        Ngains = len(GainsGD)
+        Gains = GainsGD
+    elif len(GainsPD):
+        gainstr=&#39;GainPD&#39;
+        Ngains = len(GainsPD)
+        Gains = GainsPD
+    else:
+        raise Exception(&#39;Need GainsPD or GainsGD.&#39;)
+        
+    print(f&#34;Start {gainstr} optimisation with sample gains={Gains}&#34;)
+    
+    # SimpleIntegrator(init=True, GainPD=Gains[0], GainGD=0)
+    
+    
+    VarOPD = np.zeros([Ngains,NIN])     # Phase variances
+    VarCP = np.zeros([Ngains, NC])      # Cosure Phase variances
+    FCArray = np.zeros([Ngains, NIN])   # Contains the fringe contrasts
+    
+    
+    minValue = 10000
+    iOptim = -1
+        
+    
+    def GiveResults(G):
+        
+        config.FT[&#39;GainPD&#39;] = G
+        
+        print(f&#39;{gainstr}={G}&#39;)
+        
+        # Launch the simulator
+        cl.loop()
+        # Load the performance observables into simu module
+        cl.ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=False)
+                
+        
+        return simu.VarOPD, simu.VarCPD, simu.VarCGD, simu.FringeContrast
+        
+       
+        # elif (Value &gt; 10*minValue) and (ig &lt; Ngains-1):
+        #     VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+        #     VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
+        #     FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+        #     break
+    
+    
+    # result = GiveResults(0.2)
+    myresult = pool.starmap(GiveResults, Gains.reshape([Ngains,1]))
+    
+    print(myresult)
+    
+    # for ig in range(Ngains):
+        
+    #     # Initialise the comparison tables
+    #     VarOPD[ig,:] = simu.VarOPD
+    #     if gainstr==&#39;GainPD&#39;:
+    #         VarCP[ig,:] = simu.VarCPD
+    #     elif gainstr==&#39;GainGD&#39;:
+    #         VarCP[ig,:] = simu.VarCGD
+    #     FCArray[ig,:] = simu.FringeContrast
+        
+    #     if optim==&#39;phase&#39;:      # Optimisation on Phase residues
+    #         if not telescopes:
+    #             Value = np.mean(VarOPD[ig,:])
+    #         elif telescopes:
+    #             itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+    #             ib = coh_tools.posk(itel1, itel2, config.NA)
+    #             Value = VarOPD[ig,ib]
+    #         if Value &lt; minValue:    
+    #             minValue = Value
+    #             iOptim = ig
+        
+    #     elif optim == &#39;FC&#39;:     # Optimisation on final fringe contrast
+    #         if not telescopes:
+    #             Value = 1-np.mean(FCArray[ig,:])
+    #         elif telescopes:
+    #             itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+    #             ib = coh_tools.posk(itel1, itel2, config.NA)
+    #             Value = 1-FCArray[ig,ib]
+    #         print(Value, minValue)
+    #         if Value &lt; minValue:
+    #             minValue = Value
+    #             iOptim = ig
+                
+    #     elif optim==&#39;CP&#39;:       # Optimisation on Closure Phase variance
+    #         if not telescopes:
+    #             Value = np.mean(VarCP[ig,:])
+    #         elif telescopes:
+    #             if len(telescopes) != 3:
+    #                 raise Exception(&#39;For defining a closure phase, telescopes must be three.&#39;)
+    #             itel1,itel2,itel3 = telescopes[0]-1, telescopes[1]-1, telescopes[2]-1
+    #             ic = coh_tools.poskfai(itel1, itel2, itel3, config.NA)
+    #             Value = VarCP[ig,ic]
+    #         if Value &lt; minValue:    
+    #             minValue = Value
+    #             iOptim = ig           
+        
+    #     elif (Value &gt; 10*minValue) and (ig &lt; Ngains-1):
+    #         VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+    #         VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
+    #         FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
+    #         break
+        
+    # bestGain = Gains[iOptim]
+    
+#     print(f&#34;Best gain: {Gains[iOptim]} \n\
+# Average OPD Variance: {minValue} \n\
+# Average CPD Variance: {minValue} \n\
+# Average Fringe Contrast: {1-minValue}&#34;)
+    
+
+
+    return #bestGain, iOptim, VarOPD, VarCP, FCArray</code></pre>
+</details>
+</dd>
+<dt id="coh_lib.optimisation.calcRMS"><code class="name flex">
+<span>def <span class="ident">calcRMS</span></span>(<span>startframe)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Calculates the Standard Deviation of the OPD in micrometers.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>startframe</code></strong> :&ensp;<code>integer</code></dt>
+<dd>Starting time in the loop. An integer, not in ms for the moment.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>varOPD</code></strong> :&ensp;<code>float</code></dt>
+<dd>.</dd>
+<dt><strong><code>varOGD</code></strong> :&ensp;<code>TYPE</code></dt>
+<dd>DESCRIPTION.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def calcRMS(startframe):
+    &#34;&#34;&#34;
+    Calculates the Standard Deviation of the OPD in micrometers.
+        
+
+    Parameters
+    ----------
+    startframe : integer
+        Starting time in the loop. An integer, not in ms for the moment.
+
+    Returns
+    -------
+    varOPD : float
+        .
+    varOGD : TYPE
+        DESCRIPTION.
+
+    &#34;&#34;&#34;
+    from .simu import OPDTrue
+    
+    rmsOPD = np.std(OPDTrue[startframe:,:],axis=0)
+    
+    return rmsOPD</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="coh_lib" href="index.html">coh_lib</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="coh_lib.optimisation.OptimGain" href="#coh_lib.optimisation.OptimGain">OptimGain</a></code></li>
+<li><code><a title="coh_lib.optimisation.OptimGain0" href="#coh_lib.optimisation.OptimGain0">OptimGain0</a></code></li>
+<li><code><a title="coh_lib.optimisation.OptimGainMultiprocess" href="#coh_lib.optimisation.OptimGainMultiprocess">OptimGainMultiprocess</a></code></li>
+<li><code><a title="coh_lib.optimisation.calcRMS" href="#coh_lib.optimisation.calcRMS">calcRMS</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.2</a>.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,7 @@
+FlatResolved: One Star with an angular diameter of 0.8mrad
+FlatUnresolved: One centered star with an angular diameter of 0.01mrad
+FlatMidresolved: One centered star with an angular diameter sufficently high not to have phase shift. (The True*** is done for 0.05mrad)
+
+True***: Data generated on the spectra of the SPICA Fringe sensor MIRCX_ABCD_H_PRISM22_V2PM.fits
+
+

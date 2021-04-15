@@ -1,0 +1,42 @@
+Integration V2PM SPICA: 
+selon données fichiers fits: effective wavelength du FS, coordonnées pixels->base, throughputs
+Spectre de référence définie avant. Puis fit de la V2pm dessus. --> pour l'instant, pas fait. Nécessaire de prendre en compte les bandes pour bien calculer l'image et la variance.
+--> Serait pas mal de créer un fitsfile de référence avec la V2PM parfaite. Pour faire un unique spica_fs défini par ce fichier. A voir plus tard.
+
+
+State-machine:
+1. Variance calculation implementation:
+	variance flux=bruit de lecture + bruit de photons (Choquet14, Lacour19) --> valeurs utilisées pour SPICA-FT ? feuilleter puis demander à Philippe
+	covariances: p2vm*var(flux)*p2vmT
+	variance phase: sum(var(coherences))/sum(coherences)
+
+2. Vecteur références:
+
+
+3. Seuils:
+
+
+Group-Delay:
+- à compléter par: correction PD (eq15)
+
+Phase-delay:
+- à compléter par: correction dispersion flux cohérents (eq10)
+
+Gaussian beam modelisation: Choquet2014
+
+
+
+********
+Magnitudes étoiles
+--------
+Semble que je n'atteint pas les valeurs de magnitudes attendues puisque je devrais toujours garder plus d'un photon par frame pour que cela fonctionne.
+--> important pour avoir une bonne approximation des performances qu'on peut atteindre aux magnitudes limites.
+
+
+
+********
+Gérer le problème de divergence quand visibilité complexe
+--------
+Quand la visibilité devient complexe (ou négative et donc phase = 2pi), le GD ne sait plus ou donner de la tête et oscille. Comment faire en sorte qu'il ne diverge pas? --> C'est certainement uniquement une erreur de visualisation. Quand est calculé le GD affiché ? 
+
+Voyons ça.
