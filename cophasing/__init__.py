@@ -6,7 +6,7 @@ Created on Tue Jan 14 17:50:27 2020
 """
 
 """
-Python simulator of a fringe tracking close loop
+Python simulator of a fringe tracking close loop for cophasing the telescopes
 """
 
 __author__ = "Cyril Pannetier"

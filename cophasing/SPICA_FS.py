@@ -16,7 +16,7 @@ Calculated and stored observables:
 import numpy as np
 from astropy.io import fits
 
-# coh_lib subpackages
+
 from . import coh_tools as ct
 from . import config
 from .FS_DEFAULT import ABCDmod, realisticABCDmod
@@ -41,7 +41,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         - simu.CommandODL: Piston Command to send       [NT,NA]
         
     SUBROUTINES:
-        - coh_lib.add_camera_noise
+        - skeleton.add_camera_noise
 
     Parameters
     ----------
@@ -192,7 +192,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         - simu.CommandODL: Piston Command to send       [NT,NA]
         
     SUBROUTINES:
-        - coh_lib.add_camera_noise
+        - skeleton.add_camera_noise
 
     Parameters
     ----------

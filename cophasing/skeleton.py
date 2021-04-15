@@ -22,7 +22,6 @@ from astropy.io import fits
 from .FS_DEFAULT import *
 from .decorators import *
 
-# os.chdir('C:/Users/cpannetier/Documents/These/FringeTracking/Python/coh_pack/coh_lib/')
 
 # Change the display font
 # plt.rc('font', **{'family' : 'serif', 'serif' : ['Computer Modern Roman']})
@@ -41,7 +40,7 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, N
     
     """
     NAME: initialize - Initializes a structure to simulate an interferometer by \
-    COH_LIB
+        COPHASING
     
     PURPOSE:
         This procedure creates the coh structure and intializes it with the \
@@ -1917,7 +1916,7 @@ def FSdefault(NA, NW):
     """
     NEEDS TO BE UPDATE FOR BEING USED
     
-    Simplest Fringe Sensor to be run with COH_LIB
+    Simplest Fringe Sensor to be run with the COPHASING
     This procedure implements the P2V matrix of the simplest fringe sensor for the coh library.
     The principles are that:
         - the raw image is equal to the coherence

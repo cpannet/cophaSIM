@@ -17,8 +17,8 @@ import numpy as np
 import time
 
 from . import config
-import coh_lib.skeleton as sk
-import coh_lib.coh_tools as ct
+import cophasing.skeleton as sk
+import cophasing.coh_tools as ct
 import glob
 
 from importlib import reload  # Python 3.4+ only.

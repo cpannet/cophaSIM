@@ -6,7 +6,7 @@ Created on Fri Mar  6 16:14:42 2020
 """
 
 import os
-# os.chdir('C:/Users/cpannetier/Documents/These/FringeTracking/Python/coh_pack/coh_lib')
+
 datadir = 'data/'
 
 import pandas as pd
@@ -26,7 +26,7 @@ from astropy.io import fits
 import matplotlib.pyplot as plt
 
 from . import config
-import coh_lib.decorators as deco
+import cophasing.decorators as deco
 
 global h_, c_, k_
 
@@ -932,7 +932,7 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
         PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance[0])
 
     CfDisturbance = np.zeros([NT,NW,NB])*1j
-    from coh_lib import skeleton
+    from cophasing import skeleton
     for it in range(NT):
         CfDisturbance[it,:,:] = skeleton.coh__pis2coh(PistonDisturbance[it,:], 1/spectra, ampl=TransmissionDisturbance[it,:])
 
