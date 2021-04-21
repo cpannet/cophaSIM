@@ -76,8 +76,11 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
                   [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
         
+        ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14]
+            
         config.FS['func'] = SPICAFS_PERFECT
         config.FS['ich'] = ich
+        config.FS['ichorder'] = ichorder
         NG = np.shape(ich)[0]       # should always be equal to NIN
         
         # Classic balanced ABCD modulation of each baseline
@@ -85,11 +88,19 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         M_ABCD = ABCDmod()          # A2P ABCD modulation
         NMod = len(M_ABCD)          # Number of modulations for each baseline
         config.FS['Modulations'] = ['A','B','C','D']
-        config.FS['ABCDind'] = [0,1,2,3]
+        ABCDind = [0,1,2,3]
+        config.FS['ABCDind'] = ABCDind
         NP = NMod*NG
         
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
+        
+        NIN = NP//NMod
+        OrderingIndex = np.zeros(NP,dtype=np.int8)
+        for ib in range(NIN):
+            for k in range(NMod):
+                OrderingIndex[ib*NMod+k] = ichorder[ib]*NMod+ABCDind[k]
+                
         config.FS['T'] = T
         
         # Build the A2P of SPICA
@@ -226,9 +237,12 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         # Created by the user here
         ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
                   [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
-        
+        ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14]
+
         config.FS['func'] = SPICAFS_REALISTIC
         config.FS['ich'] = ich
+        config.FS['ichorder'] = ichorder
+        
         NG = np.shape(ich)[0]       # should always be equal to NIN
         
         # Classic balanced ABCD modulation of each baseline
@@ -236,13 +250,24 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         M_ABCD = realisticABCDmod(phaseshifts, transmissions)          # A2P ABCD modulation
         NMod = len(M_ABCD)          # Number of modulations for each baseline
         config.FS['Modulations'] = ['A','B','C','D']
-        config.FS['ABCDind'] = [0,1,2,3]
+        ABCDind = [0,1,2,3]
+        config.FS['ABCDind'] = ABCDind
         config.FS['Phaseshifts'] = [k*np.pi/2 for k in phaseshifts]
         
         NP = NMod*NG
         
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
+        
+        NIN = NP//NMod
+        OrderingIndex = np.zeros(NP,dtype=np.int8)
+        for ib in range(NIN):
+            for k in range(NMod):
+                OrderingIndex[ib*NMod+k] = ichorder[ib]*NMod+ABCDind[k]
+        
+        config.FS['orderingindex'] = OrderingIndex
+        
+        
         config.FS['T'] = T
         
         # Build the A2P of SPICA
@@ -414,6 +439,22 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
         config.FS['ich'] = np.array([(ichraw[i]) for i in range(0,NP,NMod)])
+        
+        NIN=NP//NMod ; NA=np.max(ichraw)
+        ichorder=np.zeros(NIN,dtype=np.int)
+        for ib in range(NIN):
+            ia,iap=ichraw[ib]
+            ibconventional=ct.posk(ichraw[ib*NMod,0]-1,ichraw[ib*NMod,1]-1,NA)
+            ichorder[ibconventional] = ib
+            
+        config.FS['ichorder'] = ichorder
+        
+        OrderingIndex = np.zeros(NP,dtype=np.int8)
+        for ib in range(NIN):
+            for k in range(NMod):
+                OrderingIndex[ib*NMod+k] = ichorder[ib]*NMod+ABCDind[k]
+        
+        config.FS['orderingindex'] = OrderingIndex
         config.FS['T'] = T
         
         # We pick up the calibrated wavelengths and corresponding wavebands

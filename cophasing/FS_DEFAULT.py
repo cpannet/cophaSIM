@@ -14,7 +14,7 @@ def realisticABCDmod(phaseshifts,transmissions):
     """
     Creates the A2P matrix with phaseshifts not equal to integer numbers of Pi/2.
     A,B,C and D are given in (float) number of Pi/2.
-    Thus for the perfect CHIP, (kA,kB,kC,kD)=(1,0,-1,2)
+    Thus for the perfect CHIP, (kA,kB,kC,kD)=(-1,0,1,2)
     """
     kA,kB,kC,kD = phaseshifts
     t1,t2,t3,t4 = np.sqrt(transmissions)        # Convert in amplitude

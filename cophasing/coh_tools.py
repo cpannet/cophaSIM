@@ -1358,6 +1358,7 @@ def sortmatrix(matrix,ich,ABCDindex,direction='v2pm'):
             baseline_sorted[:,:,conventionalpositions] = matrix[:,:,detectorpositions]
         
     matrix_sorted = np.zeros_like(matrix)
+    
     # Resort the ABCD modulations
     for ib in range(NIN):
         for k in range(Nmod):
