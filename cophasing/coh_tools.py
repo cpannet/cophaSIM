@@ -18,7 +18,7 @@ import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 
-from mypackage.tol_colors import tol_cset # colorblind-friendly library
+from .tol_colors import tol_cset # colorblind-riendly and contrastful library
 import matplotlib.patches as mpatches
 
 from astropy.io import fits

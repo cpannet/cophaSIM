@@ -2,13 +2,13 @@
 
 from setuptools import setup, find_packages
 
-setup(name='coh_lib',
+setup(name='cophasing',
       version='0.1',
       description='Fringe tracking simulator',
-      url='http://github.com/cpannet/coh_pack',
+      url='https://gitlab.oca.eu/cpannetier/fringetracker.git',
       author='Cyril Pannetier',
       author_email='cyril@cpannetier.fr',
       license='',
-      install_requires=['matplotlib','numpy','scipy','astropy'],
+      install_requires=['matplotlib','numpy','scipy','astropy','pandas','sympy'],
       packages=find_packages(),
       zip_safe=False)
