@@ -8,19 +8,15 @@ import numpy as np
 # import cupy as cp # NumPy-equivalent module accelerated with NVIDIA GPU  
 
 import matplotlib.pyplot as plt
-from scipy import interpolate 
-import pandas as pd
-from importlib import import_module
+
 from importlib import reload  # Python 3.4+ only.
-import datetime
 
 from . import coh_tools
 from . import config
 
 from astropy.io import fits
 
-from .FS_DEFAULT import *
-from .decorators import *
+from .decorators import timer
 
 
 # Change the display font
@@ -35,7 +31,7 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, N
              noise=False,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
              seedph=100, seedron=100, seeddist=100,
              starttracking=100, latencytime=0,
-             start_at_zero=True,
+             start_at_zero=True,display=False,
              **kwargs):
     
     """
@@ -97,15 +93,15 @@ SOURCE:
     with fits.open(filepath) as hdu:
         ArrayParams = hdu[0].header
         NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
-        TelData = hdu[1].data
-        BaseData = hdu[2].data
+        # TelData = hdu[1].data
+        # BaseData = hdu[2].data
         
-        TelNames = TelData['TelNames']
-        TelCoordinates = TelData['TelCoordinates']
-        TelTransmissions = TelData['TelTransmissions']
-        TelSurfaces = TelData['TelSurfaces']
-        BaseNames = BaseData['BaseNames']
-        BaseCoordinates = BaseData['BaseCoordinates']
+        # TelNames = TelData['TelNames']
+        # TelCoordinates = TelData['TelCoordinates']
+        # TelTransmissions = TelData['TelTransmissions']
+        # TelSurfaces = TelData['TelSurfaces']
+        # BaseNames = BaseData['BaseNames']
+        # BaseCoordinates = BaseData['BaseCoordinates']
         
         
     # Redundant number of baselines
@@ -114,7 +110,7 @@ SOURCE:
     # Non-redundant number of Closure Phase
     NC = int((NA-2)*(NA-1))
    
-    NP = config.FS['NP']
+    # NP = config.FS['NP']
     
 # TEMPORAL PARAMETERS
     
@@ -325,7 +321,7 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
     with fits.open(InterferometerFile) as hdu:
         ArrayParams = hdu[0].header
         NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
-        ArrayName = ArrayParams['NAME']
+        # ArrayName = ArrayParams['NAME']
         # TelData = hdu[1].data
         BaseData = hdu[2].data
         
@@ -334,17 +330,17 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         # BaseNames = BaseData['BaseNames']
         BaseCoordinates = BaseData['BaseCoordinates']
     
-    NB = NA**2
+    # NB = NA**2
     NW = len(spectra)
     Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
     
-    if not RefLambda:
-        RefLmbda = np.mean(spectra)
+    # if not RefLambda:
+    #     RefLmbda = np.mean(spectra)
     
     obstime = NT*dt                     # Observation time [ms]
     timestamps = np.arange(NT)*dt        # Time sampling [ms]
     
-    lmbdamin = 1/np.max(spectra)
+    # lmbdamin = 1/np.max(spectra)
     
 # =============================================================================
 #     PISTON DISTURBANCE
@@ -408,9 +404,9 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             rmsPiston = rmsOPD/np.sqrt(2)
             freq = np.fft.fftshift(np.fft.fftfreq(NT,d=dt*1e-3))
             freqfft=freq
-            Fc = 100            # Maximal frequency of the atmosphere
+            # Fc = 100            # Maximal frequency of the atmosphere
             Fmax = np.max(freq)
-            Nc = int(Fc*NT/2/Fmax)
+            # Nc = int(Fc*NT/2/Fmax)
             filtre = np.zeros(NT)
     
             # Atmospheric disturbance from Conan et al 1995
@@ -672,7 +668,7 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
                 
                 newdsp = dsp*filtre
                 
-                var_newdsp = np.sum(newdsp)/Npix
+                # var_newdsp = np.sum(newdsp)/Npix
                 
                 motif0 = np.real(np.fft.ifft(np.fft.ifftshift(newdsp), norm="ortho"))
                 keeptime = (timefft>=0)*(timefft<obstime)
@@ -839,7 +835,7 @@ def loop(*args):
     
     for ia in range(config.NA):
         PhotometryObject = np.abs(CfObj[:,ia*(config.NA+1)])
-        simu.PhotometryDisturbance[:,:,ia] = simu.TransmissionDisturbance[:,:,ia]*PhotometryObject*OW
+        simu.PhotometryDisturbance[:,:,ia] = simu.TransmissionDisturbance[:,:,ia]*PhotometryObject
 
     simu.FTmode[:config.starttracking] = np.zeros(config.starttracking)
 
@@ -882,7 +878,7 @@ def loop(*args):
         checkpoint = int(NT/10)
         if (it%checkpoint == 0) and (it!=0):
             processedfraction = it/NT
-            LeftProcessingTime = (time.time()-time0)*(1-processedfraction)/processedfraction
+            # LeftProcessingTime = (time.time()-time0)*(1-processedfraction)/processedfraction
             print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
 
     
@@ -910,8 +906,8 @@ def loop(*args):
     
     # print(args)
     if len(args):
-        print(f'Saving infos in {filepath}')
         filepath = args[0]
+        print(f'Saving infos in {filepath}')
         
         fileexists = os.path.exists(filepath)
         
@@ -948,23 +944,23 @@ def loop(*args):
     return
         
 
-def SaveSimulation():
+# def SaveSimulation():
     
-    from . import simu
+#     from . import simu
     
-    # infosimu = pd.DataFrame(coh)
+#     # infosimu = pd.DataFrame(coh)
     
-    observables = pd.DataFrame({'timestamp':timestamps,'PistonDisturbance':simu.PistonDisturbance,'pis_res':simu.PistonTrue,'cmd_odl':simu.CommandODL,\
-                               'PD_res':simu.PDResidual,'GD_res':simu.GDResidual,'PDCommand':simu.PDCommand,'GDCommand':simu.GDCommand,\
-                               'rmsPD':rmsPD_,'rmsGD':rmsGD_,\
-                                   'phot_per':simu.TransmissionDisturbance,'phot_est':simu.PhotometryEstimated,'SquaredCoherenceDegree':simu.SquaredCoherenceDegree})
+#     # observables = pd.DataFrame({'timestamp':simu.timestamps,'PistonDisturbance':simu.PistonDisturbance,'pis_res':simu.PistonTrue,'cmd_odl':simu.CommandODL,\
+#     #                            'PD_res':simu.PDResidual,'GD_res':simu.GDResidual,'PDCommand':simu.PDCommand,'GDCommand':simu.GDCommand,\
+#     #                            'rmsPD':simu.rmsPD_,'rmsGD':simu.rmsGD_,\
+#     #                                'phot_per':simu.TransmissionDisturbance,'phot_est':simu.PhotometryEstimated,'SquaredCoherenceDegree':simu.SquaredCoherenceDegree})
     
-    t2 = Table.from_pandas(df)
+#     t2 = Table.from_pandas(df)
     
-    currentDT = datetime.datetime.now()
-    suffix=currentDT.strftime("%Y%m%d%H%M")
+#     currentDT = datetime.datetime.now()
+#     suffix=currentDT.strftime("%Y%m%d%H%M")
     
-    fits.writeto(prefix+suffix,np.array(t2))
+#     fits.writeto(prefix+suffix,np.array(t2))
     
     
         
@@ -992,6 +988,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
           
     import matplotlib.patches as mpatches
     import matplotlib.lines as mlines
+    from cophasing.tol_colors import tol_cset
     
     from . import simu
     # import config
@@ -1023,14 +1020,26 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         print(args)
         displayall = True
         
-    from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,
-                       AutoMinorLocator, MaxNLocator)
+    from matplotlib.ticker import AutoMinorLocator
     
-    colors = ['red','blue','dodgerblue','gold','darkorange','darkgreen','darkviolet','grey','deeppink','black']
+    # Define the list of baselines
+    baselines = []
+    for ia in range(1,7):
+        for iap in range(ia+1,7):
+            baselines.append(f'{ia}{iap}')
+            
+    # Define the list of closures
+    closures = []
+    for iap in range(2,7):
+        for iapp in range(iap+1,7):
+            closures.append(f'{1}{iap}{iapp}')
+    
+    colors = tol_cset('muted')
+    telcolors = tol_cset('bright')
     
     beam_patches = []
     for ia in range(NA):
-        beam_patches.append(mpatches.Patch(color=colors[ia+1],label=f"Telescope {ia+increment}"))
+        beam_patches.append(mpatches.Patch(color=telcolors[ia+1],label=f"Telescope {ia+increment}"))
     
     pis_max = 1.1*np.max(np.abs(simu.PistonDisturbance))
     pis_min = -pis_max
@@ -1045,7 +1054,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         ax1,ax2,ax3 = fig.subplots(nrows=3,ncols=1)
         for ia in range(NA):
             # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-            ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=colors[ia+1])
+            ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia+1])
         
         ax1.set_xlabel('Time (ms)')
         ax1.set_ylabel('Piston [µm]')
@@ -1087,9 +1096,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         
         for ia in range(NA):
             plt.plot(timestamps, simu.PhotometryDisturbance[:,ind,ia],
-                     color=colors[ia],linestyle='dashed')#),label='Photometry disturbances')
+                     color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
             plt.plot(timestamps, simu.PhotometryEstimated[:,ind,ia],
-                     color=colors[ia],linestyle='solid')#,label='Estimated photometries')
+                     color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
             
         plt.vlines(config.starttracking*dt,s[0],s[1],
                    color='k', linestyle='--')
@@ -1129,9 +1138,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         for ia in range(NA):
             
             ax1.plot(timestamps, simu.PistonDisturbance[:,ia]-PistonRef,
-                      color=colors[ia+1],linestyle='dashed')
+                      color=telcolors[ia+1],linestyle='dashed')
             ax2.plot(timestamps, simu.PistonTrue[:,ia]-PistonRef,
-                     color=colors[ia+1],linestyle='solid')
+                     color=telcolors[ia+1],linestyle='solid')
             plt.grid()
         
         ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
@@ -1199,6 +1208,109 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
             config.newfig+=1    
 
 
+    if displayall or ('perftable' in args):
+        
+        SS = 12     # Small size
+        MS = 14     # Medium size
+        BS = 16     # Big size
+        figsize = (16,8)
+        rcParamsForBaselines = {"font.size":SS,
+               "axes.titlesize":SS,
+               "axes.labelsize":MS,
+               "axes.grid":True,
+               
+               "xtick.labelsize":SS,
+               "ytick.labelsize":SS,
+               "legend.fontsize":SS,
+               "figure.titlesize":BS,
+               "figure.constrained_layout.use": False,
+               "figure.figsize":figsize,
+               'figure.subplot.hspace': 0.05,
+               'figure.subplot.wspace': 0,
+               'figure.subplot.left':0.1,
+               'figure.subplot.right':0.95
+               }
+    
+        from mypackage.plot_tools import setaxelim
+        
+        t = simu.timestamps ; timerange = range(NT)
+        # NA=6 ; NIN = 15 ; NC = 10
+        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
+        len2 = NIN//2 ; len1 = NIN-len2
+        
+        basecolors = colors[:len1]+colors[:len2]
+        # basestyles = len1*['solid'] + len2*['dashed']
+        # closurecolors = colors[:NC]
+        
+        R=config.FS['R']
+        
+        GD = simu.GDEstimated ; PD=simu.PDEstimated
+        GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
+        SquaredSNR = simu.SquaredSNRMovingAverage
+        # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
+        
+        
+        start_pd_tracking = 100
+        
+        RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
+        RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+        # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
+        # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
+        
+        
+        
+        plt.rcParams.update(rcParamsForBaselines)
+        title='GD and PD'
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+        fig.suptitle(title)
+        (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+        ax1.set_title("First serie of baselines, from 12 to 25")
+        ax6.set_title("Second serie of baselines, from 26 to 56")
+        
+        for iBase in range(len1):   # First serie
+            ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+            ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+            
+        for iBase in range(len1,NIN):   # Second serie
+            ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+            ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+        
+        
+        ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
+        ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
+        
+        ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
+        ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
+        
+        ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=GDmic)
+        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=RMSgdmic,ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),[wl/5]]),ymin=0)
+        
+        ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
+        ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
+        
+        ax1.set_ylabel('SNR²')
+        ax2.set_ylabel('Group-Delays [µm]')
+        ax3.set_ylabel('Phase-Delays [µm]')
+        ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+        ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+        
+        ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+        
+        ax3.set_xlabel('Frames', labelpad=-10) ; ax8.set_xlabel('Frames', labelpad=-10)
+        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+        # figname = '_'.join(title.split(' ')[:3])
+        # figname = 'GD&PD'
+        # plt.savefig(datasave+f"{figname}.pdf")
+        fig.show()
+
+
     if displayall or ('opd' in args):
         """
         OPD 
@@ -1262,7 +1374,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                 else:
                     ax2.set_yticks([-wl,0,wl])
                 ax.set_ylabel(f'OPD ({ia+1},{iap+1})\n [µm]')
-                ax2.set_ylabel(f'Residual \n [µm]')
+                ax2.set_ylabel('Residual \n [µm]')
                 fig.tight_layout()
                 # wlr = round(wl,2)
                 # ax2.set_yticks([-wl,0,wl])
@@ -1310,7 +1422,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                 iap,iax=0,0
                 for ax,axText,axLegend in axes:
                     ax2 = ax.twinx()
-                    ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated[stationaryregim,:]*wl/(2*np.pi)))
+                    ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated[stationaryregim,:]*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
                     ax2ylim = [-ax2ymax,ax2ymax]
                     if iap == ia:
                         iap+=1
@@ -1341,7 +1453,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                     ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                     
                     ax2.set_ylim(ax2ylim)
-                    ax2.set_ylabel(f'Residuals')
+                    ax2.set_ylabel('Residuals')
                     if ax2ymax > wl:
                         ax2.set_yticks([-ax2ylim[0],-wl,0,wl,ax2ylim[1]])
                     else:
@@ -1396,7 +1508,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                 iap,iax=0,0
                 for ax,axText,axLegend in axes:
                     ax2 = ax.twinx()
-                    ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated*wl/(2*np.pi)))
+                    ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
                     ax2ylim = [-ax2ymax,ax2ymax]
                     if iap == ia:
                         iap+=1
@@ -1429,7 +1541,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                     ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                     
                     ax2.set_ylim(ax2ylim)
-                    ax2.set_ylabel(f'Residuals')
+                    ax2.set_ylabel('Residuals')
                     ax2.set_yticks([-wl,0,wl])
 
                     axText.text(0,0.70,f"PD:{np.std(simu.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
@@ -1653,13 +1765,13 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
 
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
-        ylim=[1e-1,np.max(simu.SNRMovingAverage[:,ib])]
+        ylim=[1e-1,np.max(simu.SquaredSNRMovingAverage[:,ib])]
         # State-Machine and SNR
-        fig = plt.figure("SNR")
-        fig.suptitle("SNR and State-Machine")
+        fig = plt.figure("SNR²")
+        fig.suptitle("SNR² and State-Machine")
         ax,ax2 = fig.subplots(nrows=2,ncols=1, sharex=True)
         for ib in range(NIN):
-            ax.plot(timestamps, simu.SNRMovingAverage[:,ib],
+            ax.plot(timestamps, simu.SquaredSNRMovingAverage[:,ib],
                     label=f"{ich[ib]}")
         ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
                   linestyle='--',label='Threshold GD')
@@ -1717,6 +1829,8 @@ WavelengthOfInterest
     """
     from . import simu
     from . import config
+    
+    ich = config.FS['ich']
     
     from .config import NIN,dt,NT
     
@@ -2294,7 +2408,7 @@ Ngd={Ngd} ; Type={config.FT['Name']} \n\ ***")
     currPD, currGD = ReadCf(currCfEstimated)
     
     simu.PDEstimated[it] = currPD
-    simu.GDEstimated[it] = currGD*config.FS['R']
+    simu.GDEstimated[it] = currGD#*config.FS['R']
     
     currCmd = SimpleCommandCalc(currPD,currGD)
     
@@ -2322,7 +2436,7 @@ def SimpleCommandCalc(currPD,currGD):
     
     from . import simu
     
-    from .config import NA,NB,NIN
+    from .config import NA,NIN
     from .config import FT
     
     it = simu.it            # Frame number
@@ -2489,27 +2603,29 @@ def addnoise(inPhotons):
 
     """
     
-    from .config import ron, G, enf, qe,MW
+    from .config import ron, enf, qe
     from .simu import it
     
     (seedph, seedron) = (config.seedph+1,config.seedron+1)
     
-    # Add SHOT noise
+    # Add SHOT noise (in the space of photons)
     rs = np.random.RandomState(seedph*it)
     photons = rs.poisson(inPhotons/enf, size=inPhotons.shape)*enf
     
+    # Converts photons to electrons
     electrons = photons*qe  # Works when qe is float and when qe is array of length MW
     
-    # Add DARK noise.
+    # Add DARK noise: here we assume DARK noise is only readout noise, so dark current is null.
+    # That's why it can be modelised as a Gaussian noise.
     rs = np.random.RandomState(seedron*it)
-    ron = rs.normal(scale=ron, size=electrons.shape) + electrons
+    electrons_with_darknoise = electrons + rs.normal(scale=ron, size=electrons.shape)
         
     # Quantify ADU
     # ronADU = ron*G
     # roundADU = np.round(ronADU)
-    # quantifiedphotons = roundADU/G/qe
+    # electrons_with_darknoise_and_quantification = roundADU/G
     
-    outPhotons = ron/qe
+    outPhotons = electrons_with_darknoise/qe
     
     return outPhotons
 

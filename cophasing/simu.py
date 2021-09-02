@@ -49,8 +49,8 @@ ClosurePhaseGD = np.zeros([NT,NC])              # GD closure phase
 OPDTrue = np.zeros([NT,NIN])                    # True Optical Path Delay
 OPDDisturbance = np.zeros([NT,NIN])             # OPD-space disturbance
 PDEstimated = np.zeros([NT,NIN])                # Estimated baselines PD [rad]
-varPD = np.zeros([NT,NIN])                      # Estimated "PD variance" = 1/SNR**2
-SNRMovingAverage = np.zeros([NT,NIN])           # Estimated SNR
+varPD = np.zeros([NT,NIN])                      # Estimated "PD variance" = 1/SNR²
+SquaredSNRMovingAverage = np.zeros([NT,NIN])    # Estimated SNR² averaged over N dit
 TemporalVariancePD = np.zeros([NT,NIN])         # Temporal Variance PD estimator
 TemporalVarianceGD = np.zeros([NT,NIN])         # Temporal Variance GD estimator
 GDEstimated = np.zeros([NT,NIN])                # Estimated baselines GD [rad]
@@ -116,7 +116,7 @@ VarCGD =np.zeros([NC])
 
 # Investigation Variables
 
-SNRMovingAverage2 = np.zeros([NT,NIN])           # Estimated SNR
+SquaredSNRMovingAverage2 = np.zeros([NT,NIN])           # Estimated SNR
 varPDnum = np.zeros([NT,NIN])
 varPDnum2 = np.zeros([NT,NIN])
 varPDdenom = np.zeros([NT,NIN])

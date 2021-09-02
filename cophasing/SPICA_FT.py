@@ -198,7 +198,7 @@ def SPICAFT(*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=
     currPD, currGD = ReadCf(currCfEstimated)
     
     simu.PDEstimated[it] = currPD
-    simu.GDEstimated[it] = currGD*config.FS['R']
+    simu.GDEstimated[it] = currGD#
     
     currCmd = CommandCalc(currPD, currGD)
     
@@ -434,13 +434,13 @@ def CommandCalc(currPD,currGD):
         # Raw Weighting matrix in the OPD-space
         
         timerange = range(it+1-Ngd, it+1)
-        simu.SNRMovingAverage[it] = 1/np.mean(simu.varPD[timerange], axis=0)
-        simu.SNRMovingAverage2[it] = 1/np.mean(simu.varPD2[timerange], axis=0)
+        simu.SquaredSNRMovingAverage[it] = 1/np.mean(simu.varPD[timerange], axis=0)
+        simu.SquaredSNRMovingAverage2[it] = 1/np.mean(simu.varPD2[timerange], axis=0)
         
         simu.TemporalVariancePD[it] = np.var(simu.PDEstimated[timerange], axis=0)
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
         
-        reliablebaselines = (simu.SNRMovingAverage[it,:] >= FT['ThresholdGD']**2)
+        reliablebaselines = (simu.SquaredSNRMovingAverage[it,:] >= FT['ThresholdGD']**2)
         
         Wdiag=np.zeros(NIN)
         Wdiag[reliablebaselines] = 1/varcurrPD[reliablebaselines]
@@ -766,12 +766,12 @@ def getvar():
             CohFlux[:,ib] = np.mean(simu.CfPD[timerange,:,ib], axis=0)
     
     simu.varNum2[it] = varNum2
-    simu.varPDnum[it] = np.sum(varNum,axis=0)
-    simu.varPDnum2[it] = np.sum(varNum2, axis=0)
-    simu.varPDdenom[it] = 2*np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)
+    simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
+    simu.varPDnum2[it] = np.sum(varNum2, axis=0)/2  # Sum over lmbdas of Variance of |CohFlux| taking into account the covariance
+    simu.varPDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|²
     
-    simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]
-    simu.varPD2[it] = simu.varPDnum2[it]/simu.varPDdenom[it]
+    simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
+    simu.varPD2[it] = simu.varPDnum2[it]/simu.varPDdenom[it]    # Var(|CohFlux|)/|CohFlux|²
     
     varPD = simu.varPD[it]
     
