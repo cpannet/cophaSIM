@@ -342,6 +342,90 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
     
     # lmbdamin = 1/np.max(spectra)
     
+    
+# =============================================================================
+#       TRANSMISSION DISTURBANCE
+# =============================================================================
+
+    TransmissionDisturbance = np.ones([NT,NW,NA])
+
+    if TransDisturb:        # TransDisturb not empty
+    
+        typeinfo = TransDisturb['type'] # can be "sample" or "manual"
+        if typeinfo == "sample":
+            TransmissionDisturbance = TransDisturb['values']
+            
+        elif typeinfo == "manual":  # Format: TransDisturb['TELi']=[[time, duration, amplitude],...]
+            for telescope in TransDisturb['tels']:
+                itel = telescope-1
+                tab = TransDisturb[f'TEL{telescope}']
+                Nevents = np.shape(tab)[0]
+                for ievent in range(Nevents):
+                    tstart, duration, amplitude = tab[ievent]
+                    istart = tstart//dt ; idur = duration//dt
+                    TransmissionDisturbance[istart:istart+idur+1,:,itel] = amplitude
+                    
+        elif typeinfo == "fileMIRCx":
+            
+            file = TransDisturb["file"]
+            d=fits.open(file) 
+            p=d['PHOTOMETRY'].data
+            
+#             print("A file for the photometries has been given. It defines the spectral sampling of \
+# the DisturbanceFile.")
+            filespectra = d['WAVELENGTH'].data
+            NWfile = len(spectra)
+            
+            
+            
+            filespectra[-1]
+            
+            
+            Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
+            
+            
+            NT1,NT2,NWfile,NAfile = p.shape     # MIRCx data have a particular shape due to the camera reading mode
+            inj = np.reshape(p[:,:,:,:],[NT1*NT2,NWfile,NAfile], order='C')
+            inj = inj - np.min(inj)         # Because there are negative values
+            inj = inj/np.max(inj)
+            print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
+            NTfile = NT1*NT2
+            
+            if NTfile < NT:
+                TransmissionDisturbance = repeat_sequence(inj, NT)
+            else:
+                TransmissionDisturbance = inj
+            
+            print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
+Longueur timestamps: {len(timestamps)}")
+            
+            # # inj = p[:, :, 0, 0].ravel()
+            # NTfile = len(inj)
+            # timestampsfile = TransDisturb["timestamps"]
+            # sequence = inj
+            
+            # if timestampsfile[-1] <= timestamps[-1]:
+            #     newtimestamps = timestampsfile
+            #     dtfile = timestampsfile[1] - timestampsfile[0]
+                
+            #     if timestampsfile[0] == 0:
+            #         while newtimestamps[-1] <= timestamps[-1]:
+            #             sequence = np.concatenate([sequence,inj])
+            #             newtimestamps = np.concatenate([newtimestamps, newtimestamps+newtimestamps[-1]+dtfile])
+            #     else:
+            #         while newtimestamps[-1] <= timestamps[-1]:
+            #             sequence = np.concatenate([sequence,inj])
+            #             newtimestamps = np.concatenate([newtimestamps, newtimestamps+newtimestamps[-1]])
+            #     timestampsfile = newtimestamps     
+                        
+            # for ia in range(NA):
+            #     istart = np.random.randint(NTfile)      # Take a random position among all available
+            #     sequence = np.concatenate([sequence[istart:],sequence[:istart]])
+            #     sequence = np.reshape(np.repeat(sequence[:,np.newaxis],NW,1),[NT,NW])
+            #     TransmissionDisturbance[:,:,ia] = sequence
+    
+    
+    
 # =============================================================================
 #     PISTON DISTURBANCE
 # =============================================================================
@@ -707,27 +791,7 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         # PistonDisturbance[:startframe] = np.zeros([startframe,NA])
 
 
-# =============================================================================
-#       TRANSMISSION DISTURBANCE
-# =============================================================================
 
-    TransmissionDisturbance = np.ones([NT,NW,NA])
-
-    if TransDisturb:        # TransDisturb not empty
-        
-        typeinfo = TransDisturb['type'] # can be "sample" or "manual"
-        if typeinfo == "sample":
-            TransmissionDisturbance = TransDisturb['values']
-            
-        elif typeinfo == "manual":  # Format: TransDisturb['TELi']=[[time, duration, amplitude],...]
-            for telescope in TransDisturb['tels']:
-                itel = telescope-1
-                tab = TransDisturb[f'TEL{telescope}']
-                Nevents = np.shape(tab)[0]
-                for ievent in range(Nevents):
-                    tstart, duration, amplitude = tab[ievent]
-                    istart = tstart//dt ; idur = duration//dt
-                    TransmissionDisturbance[istart:istart+idur+1,:,itel] = amplitude
 
     if debug:
         return CoherentFlux, PistonDisturbance, TransmissionDisturbance
@@ -2711,3 +2775,22 @@ def coh__matcoher2real(NA, *args):
 
 
 
+def repeat_sequence(sequence, newNT):
+    NT = len(sequence)
+    if NT > newNT:
+        print(f"The given sequence is longer than the desired length, we take only the {newNT} elements.")
+        newseq = sequence[:newNT]
+    elif NT==newNT:
+        print("The given sequence already has the desired length, we return the sequence without any modification.")
+        newseq = sequence
+    else:
+        IntRepetitions, NumberOfRemainingElements = newNT//NT, newNT%NT
+        newseq = sequence
+        if NumberOfRemainingElements == 0:
+            for i in range(IntRepetitions-1):
+                newseq = np.concatenate([newseq,sequence])
+        else:
+            for i in range(IntRepetitions-1):
+                newseq = np.concatenate([newseq,sequence])
+            newseq = np.concatenate([newseq,sequence[:NumberOfRemainingElements]])
+    return newseq
