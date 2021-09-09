@@ -1062,7 +1062,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
     ind = np.argmin(np.abs(config.spectraM-wl))
     wl = config.spectraM[ind]
     
-    from .config import NA,NT,NIN
+    from .config import NA,NT,NIN,OW
        
     ich = config.FS['ich']
     
@@ -1105,14 +1105,11 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
     for ia in range(NA):
         beam_patches.append(mpatches.Patch(color=telcolors[ia+1],label=f"Telescope {ia+increment}"))
     
-    pis_max = 1.1*np.max(np.abs(simu.PistonDisturbance))
+    pis_max = 1.1*np.max([np.max(np.abs(simu.PistonDisturbance)),wl/2])
     pis_min = -pis_max
     ylim = [pis_min,pis_max]
     
     if displayall or ('disturbances' in args):
-        pis_max = 1.1*np.max(np.abs(simu.PistonDisturbance))
-        pis_min = -pis_max
-        ylim = [pis_min,pis_max]
         
         fig = plt.figure("Disturbances")
         ax1,ax2,ax3 = fig.subplots(nrows=3,ncols=1)
@@ -1159,7 +1156,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         plt.suptitle('Photometries at {:.2f}µm'.format(wl))
         
         for ia in range(NA):
-            plt.plot(timestamps, simu.PhotometryDisturbance[:,ind,ia],
+            plt.plot(timestamps, np.sum(simu.PhotometryDisturbance[:,OW*ind:OW*(ind+1),ia],axis=1),
                      color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
             plt.plot(timestamps, simu.PhotometryEstimated[:,ind,ia],
                      color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
