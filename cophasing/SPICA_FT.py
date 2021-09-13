@@ -244,15 +244,15 @@ def ReadCf(currCfEstimated):
     for ia in range(NA):
         PhotEst[:,ia] = np.real(currCfEstimated[:,ia*(NA+1)])
     
+    # Save coherent flux and photometries in stack
+    simu.PhotometryEstimated[it] = PhotEst
+    
     # Extract NIN-sized coherence vector from NB-sized one. 
     # (eliminates photometric and conjugate terms)
     currCfEstimatedNIN = np.zeros([MW, NIN])*1j
     for imw in range(MW):    
         currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
         
-    # Save coherent flux and photometries in stack
-    simu.PhotometryEstimated[it] = PhotEst
-    
     """
     Visibilities extraction
     [NT,MW,NIN]

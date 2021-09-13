@@ -935,7 +935,7 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
     CfDisturbance = np.zeros([NT,NW,NB])*1j
     from cophasing import skeleton
     for it in range(NT):
-        CfDisturbance[it,:,:] = skeleton.coh__pis2coh(PistonDisturbance[it,:], 1/spectra, ampl=TransmissionDisturbance[it,:])
+        CfDisturbance[it,:,:] = skeleton.coh__pis2coh(PistonDisturbance[it,:], 1/spectra, ampl=np.sqrt(TransmissionDisturbance[it,:]))
 
 
     return CfDisturbance, PistonDisturbance, TransmissionDisturbance
@@ -1719,10 +1719,9 @@ def studyP2VM(nfig=0):
     
     
     # ax1.set_ylabel("Phase [rad]")
-    ax1.set_ylabel("Transmission")
-    
-    # ax2.bar_label(rects4, label_type='center')
-    
+    ax1.set_ylabel("Transmission \n[% of the beam photometry]")
+    ax2.set_ylabel("Transmission \n[% of the beam photometry]")
+
     fig.show()
     
         

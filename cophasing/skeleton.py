@@ -356,14 +356,16 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             TransmissionDisturbance = TransDisturb['values']
             
         elif typeinfo == "manual":  # Format: TransDisturb['TELi']=[[time, duration, amplitude],...]
-            for telescope in TransDisturb['tels']:
-                itel = telescope-1
-                tab = TransDisturb[f'TEL{telescope}']
-                Nevents = np.shape(tab)[0]
-                for ievent in range(Nevents):
-                    tstart, duration, amplitude = tab[ievent]
-                    istart = tstart//dt ; idur = duration//dt
-                    TransmissionDisturbance[istart:istart+idur+1,:,itel] = amplitude
+            for itel in range(1,NA+1):
+                if f'TEL{itel}' not in TransDisturb.keys():
+                    pass
+                else:
+                    tab = TransDisturb[f'TEL{itel}']
+                    Nevents = np.shape(tab)[0]
+                    for ievent in range(Nevents):
+                        tstart, duration, amplitude = tab[ievent]
+                        istart = tstart//dt ; idur = duration//dt
+                        TransmissionDisturbance[istart:istart+idur+1,:,itel-1] = amplitude
                     
         elif typeinfo == "fileMIRCx":
             
@@ -1157,9 +1159,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         
         for ia in range(NA):
             plt.plot(timestamps, np.sum(simu.PhotometryDisturbance[:,OW*ind:OW*(ind+1),ia],axis=1),
-                     color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
+                     color=telcolors[ia+1],linestyle='dashed')#),label='Photometry disturbances')
             plt.plot(timestamps, simu.PhotometryEstimated[:,ind,ia],
-                     color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
+                     color=telcolors[ia+1],linestyle='solid')#,label='Estimated photometries')
             
         plt.vlines(config.starttracking*dt,s[0],s[1],
                    color='k', linestyle='--')
