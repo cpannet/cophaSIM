@@ -330,10 +330,6 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         # BaseNames = BaseData['BaseNames']
         BaseCoordinates = BaseData['BaseCoordinates']
     
-    # NB = NA**2
-    NW = len(spectra)
-    Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
-    
     # if not RefLambda:
     #     RefLmbda = np.mean(spectra)
     
@@ -347,8 +343,6 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
 #       TRANSMISSION DISTURBANCE
 # =============================================================================
 
-    TransmissionDisturbance = np.ones([NT,NW,NA])
-
     if TransDisturb:        # TransDisturb not empty
     
         typeinfo = TransDisturb['type'] # can be "sample" or "manual"
@@ -356,6 +350,11 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             TransmissionDisturbance = TransDisturb['values']
             
         elif typeinfo == "manual":  # Format: TransDisturb['TELi']=[[time, duration, amplitude],...]
+            
+            NW = len(spectra)
+            Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
+            TransmissionDisturbance = np.ones([NT,NW,NA])
+            
             for itel in range(1,NA+1):
                 if f'TEL{itel}' not in TransDisturb.keys():
                     pass
@@ -370,24 +369,19 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         elif typeinfo == "fileMIRCx":
             
             file = TransDisturb["file"]
-            d=fits.open(file) 
-            p=d['PHOTOMETRY'].data
+            hdu=fits.open(file) 
+            p=hdu['PHOTOMETRY'].data
             
 #             print("A file for the photometries has been given. It defines the spectral sampling of \
 # the DisturbanceFile.")
-            filespectra = d['WAVELENGTH'].data
-            NWfile = len(spectra)
-            
-            
-            
-            filespectra[-1]
-            
-            
+            spectra = hdu['WAVELENGTH'].data
+            NW = len(spectra)
             Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
+    
+            TransmissionDisturbance = np.ones([NT,NW,NA])
             
-            
-            NT1,NT2,NWfile,NAfile = p.shape     # MIRCx data have a particular shape due to the camera reading mode
-            inj = np.reshape(p[:,:,:,:],[NT1*NT2,NWfile,NAfile], order='C')
+            NT1,NT2,NW,NAfile = p.shape     # MIRCx data have a particular shape due to the camera reading mode
+            inj = np.reshape(p[:,:,:,:],[NT1*NT2,NW,NAfile], order='C')
             inj = inj - np.min(inj)         # Because there are negative values
             inj = inj/np.max(inj)
             print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
@@ -426,7 +420,47 @@ Longueur timestamps: {len(timestamps)}")
             #     sequence = np.reshape(np.repeat(sequence[:,np.newaxis],NW,1),[NT,NW])
             #     TransmissionDisturbance[:,:,ia] = sequence
     
+        elif typeinfo == "both":
+            
+            file = TransDisturb["file"]
+            hdu=fits.open(file) 
+            p=hdu['PHOTOMETRY'].data
+            
+#             print("A file for the photometries has been given. It defines the spectral sampling of \
+# the DisturbanceFile.")
+            spectra = hdu['WAVELENGTH'].data
+            NW = len(spectra)
+            Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
     
+            TransmissionDisturbance = np.ones([NT,NW,NA])
+            
+            NT1,NT2,NW,NAfile = p.shape     # MIRCx data have a particular shape due to the camera reading mode
+            inj = np.reshape(p[:,:,:,:],[NT1*NT2,NW,NAfile], order='C')
+            inj = inj - np.min(inj)         # Because there are negative values
+            inj = inj/np.max(inj)
+            print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
+            NTfile = NT1*NT2
+            
+            if NTfile < NT:
+                TransmissionDisturbance = repeat_sequence(inj, NT)
+            else:
+                TransmissionDisturbance = inj
+            
+            print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
+Longueur timestamps: {len(timestamps)}")
+            
+            
+            for itel in range(1,NA+1):
+                if f'TEL{itel}' not in TransDisturb.keys():
+                    pass
+                else:
+                    tab = TransDisturb[f'TEL{itel}']
+                    Nevents = np.shape(tab)[0]
+                    for ievent in range(Nevents):
+                        tstart, duration, amplitude = tab[ievent]
+                        istart = tstart//dt ; idur = duration//dt
+                        TransmissionDisturbance[istart:istart+idur+1,:,itel-1] *= amplitude
+
     
 # =============================================================================
 #     PISTON DISTURBANCE
@@ -1379,9 +1413,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         OPD 
         """
         
-        OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
+        OPD_max = 1.1*np.max([np.max(np.abs([simu.OPDDisturbance,
                               simu.OPDTrue,
-                              simu.OPDCommand[:-config.latency,:]]))
+                              simu.OPDCommand[:-config.latency,:]])),wl/2])
         OPD_min = -OPD_max
         ylim = [OPD_min,OPD_max]
     
@@ -1404,9 +1438,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
             iap,iax=0,0
             for ax,axText in axes:
                 ax2 = ax.twinx()
-                ax2ymax = 1.1*np.max(np.abs(simu.OPDTrue[stationaryregim]))
+                ax2ymax = 1.1*np.max([np.max(np.abs(simu.OPDTrue[stationaryregim])),wl/2])
                 ax2ylim = [-ax2ymax,ax2ymax]
-                # ax2ylim = [-wl/2,wl/2]
+                
                 if iap == ia:
                     iap+=1
                 if ia < iap:
@@ -1705,8 +1739,6 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         plt.ylabel('Closure Phase [rad]')
         ax1.set_ylim(ylim)
         ax2.set_ylim(ylim)
-        ax1.grid()
-        ax2.grid()
         plt.show()
         plt.legend(handles=linestyles)
         config.newfig+=1
@@ -1734,8 +1766,6 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                 ax.plot(timestamps, np.abs(simu.VisibilityTrue[:,ind,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
-    
-                ax.grid()
                 iap += 1
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
                        color='k', linestyle='--')
@@ -1767,7 +1797,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                 ax.plot(timestamps, np.angle(simu.VisibilityTrue[:,ind,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
-                ax.grid()
+                
                 iap += 1
                 fig.subplots_adjust(right=0.8)
                 RMS_ax = fig.add_axes([0.82, 1-1/NA*(iax+1), 0.1, 0.9/NA])
@@ -1854,7 +1884,6 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         ax2.set_ylabel("Rank of Igd")
         ax2.set_xlabel('Time (ms)')
         ax2.legend()
-        ax2.grid()
         ax.legend()
         plt.show()
         config.newfig+=1

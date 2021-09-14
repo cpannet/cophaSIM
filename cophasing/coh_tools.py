@@ -915,14 +915,14 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
     # Interpolate on the time axis   
     newobservables = []
     for observable in [PistonDisturbance, TransmissionDisturbance]:
-        f = interpolate.interp1d(filetimestamps,observable, axis=0, fill_value='extrapolate')
+        f = interpolate.interp1d(filetimestamps,observable, axis=0, bounds_error=False, fill_value=(observable[0],observable[-1]))
         newobservables.append(f(timestamps))
         
     
     PistonDisturbance, TempTransmissionDisturbance = newobservables
     
     # Interpolate transmission on the spectral axis (Piston is not chromatic)    
-    f = interpolate.interp1d(filespectra*1e6,TempTransmissionDisturbance, axis=1, fill_value='extrapolate')
+    f = interpolate.interp1d(filespectra*1e6,TempTransmissionDisturbance, axis=1, bounds_error=False,fill_value=(TempTransmissionDisturbance[:,0,:],TempTransmissionDisturbance[:,-1,:]))
     TransmissionDisturbance = np.abs(f(spectra))
     
     NT = len(timestamps) ; NW = len(spectra)
