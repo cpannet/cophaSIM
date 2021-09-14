@@ -249,7 +249,7 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
                             f_fin=200, value_start=0, value_end=0,
                             r0=0.15,t0=10, L0=25, direction=0, d=1,
                             Levents=[],
-                            TransDisturb=[],
+                            TransDisturb={}, PhaseJumps={},
                             debug=False, tel=0, highCF=True,pows=[],**kwargs):
     '''
     CREATES or LOAD a disturbance scheme INTO or FROM a FITSFILE.
@@ -342,7 +342,9 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
 # =============================================================================
 #       TRANSMISSION DISTURBANCE
 # =============================================================================
-
+    NW=len(spectra)
+    TransmissionDisturbance = np.ones([NT,NW,NA])
+    
     if TransDisturb:        # TransDisturb not empty
     
         typeinfo = TransDisturb['type'] # can be "sample" or "manual"
@@ -352,7 +354,6 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         elif typeinfo == "manual":  # Format: TransDisturb['TELi']=[[time, duration, amplitude],...]
             
             NW = len(spectra)
-            Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
             TransmissionDisturbance = np.ones([NT,NW,NA])
             
             for itel in range(1,NA+1):
@@ -371,13 +372,9 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             file = TransDisturb["file"]
             hdu=fits.open(file) 
             p=hdu['PHOTOMETRY'].data
-            
-#             print("A file for the photometries has been given. It defines the spectral sampling of \
-# the DisturbanceFile.")
+
             spectra = hdu['WAVELENGTH'].data
             NW = len(spectra)
-            Lc = np.abs(1/(spectra[0]-spectra[1]))      # Coherence length
-    
             TransmissionDisturbance = np.ones([NT,NW,NA])
             
             NT1,NT2,NW,NAfile = p.shape     # MIRCx data have a particular shape due to the camera reading mode
@@ -827,8 +824,23 @@ Longueur timestamps: {len(timestamps)}")
         # PistonDisturbance[:startframe] = np.zeros([startframe,NA])
 
 
-
-
+    if PhaseJumps:
+        
+        for itel in range(1,NA+1):
+            if f'TEL{itel}' not in PhaseJumps.keys():
+                pass
+            else:
+                tab = PhaseJumps[f'TEL{itel}']
+                Nevents = np.shape(tab)[0]
+                for ievent in range(Nevents):
+                    tstart, duration, piston_jump = tab[ievent]
+                    istart = tstart//dt; idur = duration//dt
+                    
+                    if idur:
+                        PistonDisturbance[istart:istart+idur+1,itel-1] += piston_jump
+                    else:
+                        PistonDisturbance[istart:,itel-1] += piston_jump
+                    
     if debug:
         return CoherentFlux, PistonDisturbance, TransmissionDisturbance
     
