@@ -189,6 +189,94 @@ Input:{photometries}\n\
 # Input:{visibilities}\n\
 # Output:{visibilities_chck2}")
 
+        
+        print("- Test MIRCxFS")
+        
+        from cophasing.MIRCx_FS import MIRCxFS
+        MIRCxFS(init=True, spectra=spectra, spectraM=spectraM)
+        
+        datadir = 'C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/'
+        CHARAfile = datadir+'interferometers/CHARAinterferometerH.fits'
+        ObservationFile = datadir+'observations/CHARA/Unresolved_mag3.fits'
+        datadir2 = "C:/Users/cpannetier/Documents/These/FringeTracking/Python/Simulations/data/disturbances/NoDisturbances/"
+        DisturbanceFile = datadir2+'NoDisturbances.fits'    # Realistic disturbance
+
+        sk.initialize(CHARAfile, ObservationFile, DisturbanceFile,
+                      spectra=spectra, spectraM=spectraM,qe=1.)
+        
+        from cophasing import simu
+        importlib.reload(simu)
+        
+        photometries0 = np.array([1,1,1,1,1,1])*1000
+        photometries = np.repeat(photometries0[np.newaxis,:],NW,0)
+        photometriesMacro = np.repeat(photometries0[np.newaxis,:],MW,0)*OW
+        
+        visibilities = np.ones(15)+0j
+        visibilities = np.repeat(visibilities[np.newaxis,:],NW,0)
+        coher = np.zeros([NW,36])*1j
+        for ia in range(6):
+            coher[:,ia*(6+1)] = photometries[:,ia]
+            for iap in range(ia+1,6):
+                coher[:,ia*6+iap] = np.sqrt(photometries[:,ia]*photometries[:,iap])*visibilities[:,ct.posk(ia,iap,6)]
+                coher[:,iap*6+ia] = np.conjugate(coher[:,ia*6+iap])
+        
+        
+        Demodulation = config.FS['MacroP2VM']
+        Modulation = config.FS['V2PM']
+        
+        MW,NB,NP = np.shape(Demodulation)
+        MacroImages = np.zeros([MW,NP])
+        MicroImages = np.zeros([NW,NP]) ; coher_chck_nw = np.zeros([NW,NB])+0j
+        iow=0;imw=0
+        for iw in range(config.NW):
+            
+            Modulation = config.FS['V2PM'][iw,:,:]
+            image_iw = np.real(np.dot(Modulation,coher[iw,:]))
+            self.assertTrue(np.min(image_iw)>=0)
+            MacroImages[imw,:] += image_iw
+            MicroImages[iw,:] = image_iw
+            
+            coher_chck_nw[iw,:] = np.dot(config.FS['P2VM'][iw,:],image_iw)
+            iow += 1
+            if iow == OW:
+                imw+=1
+                iow = 0      
+                
+        coher_chck = np.zeros([MW,NB])+0j
+        for imw in range(MW):
+            coher_chck[imw,:] = np.dot(Demodulation[imw,:],MacroImages[imw,:])
+        
+        photometries_chck = np.transpose([coher_chck[:,ia*(6+1)] for ia in range(6)])
+        photometries_chck_nw = np.transpose([coher_chck_nw[:,ia*(6+1)] for ia in range(6)])
+        
+#         self.assertTrue(np.abs(np.sum(photometries)-np.sum(photometries_chck))<1e-5, f"Input Photometries: {photometries[0]} \n\
+# Output photometries: {photometries_chck[0]}")
+#         self.assertTrue(np.linalg.norm(photometriesMacro-photometries_chck)<1e-5,f"{np.linalg.norm(photometriesMacro-photometries_chck)}")
+#         self.assertTrue(np.linalg.norm(coher) - np.linalg.norm(coher_chck_nw)<1e-5, f"The micro demodulation doesn't conserve energy")
+        
+        coher2 = MIRCxFS(coher)
+
+        photometries_chck2 = np.transpose([coher2[:,ia*(6+1)] for ia in range(6)])
+        visibilities_chck2 = np.zeros([MW,15])*1j
+        for ia in range(6):
+            for iap in range(6):
+                if ia!=iap:
+                    visibilities_chck2[:,ct.posk(ia,iap,6)]  = coher2[:,ia*6+iap]/(np.sqrt(photometries_chck2[:,ia]*photometries_chck2[:,iap]))
+        
+        self.assertTrue(np.abs(np.sum(photometries)-np.sum(photometries_chck))<1e-5, f"Input Photometries: {photometries[0]} \n\
+# Output photometries: {photometries_chck2[0]}")
+        self.assertTrue(np.abs(np.sum(coher)-np.sum(coher2))<1e5, f"Energy input: {np.sum(coher)} \n\
+Energy output {np.sum(coher2)}")
+        self.assertTrue(np.linalg.norm(photometriesMacro-photometries_chck2)<1e-5,f"The estimation of photometries is not correct: \n\
+Input:{photometries}\n\
+# Output:{photometries_chck2}")
+#         self.assertTrue(np.linalg.norm(visibilities-visibilities_chck2)<1e-5,f"The estimation of coherences is not correct: \n\
+# Input:{visibilities}\n\
+# Output:{visibilities_chck2}")
+
+
+
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(TestStringMethods)

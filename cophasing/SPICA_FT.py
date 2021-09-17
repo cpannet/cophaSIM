@@ -34,7 +34,7 @@ def SPICAFT(*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=
             CPref=True, Ncp = 300, Nvar = 5,
             ThresholdGD=2, ThresholdPD = 1.5, 
             Threshold=True, usePDref=True, useWmatrices=True,
-            latencytime=1,usecupy=True):
+            latencytime=1,usecupy=False):
     """
     Uses the measured coherent flux to calculate the new positions to send 
     to the delay lines. It filters the most noisy baselines in order to 
@@ -165,7 +165,7 @@ def SPICAFT(*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=
         config.FT['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
         config.FT['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
         
-        if not usecupy:
+        if usecupy:
             import cupy as cp
             config.FS['sigsky'] = cp.asnumpy(config.FS['sigsky'])  # Background noise
             config.FS['imsky'] = cp.asnumpy(config.FS['imsky'])    # Sky image before observation

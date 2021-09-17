@@ -55,14 +55,30 @@ Obs = Observation(ArrayName='CHARA',
 
 Target = ScienceObject('Binary')
 
-mags = [0.6]#range(10)#np.round(9-np.logspace(0,np.log10(9), num=20),2)
+mags = [0]#range(10)#np.round(9-np.logspace(0,np.log10(9), num=20),2)
 for mag in mags:
     Target.Star1 = {'Position':(0,0),'AngDiameter':0.05,'Hmag':mag}
+    Target.Name = 'Manual'
     
+    import random
+
+    # list of random float between a range 50.50 to 500.50
+    randomFloatList = []
+    # Set a length of the list to 10
+    for i in range(15):
+        # any random float between 50.50 to 500.50
+        # don't use round() if you need number as it is
+        x = round(random.uniform(0, np.pi), 2)
+        randomFloatList.append(x)
+    
+    print("Printing list of 10 random float numbers")
+    print(randomFloatList)
+    
+    Target.Phases = np.array(randomFloatList)
     # If second object:
-    Target.Star2 = {'Position':(0,-0.15),'AngDiameter':0.05,'Hmag':1}
+    # Target.Star2 = {'Position':(0,-0.3),'AngDiameter':0.05,'Hmag':1}
     
-    ObservationFile = datadir+f'observations/CHARA/Binary_mag{mag}.fits'
+    ObservationFile = datadir+f'observations/CHARA/ManualHigherCP_mag{mag}.fits'
     
     CohIrr, UncohIrr, VisObj,_,_ = create_obsfile(spectra, Obs,Target,
                                                      savingfilepath=ObservationFile,

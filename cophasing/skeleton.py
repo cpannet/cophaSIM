@@ -30,7 +30,7 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, N
              ft = 'integrator', state = 0,
              noise=False,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
              seedph=100, seedron=100, seeddist=100,
-             starttracking=100, latencytime=0,
+             starttracking=50, latencytime=0,
              start_at_zero=True,display=False,
              **kwargs):
     
@@ -1838,35 +1838,65 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         if 'spica' in config.fs or 'abcd' in config.fs:
             NMod = config.FS['NM']
             
-        NIN = config.NIN
-        NP = config.FS['NP']
-        NMod = config.FS['NMod']
-        
-        for ip in range(NP):
+        if 'Nmod' in config.FS.keys():
+            ABCDchip = True
+        else:
+            ABCDchip=False
             
-            ax = plt.subplot(NIN,NMod,ip+1)
-            if ip < NMod:
-                ax.set_title(config.FS['Modulations'][ip])
-            im = plt.imshow(np.transpose(np.dot(np.reshape(simu.MacroImages[:,ind,ip],[NT,1]), \
-                                                np.ones([1,100]))), vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))    
+            
+            
+        if ABCDchip:
+            NIN = config.NIN
+            NP = config.FS['NP']
+            NMod = config.FS['NMod']
+            
+            for ip in range(NP):
                 
-            plt.tick_params(axis='y',left='off')
-            if ip//NMod == ip/NMod:
-                plt.ylabel(str(int(ich[ip//NMod,0]))+str(int(ich[ip//NMod,1])))
-                
-            if ip>=NP-NMod:
-                plt.xticks([0,NT],[0,NT*dt])
-                plt.xlabel('Time (ms)') 
-            else:
-                plt.xticks([],[])
-            plt.yticks([],[])
-                
-    
-        fig.subplots_adjust(right=0.8)
-        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-        fig.colorbar(im, cax=cbar_ax)
-        plt.show()
-        config.newfig+=1
+                ax = plt.subplot(NIN,NMod,ip+1)
+                if ip < NMod:
+                    ax.set_title(config.FS['Modulations'][ip])
+                im = plt.imshow(np.transpose(np.dot(np.reshape(simu.MacroImages[:,ind,ip],[NT,1]), \
+                                                    np.ones([1,100]))), vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))    
+                    
+                plt.tick_params(axis='y',left='off')
+                if ip//NMod == ip/NMod:
+                    plt.ylabel(str(int(ich[ip//NMod,0]))+str(int(ich[ip//NMod,1])))
+                    
+                if ip>=NP-NMod:
+                    plt.xticks([0,NT],[0,NT*dt])
+                    plt.xlabel('Time (ms)') 
+                else:
+                    plt.xticks([],[])
+                plt.yticks([],[])
+                    
+            fig.subplots_adjust(right=0.8)
+            cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+            fig.colorbar(im, cax=cbar_ax)
+            plt.grid(False)
+            plt.show()
+            config.newfig+=1
+            
+            
+        else:
+            # H,L = config.FS['Dsize']
+            # posp = config.FS['posp']
+            # posi_center = config.FS['posi_center']
+            # PSDwindow = config.FS['PSDwindow']
+            # p = config.FS['p']
+            
+            # realimage = np.zeros([NT,MW,L])
+            # for ia in range(NA):
+            #     realimage[:,posp[ia]] = simu.MacroImages[:,:,ia]
+            
+            # realimage[:,:,posi_center//p-(NP-NA)//2:posi_center//p+(NP-NA)//2] = simu.MacroImages[:,:,NA:]
+            ax = plt.subplot()
+            im = plt.imshow(simu.MacroImages[:,ind,:], vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))
+
+            plt.ylabel('Time')
+            plt.xlabel(f'Image at wl={round(config.spectraM[ind],2)}µm')
+            plt.grid(False)
+            config.newfig +=1
+            
 
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
