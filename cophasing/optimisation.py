@@ -428,6 +428,39 @@ gains={GainsGD}")
 def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
                 TimeBonds=100, WavelengthOfInterest=1.5, DIT=50,
                 telescopes=0):
+    """
+    Estimates the best couple GD and PD gains after calculating the performance 
+    (residual phase) of the servo loop on all the files contained in filedir.
+
+    Parameters
+    ----------
+    GainsPD : TYPE, optional
+        DESCRIPTION. The default is [].
+    GainsGD : TYPE, optional
+        DESCRIPTION. The default is [].
+    optim : TYPE, optional
+        DESCRIPTION. The default is 'opd'.
+    filedir : TYPE, optional
+        DESCRIPTION. The default is ''.
+    TimeBonds : TYPE, optional
+        DESCRIPTION. The default is 100.
+    WavelengthOfInterest : TYPE, optional
+        DESCRIPTION. The default is 1.5.
+    DIT : TYPE, optional
+        DESCRIPTION. The default is 50.
+    telescopes : TYPE, optional
+        DESCRIPTION. The default is 0.
+
+    Raises
+    ------
+    Exception
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
     
     from . import simu
     from . import config
@@ -448,8 +481,10 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
     
     minValue = 10000
     
+    NumberOfLoops = NgainsGD*NgainsPD*len(filedir)
+    
     EarlyStop=0
-    time1 = 0
+    time1 = 0 ; time0 = time.time() ; LoopNumber = 0
     for ig in range(NgainsGD):
         lasttime=time1
         time1=time.time()
@@ -482,6 +517,7 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
                 files = glob.glob(filedir+'*.fits')
                 Nfiles = len(files) ; print(f"Found: {Nfiles} files")
                 for DisturbanceFile in files:
+                    LoopNumber+=1
                     print(f'Reading file number {DisturbanceFile[-6]}')
                     sk.update_params(DisturbanceFile)
                 
@@ -498,6 +534,7 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
                     FCArray[igp,:] += simu.FringeContrast[0]/Nfiles
                 
             else:
+                LoopNumber+=1
                 # Launch the simulator
                 sk.loop()
                 # Load the performance observables into simu module
@@ -561,9 +598,15 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
         #         FCArray[ig+1:,:] = 100*np.ones([NgainsGD-ig-1,NIN])
         #         break
             
+            Progress = LoopNumber/NumberOfLoops
+            PassedTime = time.time() - time0
+            RemainingTime = PassedTime/Progress - PassedTime
+    
             print(f'Current value={Value}, Minimal value={minValue} for \n\
 GainGD={GainsGD[iOptimGD]}\n\
 GainsPD={GainsPD[iOptimPD]}')
+            print(f"Progression: {round(LoopNumber/NumberOfLoops*100)}% \n\
+Remaining time: {round(RemainingTime*1e-3/60,2)}min")
         
     bestGains = GainsGD[iOptimGD], GainsPD[iOptimPD]
     

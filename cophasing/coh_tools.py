@@ -886,7 +886,7 @@ def get_infos(file):
     
     with fits.open(file) as hdu:
         hdr = hdu[0].header
-        dt = hdr['dt']
+        dt = hdr['DT']
         NT = hdr['NT']
         piston = hdu['Piston'].data
         transmission = hdu['transmission'].data

@@ -19,6 +19,7 @@ except:
     raise Exception("The module 'config' must be imported and initialised \
                     before importing simu")
 
+print(NT)
 # Time
 it = 0
 timestamps = np.arange(NT)*dt
@@ -85,8 +86,8 @@ CovarianceImag = np.zeros([NT,MW,NB])           # Covariances of the imaginary p
 Covariance = np.zeros([NT,MW,NB,NB])            # Covariances of the real and imaginary parts of the coherent flux
 varFlux = np.zeros([NT,MW,FS['NP']])            # Variance Flux
 
-PDref = np.zeros([NIN])                        # PD reference vector
-GDref = np.zeros([NIN])                        # GD reference vector
+PDref = np.zeros([NT,NIN])                        # PD reference vector
+GDref = np.zeros([NT,NIN])                        # GD reference vector
 
 FTmode = np.ones([NT])                          # Save mode of the Fringe Tracker
                                                 # 0: off, 1: Search, 2: Track

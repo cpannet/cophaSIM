@@ -225,21 +225,21 @@ SOURCE:
     return 
 
 
-def update_params(DisturbanceFile):
+def update_config(**kwargs):
     """
     Update any parameter the same way than first done in initialise function.
-
-    Parameters
-    ----------
-    DisturbanceFile : STRING
-        Disturbance file path.
 
     Returns
     -------
     None.
 
     """
-    config.DisturbanceFile = DisturbanceFile
+    
+    for key,value in zip(list(kwargs.keys()),list(kwargs.values())):
+        setattr(config,key,value)
+    
+    if len(config.timestamps) != config.NT:
+        config.timestamps = np.arange(config.NT)*config.dt
     
     return
 
@@ -1076,7 +1076,8 @@ def loop(*args):
     
     
         
-def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True):
+def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
+            OneTelescope=True, pause=False):
     
     '''
     NAME:
@@ -1160,19 +1161,35 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
     if displayall or ('disturbances' in args):
         
         fig = plt.figure("Disturbances")
-        ax1,ax2,ax3 = fig.subplots(nrows=3,ncols=1)
-        for ia in range(NA):
-            # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-            ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia+1])
         
-        ax1.set_xlabel('Time (ms)')
-        ax1.set_ylabel('Piston [µm]')
-        ax1.set_ylim(ylim)
-        ax1.grid()
-        ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
-        ax1.legend(handles=beam_patches)
+        if not hasattr(simu, 'FreqSampling'):
+            ax1 = fig.subplots(nrows=1,ncols=1)
+            for ia in range(NA):
+                # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
+                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia+1])
+            
+            ax1.set_xlabel('Time (ms)')
+            ax1.set_ylabel('Piston [µm]')
+            ax1.set_ylim(ylim)
+            ax1.grid()
+            ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
+            ax1.legend(handles=beam_patches)
 
-        if hasattr(simu, 'FreqSampling'):
+        else:
+            ax1,ax2,ax3 = fig.subplots(nrows=3,ncols=1)
+            
+            ax1 = fig.subplots(nrows=1,ncols=1)
+            for ia in range(NA):
+                # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
+                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia+1])
+            
+            ax1.set_xlabel('Time (ms)')
+            ax1.set_ylabel('Piston [µm]')
+            ax1.set_ylim(ylim)
+            ax1.grid()
+            ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
+            ax1.legend(handles=beam_patches)
+            
             if simu.FreqSampling.size == simu.DisturbancePSD.size:
                 ax2.plot(simu.FreqSampling, simu.DisturbancePSD)
                 ax2.set_title('Power spectral distribution of the last pupil \
@@ -1355,6 +1372,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         
         GD = simu.GDEstimated ; PD=simu.PDEstimated
         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
+        GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
         SquaredSNR = simu.SquaredSNRMovingAverage
         # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
         
@@ -1380,12 +1398,15 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         for iBase in range(len1):   # First serie
             ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+            ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-            
+            ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         for iBase in range(len1,NIN):   # Second serie
             ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+            ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+            ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         
         
         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
@@ -1593,7 +1614,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
                 if OneTelescope:
                     break
             
-        if 'ODPcmd' in args:
+        if 'OPDcmd' in args:
             OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
                                   simu.GDCommand[:-config.latency,:]]))
             OPD_min = -OPD_max
@@ -1838,7 +1859,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         if 'spica' in config.fs or 'abcd' in config.fs:
             NMod = config.FS['NM']
             
-        if 'Nmod' in config.FS.keys():
+        if 'Modulations' in config.FS.keys():
             ABCDchip = True
         else:
             ABCDchip=False
@@ -1891,7 +1912,11 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
             # realimage[:,:,posi_center//p-(NP-NA)//2:posi_center//p+(NP-NA)//2] = simu.MacroImages[:,:,NA:]
             ax = plt.subplot()
             im = plt.imshow(simu.MacroImages[:,ind,:], vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))
-
+            
+            fig.subplots_adjust(right=0.8)
+            cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+            fig.colorbar(im, cax=cbar_ax)
+            
             plt.ylabel('Time')
             plt.xlabel(f'Image at wl={round(config.spectraM[ind],2)}µm')
             plt.grid(False)
@@ -1900,7 +1925,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
 
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
-        ylim=[1e-1,np.max(simu.SquaredSNRMovingAverage[:,ib])]
+        ylim=[1e-1,np.max(simu.SquaredSNRMovingAverage)]
         # State-Machine and SNR
         fig = plt.figure("SNR²")
         fig.suptitle("SNR² and State-Machine")
@@ -1927,7 +1952,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,OneTelescope=True
         ax2.set_xlabel('Time (ms)')
         ax2.legend()
         ax.legend()
-        plt.show()
+        if pause:
+            plt.pause(0.1)
         config.newfig+=1
 
 

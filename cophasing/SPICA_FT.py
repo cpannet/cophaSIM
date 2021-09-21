@@ -283,7 +283,7 @@ def ReadCf(currCfEstimated):
         simu.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
         
         # If ClosurePhase correction before wrapping
-        # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref)
+        # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref[it])
         
     # Current Phase-Delay
     currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))
@@ -310,7 +310,7 @@ def ReadCf(currCfEstimated):
         cfgd = simu.CfPD[iot]*np.exp(-1j*simu.PDEstimated[iot])/Ngd
         
         # If ClosurePhase correction before wrapping
-        # cfgd = cfgd*np.exp(-1j*simu.GDref)
+        # cfgd = cfgd*np.exp(-1j*simu.GDref[it])
         
         simu.CfGD[it,:,:] += cfgd
 
@@ -364,18 +364,14 @@ def ReadCf(currCfEstimated):
     simu.ClosurePhasePD[it] = np.angle(bispectrumPD)
     simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)
     
-    if config.FT['CPref'] and (it == 0):                     # At time 0, we create the reference vectors
+    if config.FT['CPref']:                     # At time 0, we create the reference vectors
         for ia in range(1,NA-1):
             for iap in range(ia+1,NA):
                 k = posk(ia,iap,NA)
                 ic = poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
-                
-                if config.FT['usePDref']:
-                    simu.PDref[k] = simu.ClosurePhasePD[0,ic]
-                    simu.GDref[k] = simu.ClosurePhaseGD[0,ic]
-                else:
-                    simu.PDref[k] = 0
-                    simu.GDref[k] = 0
+                simu.PDref[it,k] = simu.ClosurePhasePD[it,ic]
+                simu.GDref[it,k] = simu.ClosurePhaseGD[it,ic]
+
                     
     return currPD, currGD
 
@@ -540,7 +536,7 @@ def CommandCalc(currPD,currGD):
     Group-Delay tracking
     """
     
-    currGDerr = currGD - simu.GDref
+    currGDerr = currGD - simu.GDref[it]
     
     # Keep the GD between [-Pi, Pi]
     # Eq. 35
@@ -601,7 +597,7 @@ def CommandCalc(currPD,currGD):
     Phase-Delay command
     """
     
-    currPDerr = currPD - simu.PDref
+    currPDerr = currPD - simu.PDref[it]
  
     # Keep the PD between [-Pi, Pi]
     # Eq. 35
@@ -777,6 +773,44 @@ def getvar():
     
     return varPD
 
+
+def SetThreshold():
+    """
+    This function enables to estimate the threshold GD for the state-machine.
+    It scans the coherence envelop of the FS and displays the estimated SNR².
+    It then asks for the user to choose a smart threshold.
+
+    Returns
+    -------
+    INPUT
+        The user can choose the value to return regarding the SNR evolution.
+
+    """
+
+
+    from cophasing import skeleton as sk
+    
+    datadir2 = "C:/Users/cpannetier/Documents/These/FringeTracking/Python/Simulations/data/disturbances/"
+
+    DisturbanceFile = datadir2 + 'EtudeThreshold/scan240micron_tel6.fits'
+        
+    InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
+    
+    sk.update_config(DisturbanceFile=DisturbanceFile, NT = 2000)
+    
+    # Initialize the fringe tracker with the gain
+    from cophasing.SPICA_FT import SPICAFT
+    SPICAFT(init=True, GainPD=0, GainGD=0)
+    
+    # Launch the scan
+    sk.loop()
+    
+    sk.display('state',wl=1.6, pause=True)
+
+    sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
+    
+    return float(input("Set the Threshold GD: "))
+    
 
 def getvarcupy():
     """
