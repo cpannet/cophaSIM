@@ -19,7 +19,7 @@ except:
     raise Exception("The module 'config' must be imported and initialised \
                     before importing simu")
 
-print(NT)
+
 # Time
 it = 0
 timestamps = np.arange(NT)*dt

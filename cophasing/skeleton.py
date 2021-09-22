@@ -31,7 +31,8 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, N
              noise=False,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
              seedph=100, seedron=100, seeddist=100,
              starttracking=50, latencytime=0,
-             start_at_zero=True,display=False,
+             piston_average=0,display=False,
+             checktime=True, checkperiod=10,
              **kwargs):
     
     """
@@ -68,6 +69,11 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, N
         version : (optional input) prints version number before execution. 
         help    : (optional input) prints the documentation and exits.
         F : Amplification factor of an EM-CCD camera, by default = 1 
+        piston_average : INT
+            - 0 : The pistons are as it comes in the file
+            - 1 : The first value of pistons is subtracted to each telescope
+            - 2 : The average of the first pistons is subtracted to each telescope
+            - 3 : The temporal average of each piston is subtracted: each piston has a null average
     
 EXAMPLE:
     See unitary test at the end of file 
@@ -148,7 +154,7 @@ SOURCE:
     # Observation parameters
     config.ObservationFile = ObsFile
     config.DisturbanceFile = DisturbanceFile
-    config.start_at_zero = start_at_zero
+    config.piston_average = piston_average
     config.NA=NA
     config.NB=NB
     config.NC=NC
@@ -210,7 +216,8 @@ SOURCE:
     # Simulation parameters
     # config.SimuFilename=SimuFilename        # Where to save the data
     config.TELref=TELref             # For display only: reference delay line
-    
+    config.checkperiod = checkperiod
+    config.checktime = checktime
     # config.ich = np.zeros([NIN,2])
     # for ia in range(NA):
     #     for iap in range(ia+1,NA):
@@ -919,7 +926,7 @@ def loop(*args):
     
     from . import simu
 
-    from .config import NT, NA, timestamps, spectra, OW, MW
+    from .config import NT, NA, timestamps, spectra, OW, MW, checktime, checkperiod
     
     # Reload simu module for initialising the observables with their shape
     print('Reloading simu for reinitialising the observables.')
@@ -987,8 +994,8 @@ def loop(*args):
         
         simu.CommandODL[it+config.latency,:] = CmdODL
         
-        checkpoint = int(NT/10)
-        if (it%checkpoint == 0) and (it!=0):
+        checkpoint = int(checkperiod/100 * NT)
+        if (it%checkpoint == 0) and (it!=0) and checktime:
             processedfraction = it/NT
             # LeftProcessingTime = (time.time()-time0)*(1-processedfraction)/processedfraction
             print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
@@ -1958,7 +1965,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
 
 
 
-def ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=True, get=[]):
+def ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, p=10, display=True, get=[]):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
@@ -1982,6 +1989,10 @@ WavelengthOfInterest
         Wavelength when the Fringe Contrast needs to be calculated.
     DIT : INT
         Integration time of the science instrument [ms]
+    p : INT
+        Defines the maximal phase residuals RMS for conseidering a frame as exploitable.
+        MaxRMSForLocked = WavelengthOfInterest/p
+        MaxPhaseRMSForLocked = 2*Pi/p
     Returns
     -------
     None.
@@ -1992,7 +2003,7 @@ WavelengthOfInterest
     
     ich = config.FS['ich']
     
-    from .config import NIN,dt,NT
+    from .config import NIN,NC,dt,NT
     
     WOI = WavelengthOfInterest
     if isinstance(WOI, (float,np.float32,np.float64)):
@@ -2012,27 +2023,39 @@ WavelengthOfInterest
         
    
     simu.FringeContrast=np.zeros([NW,NIN])      # Fringe Contrast at given wavelengths [0,1]
-    simu.VarOPD=0
-    simu.TempVarPD=0 ; simu.TempVarGD=0
-    simu.VarCPD =0; simu.VarCGD=0
+    simu.VarOPD=np.zeros(NIN)
+    simu.TempVarPD=np.zeros(NIN) ; simu.TempVarGD=np.zeros(NIN)
+    simu.VarCPD =np.zeros(NC); simu.VarCGD=np.zeros(NC)
+    simu.LockedRatio=np.zeros(NIN) ; simu.WLockedRatio = np.zeros(NIN)
+    
+    MaxPhaseVarForLocked = (2*np.pi/p)**2
     
     Ndit = Period//DIT_NumberOfFrames
+    simu.PhaseVar_atWOI = np.zeros([Ndit,NIN])
+    simu.Locked = np.zeros([Ndit,NIN])
     
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
-        simu.VarOPD += 1/Ndit*np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+        OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+        simu.PhaseVar_atWOI[it] = OPDVar*(2*np.pi/WavelengthOfInterest)**2
+        simu.Locked[it] = 1*(simu.PhaseVar_atWOI[it] < MaxPhaseVarForLocked)
+        simu.VarOPD += 1/Ndit*OPDVar
         simu.TempVarPD += 1/Ndit*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
         simu.TempVarGD += 1/Ndit*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
         simu.VarCPD += 1/Ndit*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
         simu.VarCGD += 1/Ndit*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
+        
         # Fringe contrast
         for iwl in range(NW):
             wl = WOI[iwl]
-            for ib in range(NIN):   
+            for ib in range(NIN):
                 simu.FringeContrast[iwl,ib] += 1/Ndit*np.abs(np.mean(np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)))
     
         InFrame += DIT_NumberOfFrames
         
+    simu.LockedRatio = np.mean(simu.Locked,axis=0)
+    simu.WLockedRatio = np.mean(simu.Locked*(MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
+           
     if not display:
         return
 

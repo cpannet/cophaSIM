@@ -29,12 +29,12 @@ from .coh_tools import posk, poskfai,NB2NIN
 from . import config
 
 
-def SPICAFT(*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=1,
+def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=1,
             search=True,SMdelay=1,Sweep0=20, Sweep30s=10, Slope=6, Vfactors = [], 
             CPref=True, Ncp = 300, Nvar = 5,
             ThresholdGD=2, ThresholdPD = 1.5, 
             Threshold=True, usePDref=True, useWmatrices=True,
-            latencytime=1,usecupy=False):
+            latencytime=1,usecupy=False, **kwargs_for_update):
     """
     Uses the measured coherent flux to calculate the new positions to send 
     to the delay lines. It filters the most noisy baselines in order to 
@@ -188,6 +188,10 @@ def SPICAFT(*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=
             config.FT['OPD2Piston'] = config.FT['OPD2Piston'] - L_ref
         
         return
+
+    elif update:
+        for key, value in zip(list(kwargs_for_update.keys()),list(kwargs_for_update.values())):
+            setattr(config.FT, key, value)
 
     from . import simu
 
@@ -364,7 +368,7 @@ def ReadCf(currCfEstimated):
     simu.ClosurePhasePD[it] = np.angle(bispectrumPD)
     simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)
     
-    if config.FT['CPref']:                     # At time 0, we create the reference vectors
+    if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
         for ia in range(1,NA-1):
             for iap in range(ia+1,NA):
                 k = posk(ia,iap,NA)
@@ -792,11 +796,18 @@ def SetThreshold():
     
     datadir2 = "C:/Users/cpannetier/Documents/These/FringeTracking/Python/Simulations/data/disturbances/"
 
-    DisturbanceFile = datadir2 + 'EtudeThreshold/scan240micron_tel6.fits'
+    R=config.FS['R']
+    
+    if R < 50:
+        DisturbanceFile = datadir2 + 'EtudeThreshold/scan120micron_tel6.fits'
+        NT=500
+    else:
+        DisturbanceFile = datadir2 + 'EtudeThreshold/scan240micron_tel6.fits'
+        NT=1000
         
     InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
     
-    sk.update_config(DisturbanceFile=DisturbanceFile, NT = 2000)
+    sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT)
     
     # Initialize the fringe tracker with the gain
     from cophasing.SPICA_FT import SPICAFT

@@ -899,7 +899,6 @@ def get_infos(file):
             df = hdr['df']
             NF = len(PSD)
             FreqSampling = np.arange(NF)*df
-            print('Disturbance PSD present in FITSfile.')
             
         except:
             print('No Disturbance PSD in FITSfile. The arrays FreqSampling, PSD and Filter are put to zero.')
@@ -909,7 +908,7 @@ def get_infos(file):
     
     
 def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
-    from .config import start_at_zero
+    from .config import piston_average
     filetimestamps, filespectra, PistonDisturbance, TransmissionDisturbance,_,_,_,_ = get_infos(DisturbanceFile)
 
     # Interpolate on the time axis   
@@ -928,10 +927,16 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
     NT = len(timestamps) ; NW = len(spectra)
     NB = np.shape(PistonDisturbance)[1]**2
 
-    if start_at_zero:
-        print("We subtract the average piston to the piston of all telescopes.")
+    if piston_average==1:
+        print("We subtract to the piston of each telescope its first value")
+        PistonDisturbance = PistonDisturbance-PistonDisturbance[0]
+    if piston_average==2:
+        print("We subtract the average of first piston to the piston of all telescopes.")
         PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance[0])
-
+    elif piston_average==3:
+        print("We subtract to the piston of each telescope its temporal average.")
+        PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance, axis=0)
+        
     CfDisturbance = np.zeros([NT,NW,NB])*1j
     from cophasing import skeleton
     for it in range(NT):
