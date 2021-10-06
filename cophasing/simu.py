@@ -60,14 +60,18 @@ PDCommand = np.zeros([NT+latency,NIN])          # OPD-space PD command
 GDCommand = np.zeros([NT+latency,NIN])          # OPD-space GD command
 PDResidual = np.zeros([NT,NIN])                 # Estimated residual PD = PD-PDref
 GDResidual = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref
-
+GDResidual2 = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref
+GDErr = np.zeros([NT,NIN])                      # Error that integrates GD integrator
+OPDSearchCommand = np.zeros([NT+latency,NIN])           # Search command projected in the OPD-space
 
 # Piston-space observables [NA]
 PistonTrue = np.zeros([NT,NA])                  # True Pistons
 PistonDisturbance = np.zeros([NT,NA])           # Piston disturbances
-PistonPDCommand = np.zeros([NT+latency,NA])              # Piston-space PD command
-PistonGDCommand = np.zeros([NT+latency,NA])              # Piston-space GD command
-SearchCommand = np.zeros([NT+latency,NA])              # Piston-space Search command
+PistonPDCommand = np.zeros([NT+latency,NA])     # Piston-space PD command
+PistonGDCommand = np.zeros([NT+latency,NA])     # Piston-space GD command
+PistonGDCommand_beforeround = np.zeros([NT+latency,NA])
+
+SearchCommand = np.zeros([NT+latency,NA])       # Piston-space Search command
 CommandODL = np.zeros([NT+latency,NA])          # Delay lines positionnal command
 
 TransmissionDisturbance = np.ones([NT,NW,NA])   # Transmission disturbance of the telescopes
@@ -85,6 +89,7 @@ CovarianceReal = np.zeros([NT,MW,NB])           # Covariances of the real part o
 CovarianceImag = np.zeros([NT,MW,NB])           # Covariances of the imaginary part of the coherent flux
 Covariance = np.zeros([NT,MW,NB,NB])            # Covariances of the real and imaginary parts of the coherent flux
 varFlux = np.zeros([NT,MW,FS['NP']])            # Variance Flux
+SNRPhotometry = np.zeros([NT,NA])               # SNR of the photometry estimation
 
 PDref = np.zeros([NT,NIN])                        # PD reference vector
 GDref = np.zeros([NT,NIN])                        # GD reference vector
@@ -94,8 +99,13 @@ FTmode = np.ones([NT])                          # Save mode of the Fringe Tracke
 
 Ipd = np.ones([NT,NIN,NIN])                         # Weighting matrix PD command
 Igd = np.ones([NT,NIN,NIN])                         # Weighting matrix GD command
+Igdna = np.ones([NT,NA,NA])
 IgdRank =np.ones([NT])                      # Rank of the weighting matrix GD
 time_since_loss=np.zeros(NT)                    # Time since the loss of one telescope
+NoPhotometryFiltration = np.zeros([NT,NA,NA])  # Matrix that filters telescopes which have no photometry
+LostTelescopes = np.zeros([NT,NA])
+noSignal_on_T = np.zeros([NT,NA])
+
 """
 Performance Observables will be introduced and processed when the function 
 "SeePerf" is called
@@ -123,6 +133,10 @@ varPDnum2 = np.zeros([NT,NIN])
 varPDdenom = np.zeros([NT,NIN])
 varPD2 = np.zeros([NT,NIN])
 varNum2 = np.zeros([NT,MW,NIN])
+LossDueToInjection = np.zeros(NT)
+eps = np.zeros([NT,NA])
+it_last = np.zeros([NT,NA])
+last_usaw = np.zeros([NT,NA])
 
 del NA,NB,NC,NT,dt,MW,NW,NIN,FS
 

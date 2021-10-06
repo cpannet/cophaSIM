@@ -1011,7 +1011,8 @@ def loop(*args):
             simu.OPDTrue[:,ib] = simu.PistonTrue[:,ia] - simu.PistonTrue[:,iap]
             simu.OPDDisturbance[:,ib] = simu.PistonDisturbance[:,ia] - simu.PistonDisturbance[:,iap]
             simu.OPDCommand[:,ib] = simu.CommandODL[:,ia] - simu.CommandODL[:,iap]    
-    
+            simu.OPDSearchCommand[:,ib] = simu.SearchCommand[:,ia] - simu.SearchCommand[:,iap]
+            
             for iow in range(MW):
                 GammaObject = simu.CoherentFluxObject[iow*OW,ia*NA+iap]/np.sqrt(simu.CoherentFluxObject[iow*OW,ia*(NA+1)]*simu.CoherentFluxObject[iow*OW,iap*(NA+1)])
                 
@@ -1061,7 +1062,7 @@ def loop(*args):
         hdu.writeto(filepath)
     
     return
-        
+
 
 # def SaveSimulation():
     
@@ -1111,7 +1112,6 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     from cophasing.tol_colors import tol_cset
     
     from . import simu
-    # import config
     
     from .simu import timestamps
     
@@ -1289,56 +1289,58 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         plt.show()
         config.newfig+=1
     
-        if Pistondetails:
-            
-            linestyles=[]
-            linestyles.append(mlines.Line2D([], [], color='blue',
-                                            linestyle='solid',label='Estimated'))    
-            linestyles.append(mlines.Line2D([], [], color='red',
-                                            linestyle='solid',label='Disturbance'))
-            linestyles.append(mlines.Line2D([], [], color='green',
-                                            linestyle='dotted',label='Command'))
-            linestyles.append(mlines.Line2D([], [], color='green',
-                                            linestyle=(0,(3,5,1,5)),label='PD Command'))
-            linestyles.append(mlines.Line2D([], [], color='green',
-                                            linestyle=(0,(3,5,1,5,1,5)),label='GD Command'))
-            # linestyles.append(mlines.Line2D([], [], color='black',
-            #                                 linestyle='dashdot',label='Search Command'))
-            # linestyles.append(mlines.Line2D([], [], color='black',
-            #                                 linestyle='dashdot',label='Modulation Command'))
+    if displayall or ('Pistondetails' in args):
         
+        linestyles=[]
+        # linestyles.append(mlines.Line2D([], [], color=colors[0],
+        #                                 linestyle='solid',label='Estimated'))    
+        linestyles.append(mlines.Line2D([], [], color=colors[0],
+                                        label='Disturbance'))
+        linestyles.append(mlines.Line2D([], [], color=colors[1],
+                                        label='Total Command'))
+        linestyles.append(mlines.Line2D([], [], color=colors[2],
+                                        label='PD Command'))
+        linestyles.append(mlines.Line2D([], [], color=colors[3],
+                                        label='GD Command'))
+        linestyles.append(mlines.Line2D([], [], color=colors[4],
+                                        label='Search Command'))
+        # linestyles.append(mlines.Line2D([], [], color=colors[5],
+        #                                 label='Modulation Command'))
+    
+    
+        fig = plt.figure("Piston details")
+        fig.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
+        axes = fig.subplots(nrows=NA,ncols=1, sharex=True)
+        ax2ymax = np.max(np.abs(simu.PistonTrue))
+        ax2ylim = [-ax2ymax,ax2ymax]
+        for ia in range(NA):
+            ax = axes[ia]
+            ax.plot(timestamps, simu.PistonDisturbance[:,ia],
+                     color=colors[0])
+            ax.plot(timestamps, simu.CommandODL[:-config.latency,ia],
+                     color=colors[1])
+            ax.plot(timestamps, simu.PistonPDCommand[:-config.latency,ia],
+                     color=colors[2])
+            ax.plot(timestamps, simu.PistonGDCommand[:-config.latency,ia],
+                     color=colors[3])
+            ax.plot(timestamps, simu.SearchCommand[:-config.latency,ia],
+                     color=colors[4])
+            # ax2 = ax.twinx()
+            # ax2.plot(timestamps, simu.PistonTrue[:,ia],
+            #          color='blue',linestyle='solid')
+            ax.set_ylim(ylim)
+            # ax2.set_ylim(ax2ylim)
+            ax.set_ylabel(f'Tel {ia+increment} \n[µm]')
+            # ax2.set_ylabel(f'Residual Piston {ia+increment} [µm]')
+            ax.grid()
         
-            fig = plt.figure("Piston details")
-            fig.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
-            axes = fig.subplots(nrows=NA,ncols=1, sharex=True)
-            ax2ymax = np.max(np.abs(simu.PistonTrue))
-            ax2ylim = [-ax2ymax,ax2ymax]
-            for ia in range(NA):
-                ax = axes[ia]
-                ax.plot(timestamps, simu.PistonDisturbance[:,ia],
-                         color='red',linestyle='solid')
-                ax.plot(timestamps, simu.CommandODL[:-config.latency,ia],
-                         color='green',linestyle='dashed')
-                ax.plot(timestamps, simu.PistonPDCommand[:-config.latency,ia],
-                         color='green',linestyle='dotted')
-                ax.plot(timestamps, simu.PistonGDCommand[:-config.latency,ia],
-                         color='green',linestyle=(0,(3,5,1,5,1,5)))
-                ax2 = ax.twinx()
-                ax2.plot(timestamps, simu.PistonTrue[:,ia],
-                         color='blue',linestyle='solid')
-                ax.set_ylim(ylim)
-                ax2.set_ylim(ax2ylim)
-                ax.set_ylabel(f'All Pistons except residual {ia+increment} [µm]')
-                ax2.set_ylabel(f'Residual Piston {ia+increment} [µm]')
-                ax.grid()
-            
-                ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                       color='k', linestyle='--')
+            ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+                   color='k', linestyle='--')
 
-            plt.xlabel('Time (ms)')
-            plt.legend(handles=linestyles)
-            plt.show()
-            config.newfig+=1    
+        plt.xlabel('Time (ms)')
+        plt.legend(handles=linestyles)
+        plt.show()
+        config.newfig+=1    
 
 
     if displayall or ('perftable' in args):
@@ -1404,12 +1406,14 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         
         for iBase in range(len1):   # First serie
             ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax1.hlines(config.FT['ThresholdGD']**2, t[timerange[0]],t[timerange[-1]], color='black', linestyle='dashed')
             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
             ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
             ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         for iBase in range(len1,NIN):   # Second serie
             ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax6.hlines(config.FT['ThresholdGD']**2,t[timerange[0]],t[timerange[-1]],color='black', linestyle='dashed')
             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
             ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
@@ -1535,177 +1539,186 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 break
         
     
-        if OPDdetails:
-            OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
-                                  simu.GDCommand[:-config.latency,:]]))
-            OPD_min = -OPD_max
-            ylim = [OPD_min,OPD_max]
-            
-            linestyles=[]
-            linestyles.append(mlines.Line2D([], [],label='Disturbance',
-                                            color='red',linestyle='solid'))
-            linestyles.append(mlines.Line2D([], [], color='green',
-                                        linestyle='dotted',label='GD Command'))
-            linestyles.append(mlines.Line2D([], [],label='GD Residuals',
-                                            color='black',linestyle=':'))
-            linestyles.append(mlines.Line2D([], [],label='PD Residuals',
-                                            color='black',linestyle='-'))
+    if 'OPDcmd' in args:
+        OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
+                              simu.GDCommand[:-config.latency,:],simu.OPDCommand[:-config.latency,:]]))
+        OPD_min = -OPD_max
+        ylim = [OPD_min,OPD_max]
+    
+        linestyles=[]
+        linestyles.append(mlines.Line2D([], [],label='Disturbance',
+                                        color=colors[0],linestyle='solid'))
+        linestyles.append(mlines.Line2D([], [],label='Total command',
+                                        color=colors[1],linestyle='solid'))
+        linestyles.append(mlines.Line2D([], [],label='PD command',
+                                        color=colors[2],linestyle='--'))
+        linestyles.append(mlines.Line2D([], [],label='GD command',
+                                        color=colors[3],linestyle=':'))
+        linestyles.append(mlines.Line2D([], [],label='Search command',
+                                        color=colors[4],linestyle=':'))
 
-            for ia in range(NA):
-                fig = plt.figure(f"OPD details {ia+increment}")
-                fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
-        including telescope {ia+increment}")
-                axes = fig.subplots(nrows=NA-1,ncols=3,sharex=True,gridspec_kw={'width_ratios': [8, 1,1]})
-                iap,iax=0,0
-                for ax,axText,axLegend in axes:
-                    ax2 = ax.twinx()
-                    ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated[stationaryregim,:]*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
-                    ax2ylim = [-ax2ymax,ax2ymax]
-                    if iap == ia:
-                        iap+=1
-                    if ia < iap:
-                        ib = coh_tools.posk(ia,iap,NA)
-                        ax.plot(timestamps, simu.OPDDisturbance[:,ib],
-                                color='red')
-                        ax2.plot(timestamps, simu.GDCommand[:-config.latency,ib],
-                                color='green',linestyle='dotted')
-                        ax2.plot(timestamps, simu.GDResidual[:,ib]*wl/(2*np.pi),
-                                 color='black',linestyle=':')
-                        ax2.plot(timestamps, simu.PDResidual[:,ib]*wl/(2*np.pi),
-                                 color='black',linestyle='-')
-                    else:
-                        ib = coh_tools.posk(iap,ia,NA)
-                        ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
-                        ax.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
-                                color='green',linestyle='dotted')
-                        ax2.plot(timestamps, -simu.GDResidual[:,ib]*wl/(2*np.pi), color='black',
-                                 linestyle=':')
-                        ax2.plot(timestamps, -simu.PDResidual[:,ib]*wl/(2*np.pi), color='black',
-                                 linestyle='-')
+        for ia in range(NA):
+            fig = plt.figure(f"OPD commands {ia+increment}")
+            fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
+    including telescope {ia+increment}")
+            axes = fig.subplots(nrows=NA-1,ncols=3,sharex=True,gridspec_kw={'width_ratios': [8, 1,1]})
+            iap,iax=0,0
+            for ax,axText,axLegend in axes:
+                ax2 = ax.twinx()
+                ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
+                ax2ylim = [-ax2ymax,ax2ymax]
+                if iap == ia:
+                    iap+=1
+                if ia < iap:
+                    ib = coh_tools.posk(ia,iap,NA)
+                    ax.plot(timestamps, simu.OPDDisturbance[:,ib],
+                            color=colors[0])
+                    ax.plot(timestamps, simu.OPDCommand[:-config.latency,ib],
+                            color=colors[1])
+                    ax.plot(timestamps, simu.PDCommand[:-config.latency,ib],
+                            color=colors[2])
+                    ax.plot(timestamps, simu.GDCommand[:-config.latency,ib],
+                            color=colors[3])
+                    ax.plot(timestamps, simu.OPDSearchCommand[:-config.latency,ib],
+                            color=colors[4])
                     
-                    ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                              color='k', linestyle='--')
-                    
-                    ax.set_ylim(ylim)
-                    ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
-                    
-                    ax2.set_ylim(ax2ylim)
-                    ax2.set_ylabel('Residuals')
-                    if ax2ymax > wl:
-                        ax2.set_yticks([-ax2ylim[0],-wl,0,wl,ax2ylim[1]])
-                    else:
-                        ax2.set_yticks([-wl,0,wl])
 
-                    axText.text(0,0.70,f"PD:{np.std(simu.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
-                    axText.text(0,0.30,f"GD:{np.std(simu.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
-                    axText.axis("off")
-                    axLegend.axis("off")
-                    # wlr = round(wl,2)
-                    # ax2.set_yticklabels([-wlr,0,wlr])
-                    # ax2.tick_params(axis='y',which='major', length=7)
-                    # ax2.tick_params(axis='y',which='minor', length=4)
-                    # ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
-                    # ax2.grid(b=True,which='major')
-                    # ax2.grid(b=True, which='minor')
-                    
-                    iap += 1
-                    iax+=1
-                    # ax2.minorticks_on()
-                fig.tight_layout()
+                else:
+                    ib = coh_tools.posk(iap,ia,NA)
+                    ax2.plot(timestamps, -simu.OPDDisturbance[:,ib],
+                            color=colors[0])
+                    ax2.plot(timestamps, -simu.OPDCommand[:-config.latency,ib],
+                            color=colors[1])
+                    ax2.plot(timestamps, -simu.PDCommand[:-config.latency,ib],
+                            color=colors[2])
+                    ax2.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
+                            color=colors[3])
+                    ax2.plot(timestamps, -simu.OPDSearchCommand[:-config.latency,ib],
+                            color=colors[4])
                 
-                plt.xlabel('Time (ms)')
-                # plt.show()
-                axLegend.legend(handles=linestyles)
-                config.newfig+=1
-        
-                if OneTelescope:
-                    break
+                ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+                   color='k', linestyle='--')
+
+                ax.set_ylim(ylim)
+                ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
+                
+                ax2.set_ylim(ax2ylim)
+                ax2.set_ylabel('OPD [µm]')
+                ax2.set_yticks([-wl,0,wl])
+
+                axText.text(0,0.70,f"PD:{np.std(simu.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                axText.text(0,0.30,f"GD:{np.std(simu.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                # axText.axis("off")
+                # axLegend.axis("off")
+                wlr = round(wl,2)
+                ax2.set_yticklabels([-wlr,0,wlr])
+                ax2.tick_params(axis='y',which='major', length=7)
+                ax2.tick_params(axis='y',which='minor', length=4)
+                ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
+                ax2.grid(b=True,which='major')
+                ax2.grid(b=True, which='minor')
+                
+                iap += 1
+                iax+=1
+                # ax2.minorticks_on()
             
-        if 'OPDcmd' in args:
-            OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
-                                  simu.GDCommand[:-config.latency,:]]))
-            OPD_min = -OPD_max
-            ylim = [OPD_min,OPD_max]
+                
+            plt.xlabel('Time (ms)')
+            plt.show()
+            axLegend.legend(handles=linestyles)
+            config.newfig+=1
+    
+            if OneTelescope:
+                break
+
+    
+    
+    if displayall or ('OPDdetails' in args):
+        OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
+                              simu.GDCommand[:-config.latency,:]]))
+        OPD_min = -OPD_max
+        ylim = [OPD_min,OPD_max]
         
-            linestyles=[]
-            linestyles.append(mlines.Line2D([], [],label='Disturbance',
-                                            color='red',linestyle='solid'))
-            linestyles.append(mlines.Line2D([], [],label='Command OPD',
-                                            color='blue',linestyle='solid'))
-            linestyles.append(mlines.Line2D([], [],label='GD Estimated',
-                                            color='black',linestyle='--'))
-            linestyles.append(mlines.Line2D([], [],label='PD Estimated',
-                                            color='black',linestyle=':'))
+        linestyles=[]
+        linestyles.append(mlines.Line2D([], [],label='Disturbance',
+                                        color='red',linestyle='solid'))
+        linestyles.append(mlines.Line2D([], [], color='green',
+                                    linestyle='dotted',label='GD Command'))
+        linestyles.append(mlines.Line2D([], [],label='GD Residuals',
+                                        color='black',linestyle=':'))
+        linestyles.append(mlines.Line2D([], [],label='PD Residuals',
+                                        color='black',linestyle='-'))
 
-            for ia in range(NA):
-                fig = plt.figure(f"OPD details {ia+increment}")
-                fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
-        including telescope {ia+increment}")
-                axes = fig.subplots(nrows=NA-1,ncols=3,sharex=True,gridspec_kw={'width_ratios': [8, 1,1]})
-                iap,iax=0,0
-                for ax,axText,axLegend in axes:
-                    ax2 = ax.twinx()
-                    ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
-                    ax2ylim = [-ax2ymax,ax2ymax]
-                    if iap == ia:
-                        iap+=1
-                    if ia < iap:
-                        ib = coh_tools.posk(ia,iap,NA)
-                        ax.plot(timestamps, simu.OPDDisturbance[:,ib],
-                                color='red')
-                        # ax2.plot(timestamps, simu.GDCommand[:-config.latency,ib],
-                        #         color='blue')
-                        ax2.plot(timestamps, simu.OPDCommand[:-config.latency,ib],
-                                color='blue')
-                        ax2.plot(timestamps, simu.GDResidual[:,ib]*wl/(2*np.pi),
-                                 color='black',linestyle='-.')
-                        ax2.plot(timestamps, simu.PDResidual[:,ib]*wl/(2*np.pi),
-                                 color='black',linestyle='-')
-                    else:
-                        ib = coh_tools.posk(iap,ia,NA)
-                        ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
-                        ax.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
-                                color='green',linestyle=(0,(3,5,1,5,1,5)))
-                        ax2.plot(timestamps, -simu.GDResidual[:,ib]*wl/(2*np.pi), color='black',
-                                 linestyle='--')
-                        ax2.plot(timestamps, -simu.PDResidual[:,ib]*wl/(2*np.pi), color='black',
-                                 linestyle=':')
-                    
-                    ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                       color='k', linestyle='--')
-
-                    ax.set_ylim(ylim)
-                    ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
-                    
-                    ax2.set_ylim(ax2ylim)
-                    ax2.set_ylabel('Residuals')
+        for ia in range(NA):
+            fig = plt.figure(f"OPD details {ia+increment}")
+            fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
+    including telescope {ia+increment}")
+            axes = fig.subplots(nrows=NA-1,ncols=3,sharex=True,gridspec_kw={'width_ratios': [8, 1,1]})
+            iap,iax=0,0
+            for ax,axText,axLegend in axes:
+                ax2 = ax.twinx()
+                ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated[stationaryregim,:]*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
+                ax2ylim = [-ax2ymax,ax2ymax]
+                if iap == ia:
+                    iap+=1
+                if ia < iap:
+                    ib = coh_tools.posk(ia,iap,NA)
+                    ax.plot(timestamps, simu.OPDDisturbance[:,ib],
+                            color='red')
+                    ax2.plot(timestamps, simu.GDCommand[:-config.latency,ib],
+                            color='green',linestyle='dotted')
+                    ax2.plot(timestamps, simu.GDResidual[:,ib]*wl/(2*np.pi),
+                             color='black',linestyle=':')
+                    ax2.plot(timestamps, simu.PDResidual[:,ib]*wl/(2*np.pi),
+                             color='black',linestyle='-')
+                else:
+                    ib = coh_tools.posk(iap,ia,NA)
+                    ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
+                    ax.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
+                            color='green',linestyle='dotted')
+                    ax2.plot(timestamps, -simu.GDResidual[:,ib]*wl/(2*np.pi), color='black',
+                             linestyle=':')
+                    ax2.plot(timestamps, -simu.PDResidual[:,ib]*wl/(2*np.pi), color='black',
+                             linestyle='-')
+                
+                ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+                          color='k', linestyle='--')
+                
+                ax.set_ylim(ylim)
+                ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
+                
+                ax2.set_ylim(ax2ylim)
+                ax2.set_ylabel('Residuals')
+                if ax2ymax > wl:
+                    ax2.set_yticks([-ax2ylim[0],-wl,0,wl,ax2ylim[1]])
+                else:
                     ax2.set_yticks([-wl,0,wl])
 
-                    axText.text(0,0.70,f"PD:{np.std(simu.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
-                    axText.text(0,0.30,f"GD:{np.std(simu.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
-                    # axText.axis("off")
-                    # axLegend.axis("off")
-                    wlr = round(wl,2)
-                    ax2.set_yticklabels([-wlr,0,wlr])
-                    ax2.tick_params(axis='y',which='major', length=7)
-                    ax2.tick_params(axis='y',which='minor', length=4)
-                    ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
-                    ax2.grid(b=True,which='major')
-                    ax2.grid(b=True, which='minor')
-                    
-                    iap += 1
-                    iax+=1
-                    # ax2.minorticks_on()
+                axText.text(0,0.70,f"PD:{np.std(simu.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                axText.text(0,0.30,f"GD:{np.std(simu.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                axText.axis("off")
+                axLegend.axis("off")
+                # wlr = round(wl,2)
+                # ax2.set_yticklabels([-wlr,0,wlr])
+                # ax2.tick_params(axis='y',which='major', length=7)
+                # ax2.tick_params(axis='y',which='minor', length=4)
+                # ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
+                # ax2.grid(b=True,which='major')
+                # ax2.grid(b=True, which='minor')
                 
-                    
-                plt.xlabel('Time (ms)')
-                plt.show()
-                axLegend.legend(handles=linestyles)
-                config.newfig+=1
-        
-                if OneTelescope:
-                    break
-
+                iap += 1
+                iax+=1
+                # ax2.minorticks_on()
+            fig.tight_layout()
+            
+            plt.xlabel('Time (ms)')
+            # plt.show()
+            axLegend.legend(handles=linestyles)
+            config.newfig+=1
+    
+            if OneTelescope:
+                break
+    
 
         if 'OPDgathered' in args:
 
@@ -1940,6 +1953,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         for ib in range(NIN):
             ax.plot(timestamps, simu.SquaredSNRMovingAverage[:,ib],
                     label=f"{ich[ib]}")
+            
         ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
                   linestyle='--',label='Threshold GD')
         
@@ -1962,10 +1976,34 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         if pause:
             plt.pause(0.1)
         config.newfig+=1
+        
+    pass
 
 
+def investigate(*args):
+    from . import config
+    from . import simu
+    
+    from cophasing.tol_colors import tol_cset
+    colors= tol_cset('muted')
+    
+    if 'detail search' in args:
+        fig=plt.figure('detail FS', clear=True)
+        ax1,ax2,ax3 = fig.subplots(nrows=3)
+        for ia in range(config.NA):
+            ax1.plot(simu.timestamps, simu.last_usaw[:,ia], color=colors[ia], label=f"Tel{ia+1}")
+            ax2.plot(simu.timestamps, simu.it_last[:,ia]*config.dt, color=colors[ia])
+            ax3.plot(simu.timestamps, simu.eps[:,ia], color=colors[ia])
+            ax3.plot(simu.timestamps, np.gradient(simu.SearchCommand[:-2,ia]), color=colors[ia], linestyle='-.')
+        ax1.set_ylabel("last_usaw")
+        ax2.set_ylabel("it_last")
+        ax3.set_ylabel("eps")
+        ax3.set_ylim(-2,2)
+        ax1.legend()
 
-def ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, p=10, display=True, get=[]):
+    pass
+
+def ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, R=140, p=10, display=True, get=[]):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
@@ -1993,6 +2031,9 @@ WavelengthOfInterest
         Defines the maximal phase residuals RMS for conseidering a frame as exploitable.
         MaxRMSForLocked = WavelengthOfInterest/p
         MaxPhaseRMSForLocked = 2*Pi/p
+    R : FLOAT
+        Spectral resolution of the instrument whose performance are estimated.
+        By default, R=140 (minimal spectral resolution of SPICA-VIS)
     Returns
     -------
     None.
@@ -2010,6 +2051,8 @@ WavelengthOfInterest
         WOI = [WOI]    
     NW = len(WOI) 
     
+    Lc = R*WOI      # Vector
+    
     DIT_NumberOfFrames = int(DIT/dt)
     
     if isinstance(TimeBonds,(float,int)):
@@ -2023,6 +2066,7 @@ WavelengthOfInterest
         
    
     simu.FringeContrast=np.zeros([NW,NIN])      # Fringe Contrast at given wavelengths [0,1]
+    simu.CoherenceEnvelopModulation = np.zeros([NW,NIN]) # Contrast loss due to spectral dispersion.
     simu.VarOPD=np.zeros(NIN)
     simu.TempVarPD=np.zeros(NIN) ; simu.TempVarGD=np.zeros(NIN)
     simu.VarCPD =np.zeros(NC); simu.VarCGD=np.zeros(NC)
@@ -2046,16 +2090,19 @@ WavelengthOfInterest
         simu.VarCGD += 1/Ndit*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
         
         # Fringe contrast
-        for iwl in range(NW):
-            wl = WOI[iwl]
+        for iw in range(NW):
+            wl = WOI[iw]
             for ib in range(NIN):
-                simu.FringeContrast[iwl,ib] += 1/Ndit*np.abs(np.mean(np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)))
-    
+                simu.CoherenceEnvelopModulation[iw,ib] = np.mean(np.sinc(simu.OPDTrue[:,ib]/Lc[iw]))
+                simu.FringeContrast[iw,ib] += 1/Ndit*np.abs(np.mean(np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)))
+                simu.FringeContrast[iw,ib] *= simu.CoherenceEnvelopModulation[iw,ib]
+        
         InFrame += DIT_NumberOfFrames
         
     simu.LockedRatio = np.mean(simu.Locked,axis=0)
-    simu.WLockedRatio = np.mean(simu.Locked*(MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
-           
+    simu.WLockedRatio = np.mean(simu.Locked*simu.FringeContrast, axis=0)
+    simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
+    
     if not display:
         return
 

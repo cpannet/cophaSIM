@@ -29,10 +29,10 @@ from .coh_tools import posk, poskfai,NB2NIN
 from . import config
 
 
-def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=1,
-            search=True,SMdelay=1,Sweep0=20, Sweep30s=10, Slope=6, Vfactors = [], 
-            CPref=True, Ncp = 300, Nvar = 5,
-            ThresholdGD=2, ThresholdPD = 1.5, 
+def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
+            search=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, Slope=6, Vfactors = [], 
+            CPref=True, Ncp = 300, Nvar = 5,cmdOPD=True, switch=1,
+            ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,
             Threshold=True, usePDref=True, useWmatrices=True,
             latencytime=1,usecupy=False, **kwargs_for_update):
     """
@@ -131,15 +131,8 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         config.FT['Ngd'] = Ngd
         config.FT['GainGD'] = GainGD
         config.FT['GainPD'] = GainPD
-        config.FT['SMdelay'] = SMdelay
-        config.FT['Sweep0'] = Sweep0        # Starting sweep in [s]
-        config.FT['Sweep30s'] = Sweep30s    # Sweep at 30s
-        config.FT['Slope'] = Slope      # Maximal slope given in µm/frame
-        config.FT['usaw'] = np.zeros([NA])
-        config.FT['last_usaw'] = np.zeros([NA])
-        config.FT['it_last'] = 0
-        config.FT['state'] = np.zeros([NT])
-        config.FT['eps'] = 1
+        config.FT['state'] = np.zeros(NT)
+        config.FT['eps'] = np.ones(NA)
         config.FT['Ncross'] = Ncross
         config.FT['Ncp'] = Ncp
         config.FT['Nvar'] = Nvar
@@ -148,11 +141,23 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         config.FT['CPref'] = CPref
         config.FT['roundGD'] = roundGD
         config.FT['Threshold'] = Threshold
-        config.FT['cmdOPD'] = True
+        config.FT['switch'] = switch
+        config.FT['cmdOPD'] = cmdOPD
         config.FT['usePDref'] = usePDref
         config.FT['useWmatrices'] = useWmatrices
         config.FT['usecupy'] = usecupy
+        
+        # Search command parameters
         config.FT['search'] = search
+        config.FT['SMdelay'] = SMdelay      # Waiting time before launching search
+        config.FT['Sweep0'] = Sweep0        # Starting sweep in [s]
+        config.FT['Sweep30s'] = Sweep30s    # Sweep at 30s
+        config.FT['Slope'] = Slope          # Maximal slope given in µm/frame
+        config.FT['usaw'] = np.zeros([NT,NA])
+        config.FT['last_usaw'] = np.zeros(NA)
+        config.FT['it_last'] = np.zeros(NA)
+        config.FT['it0'] = np.zeros(NA)
+        config.FT['ThresholdPhot'] = ThresholdPhot      # Minimal photometry SNR for launching search
 
         if len(Vfactors) != 0:
             config.FT['Vfactors'] = np.array(Vfactors)
@@ -160,7 +165,7 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
             config.FT['Vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])/8.75
             print(f"Searching velocity factors are {config.FT['Vfactors']}")
         
-        config.FT['Velocities'] = config.FT['Vfactors']/np.max(config.FT['Vfactors'])*Slope
+        config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*Slope     # The maximal OPD velocity is equal to slope/frame
         
         config.FT['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
         config.FT['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
@@ -506,31 +511,75 @@ def CommandCalc(currPD,currGD):
     
     if NotCophased:
         simu.time_since_loss[it]=simu.time_since_loss[it-1]+config.dt
-        # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_ranksimu.Igd[it-1]))
+        
+        # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_rank(simu.Igd[it-1]))
         # This situation could pose a problem but we don't manage it yet        
-        if (simu.time_since_loss[it] > FT['SMdelay']*1e3):
-            
-            config.FT['state'][it] = 1
-            
-            if (config.FT['state'][it-1] == 0):
-                config.FT['it0'] = it ; config.FT['it_last'] = it
-                config.FT['last_usaw'] = config.FT['usaw']
+        if (simu.time_since_loss[it] > config.FT['SMdelay']):
             
             Igdna = np.dot(config.FT['OPD2Piston'],
                            np.dot(simu.Igd[it],config.FT['Piston2OPD']))
-            Kernel = np.identity(NA) - Igdna
-            config.FT['usaw'] = searchfunction(config.FT['usaw'],it)
-            usearch = np.dot(Kernel,config.FT['usaw']*config.FT['Velocities'])
-        
+            
+            # Fringe loss
+            simu.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
+            # WeLostANewTelescope = (sum(newLostTelescopes) > 0)
+            
+            # Photometry loss
+            simu.noSignal_on_T[it] = 1*(simu.SNRPhotometry[it] < config.FT['ThresholdPhot'])
+                
+            comparison = (simu.noSignal_on_T[it] == simu.LostTelescopes[it])
+            simu.LossDueToInjection[it] = comparison.all()       # Evaluates if the two arrays are the same
+            
+            if not simu.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
+                config.FT['state'][it] = 1
+                
+                newLostTelescopes = (simu.LostTelescopes[it] - simu.LostTelescopes[it-1] == 1)
+                TelescopesThatGotBackPhotometry = (simu.noSignal_on_T[it-1] - simu.noSignal_on_T[it] == 1)
+                # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
+                
+                TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
+                
+                if (config.FT['state'][it-1] == 0):         # Last frame, all telescopes were tracked
+                    config.FT['it0'] = np.ones(NA)*it ; config.FT['it_last'] = np.ones(NA)*it
+                    config.FT['last_usaw'] = np.zeros(NA)
+                    
+                elif sum(TelescopesThatNeedARestart) > 0:
+                    
+                    # Version "Restart only concerned telescopes" (06-10-2021)
+                    # --> doesn't work because it avoids some OPDs.
+                    # for ia in TelescopesThatNeedARestart:
+                    #     config.FT['it0'][ia] = it ; config.FT['it_last'][ia] = it
+                    #     config.FT['last_usaw'][ia] = 0
+                
+                    # Version "Restart all" (06-10-2021)
+                    # Restart all telescope from their current position.
+                    config.FT['it0'] = np.ones(NA)*it
+                    config.FT['it_last'] = np.ones(NA)*it
+                    config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
+                    
+                config.FT['usaw'][it] = searchfunction(config.FT['usaw'][it-1])         # Fonction search de vitesse 1µm/frame par piston
+                    
+                Kernel = np.identity(NA) - Igdna
+                simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
+                Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)                 
+                
+                # After multiplication by Kernel, the OPD velocities can only be lower or equal than before
+                
+                usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
+            
+                
+            else:
+                config.FT['state'][it] = 0
+                usearch = simu.SearchCommand[it-1]
         else:
             config.FT['state'][it] = 0
             usearch = simu.SearchCommand[it-1]
             
     else:
         simu.time_since_loss[it] = 0
-        config.FT['state'][it] = 0
+        config.FT['state'][it] = 0 ; config.FT['eps'] = np.ones(NA)
         usearch = simu.SearchCommand[it-1]
         
+    usearch -= usearch[0]
     
     usearch = config.FT['search']*usearch
     simu.SearchCommand[it] = usearch
@@ -557,19 +606,24 @@ def CommandCalc(currPD,currGD):
     simu.GDResidual[it] = currGDerr*R
     
     # Weights the GD (Eq.35)
-        
     currGDerr = np.dot(currIgd,currGDerr)
      
-    if FT['Threshold']:     # Threshold function (eq.36)
+    simu.GDResidual2[it] = currGDerr
+    
+    # Threshold function (eq.36)
+    if FT['Threshold']:     
     
         # Array elements verifying the condition
-        higher_than_pi = (currGDerr > np.pi/R)
-        lower_than_mpi = (currGDerr < -np.pi/R)
-        within_pi = (np.abs(currGDerr) <= np.pi/R)
+        higher_than_pi = (currGDerr > np.pi/R*FT['switch'])
+        lower_than_mpi = (currGDerr < -np.pi/R*FT['switch'])
+        within_pi = (np.abs(currGDerr) <= np.pi/R*FT['switch'])
         
-        currGDerr[higher_than_pi] -= np.pi/R
-        currGDerr[lower_than_mpi] += np.pi/R
+        # if FT['continu']:
+        #     currGDerr[higher_than_pi] -= np.pi/R*FT['switch']
+        #     currGDerr[lower_than_mpi] += np.pi/R*FT['switch']
         currGDerr[within_pi] = 0
+    
+    simu.GDErr[it] = currGDerr
     
     # Integrator (Eq.37)
     if FT['cmdOPD']:     # integrator on OPD
@@ -590,11 +644,20 @@ def CommandCalc(currPD,currGD):
     # From OPD to Piston
     # uGD = np.dot(FT['OPD2Piston'], simu.GDCommand[it+1])
     
-    if config.FT['roundGD']:
+    simu.PistonGDCommand_beforeround[it] = uGD
+    
+    if config.FT['roundGD']=='round':
         for ia in range(NA):
             jumps = round(uGD[ia]/config.PDspectra)
             uGD[ia] = jumps*config.PDspectra
-            
+    elif config.FT['roundGD']=='int':
+        for ia in range(NA):
+            jumps = int(uGD[ia]/config.PDspectra)
+            uGD[ia] = jumps*config.PDspectra
+    elif config.FT['roundGD']=='no':
+        pass
+    else:
+        raise ValueError("The roundGD parameter of the fringe-tracker must be 'round', 'int' or 'no'.")
     simu.PistonGDCommand[it] = uGD
 
     """
@@ -731,12 +794,14 @@ def getvar():
         simu.Covariance[it,iw] = np.dot(DemodGRAV[iw], np.dot(np.diag(varFlux[iw]),np.transpose(DemodGRAV[iw])))
         
     simu.DemodGRAV = DemodGRAV
+    
     # Phase variance calculation (eq. 14)
     Nvar = config.FT['Nvar']                # Integration time for phase variance
     if it < Nvar:
         Nvar = it+1
         
     varNum = np.zeros([MW,NIN]) ; varNum2 = np.zeros([MW,NIN])
+    varPhot = np.zeros([MW,NA])         # Variance of the photometry measurement
     CohFlux = np.zeros([MW,NIN])*1j
     
 # =============================================================================
@@ -748,12 +813,14 @@ def getvar():
     
     timerange = range(it+1-Nvar,it+1)
     for ia in range(NA):
+        ibp = ia*(NA+1)
+        varPhot[:,ia] = simu.Covariance[it,:,ibp,ibp]       # Variance of photometry at each frame
         for iap in range(ia+1,NA):
             ib = posk(ia,iap,NA)
-            kp = ia*NA+iap
-            posX = NA + ib ; posY = NA + NIN + ib
-            Ex = np.mean(np.real(simu.CfPD[timerange,:,ib]), axis=0)
-            Ey = np.mean(np.imag(simu.CfPD[timerange,:,ib]), axis=0)
+            # kp = ia*NA+iap
+            # posX = NA + ib ; posY = NA + NIN + ib
+            # Ex = np.mean(np.real(simu.CfPD[timerange,:,ib]), axis=0)
+            # Ey = np.mean(np.imag(simu.CfPD[timerange,:,ib]), axis=0)
             # varX = simu.CovarianceReal[timerange,:,kp]
             # varY = simu.CovarianceImag[timerange,:,kp]
             ibr=NA+ib; varX = simu.Covariance[timerange,:,ibr,ibr]
@@ -772,6 +839,8 @@ def getvar():
     
     simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
     simu.varPD2[it] = simu.varPDnum2[it]/simu.varPDdenom[it]    # Var(|CohFlux|)/|CohFlux|²
+    
+    simu.SNRPhotometry[it,:] = np.sum(simu.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
     
     varPD = simu.varPD[it]
     
@@ -898,25 +967,52 @@ def getvarcupy():
     return varPDnumpy
 
 
-def searchfunction(usaw,it):
-    
-    a = config.FT['Sweep30s']/30
-    sweep = config.FT['Sweep0'] + a*(it-config.FT['it0'])*config.dt
-    
-    time_since_last_change = (it-config.FT['it_last'])*config.dt
-    
-    if time_since_last_change < sweep:
-        usaw = usaw + config.FT['eps']
-        # return config.FT['eps']*config.FT['Vfactors']*time_since_last_change
-    else:
-        utemp=usaw
-        config.FT['eps'] = -config.FT['eps']
-        config.FT['it_last'] = it
-        usaw = config.FT['last_usaw'] + config.FT['eps']
-        config.FT['last_usaw'] = utemp
+def searchfunction(usaw):
+    """
+    Calculates a search function for NA telescopes using the last search command.
 
-    config.FT['usaw'] = usaw
+    Parameters
+    ----------
+    usaw : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    usaw : TYPE
+        DESCRIPTION.
+
+    """
+    
+    from . import simu
+    from .config import NA,dt
+    from .simu import it
+    
+    for ia in range(NA):
+        it0 = config.FT['it0'][ia] ; it_last = config.FT['it_last'][ia]
         
+        a = config.FT['Sweep30s']/30
+        sweep = config.FT['Sweep0'] + a*(it-it0)*config.dt
+        
+        time_since_last_change = (it-it_last)*config.dt     # depends on ia
+        
+        if time_since_last_change < sweep:          # this depends on ia
+            usaw[ia] = usaw[ia] + config.FT['eps'][ia]
+            # return config.FT['eps']*config.FT['Vfactors']*time_since_last_change
+        else:
+            # print(it*dt,"change")                                       # this depends on ia
+            utemp=usaw[ia]
+            config.FT['eps'][ia] = -config.FT['eps'][ia]
+            config.FT['it_last'][ia] = it
+            usaw[ia] = config.FT['last_usaw'][ia] + config.FT['eps'][ia]
+            config.FT['last_usaw'][ia] = utemp
+        
+    
+    simu.eps[it] = config.FT['eps']
+    simu.it_last[it] = config.FT['it_last']
+    simu.last_usaw[it] = config.FT['last_usaw']
+        
+    # Investigation data
+    
     return usaw
 
 

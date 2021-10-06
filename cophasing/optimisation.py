@@ -497,19 +497,18 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
     
     NumberOfLoops = NgainsGD*NgainsPD
     
-    EarlyStop=0
-    time1 = 0 ; time0 = time.time() ; LoopNumber = 0
+    if len(filedir):
+        files = glob.glob(filedir+'*.fits')
+        Nfiles = len(files) ; print(f"Found: {Nfiles} files")
+    else:
+        files = [config.DisturbanceFile]
+        Nfiles = 1
+    
+    time0 = time.time() ; LoopNumber = 0
     for ig in range(NgainsGD):
-        lasttime=time1
-        time1=time.time()
-        print(f"--Time for last gain GD: {round(time1-lasttime,2)}s--")  
-        # if (ig-iOptimGD>4) and (np.mean(FCArray[iOptimGD+1:ig,:]) > minValue):
-        #         print("The higher gains won't do better. We stop the optimisation.")
-        #         EarlyStop=ig
-        #         break
+
         Ggd = GainsGD[ig]    
         print(f"-----------Start optimising with gain GD={Ggd}------------")   
-        
         
         for ip in range(NgainsPD):
             LoopNumber+=1
@@ -526,19 +525,13 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
             config.FT['GainGD'] = Ggd
             config.FT['GainPD'] = Gpd
             
-            print(f'Gain GD={Ggd}; GainPD={Gpd}')
-            
-            if len(filedir):
-                files = glob.glob(filedir+'*.fits')
-                Nfiles = len(files) ; print(f"Found: {Nfiles} files")
-            else:
-                files = [config.DisturbanceFile]
-                Nfiles = 1
+            print("\n----------------------------------")
+            print(f'## Gain GD={Ggd}; GainPD={Gpd} ##')
                 
             for ifile in range(Nfiles):
                 
                 DisturbanceFile = files[ifile]
-                print(f'Reading file number {ifile+1} over {Nfiles}')
+                print(f'File {ifile+1}/{Nfiles}')
                 
                 sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=40)
             
@@ -578,109 +571,23 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
                 ib = ct.posk(itel1, itel2, config.NA)
                 Value = criteria[igp,ib]
             
+            
+            print(f'\nComputed value={round(Value,5)}')
             if Value < minValue:    
                     minValue = Value
                     iOptim = igp
                     iOptimGD = ig
                     iOptimPD = ip
-            
-            # elif (Value > 10*minValue):
-            #     if (ip < NgainsPD-1):
-            #         # We put the NgainsPD-ip-1 next elements to 100.
-            #         Nelements = NgainsPD-ip-1
-            #         VarOPD[igp+1:igp+1+Nelements,:] = 100*np.ones([Nelements,NIN])
-            #         VarCP[igp+1:igp+1+Nelements,:] = 100*np.ones([Nelements,NC])
-            #         FCArray[igp+1:igp+1+Nelements,:] = 100*np.ones([Nelements,NIN])
-            #         LockedRatio[igp+1:igp+1+Nelements,:] = 100*np.ones([Nelements,NIN])
-            #         WLockedRatio[igp+1:igp+1+Nelements,:] = 100*np.ones([Nelements,NIN])
-            #         break
-                
-            # if optim=='opd':      # Optimisation on OPD residues
-            #     if not telescopes:
-            #         Value = np.mean(VarOPD[igp,:])
-            #     elif telescopes:
-            #         itel1,itel2 = telescopes[0]-1, telescopes[1]-1
-            #         ib = ct.posk(itel1, itel2, config.NA)
-            #         Value = VarOPD[igp,ib]
-            #     if Value < minValue:    
-            #         minValue = Value
-            #         iOptim = igp
-            #         iOptimGD = ig
-            #         iOptimPD = ip
-            
-            # elif optim == 'FC':     # Optimisation on final fringe contrast
-            #     if not telescopes:
-            #         Value = 1-np.mean(FCArray[igp,:])
-            #     elif telescopes:
-            #         itel1,itel2 = telescopes[0]-1, telescopes[1]-1
-            #         ib = ct.posk(itel1, itel2, config.NA)
-            #         Value = 1-FCArray[igp,ib]
-            #     if Value < minValue:
-            #         minValue = Value
-            #         iOptim = igp
-            #         iOptimGD = ig
-            #         iOptimPD = ip
-                    
-            # elif optim=='CP':       # Optimisation on Closure Phase variance
-            #     if not telescopes:
-            #         Value = np.mean(VarCP[igp,:])
-            #     elif telescopes:
-            #         if len(telescopes) != 3:
-            #             raise Exception('For defining a closure phase, telescopes must be three.')
-            #         itel1,itel2,itel3 = telescopes[0]-1, telescopes[1]-1, telescopes[2]-1
-            #         ic = ct.poskfai(itel1, itel2, itel3, config.NA)
-            #         Value = VarCP[igp,ic]
-            #     if Value < minValue:    
-            #         minValue = Value
-            #         iOptim = igp
-            #         iOptimGD = ig
-            #         iOptimPD = ip
-                    
-            # elif optim == 'LockedRatio':     # Optimisation on final fringe contrast
-            #     if not telescopes:
-            #         Value = np.mean(LockedRatio[igp,:])
-            #     elif telescopes:
-            #         itel1,itel2 = telescopes[0]-1, telescopes[1]-1
-            #         ib = ct.posk(itel1, itel2, config.NA)
-            #         Value = LockedRatio[igp,ib]
-            #     if Value < minValue:
-            #         minValue = Value
-            #         iOptim = igp
-            #         iOptimGD = ig
-            #         iOptimPD = ip
-                    
-            # elif optim == 'WLockedRatio':     # Optimisation on final fringe contrast
-            #     if not telescopes:
-            #         Value = np.mean(WLockedRatio[igp,:])
-            #     elif telescopes:
-            #         itel1,itel2 = telescopes[0]-1, telescopes[1]-1
-            #         ib = ct.posk(itel1, itel2, config.NA)
-            #         Value = WLockedRatio[igp,ib]
-            #     if Value < minValue:
-            #         minValue = Value
-            #         iOptim = igp
-            #         iOptimGD = ig
-            #         iOptimPD = ip
-            
-        #     elif (Value > 10*minValue) and (ip < NgainsPD-1):
-        #         VarOPD[ip+1:,:] = 100*np.ones([NgainsPD-ip-1,NIN])
-        #         VarCP[ip+1:,:] = 100*np.ones([NgainsPD-ip-1,NC])
-        #         FCArray[ip+1:,:] = 100*np.ones([NgainsPD-ip-1,NIN])
-        #         break
-        # elif (Value > 10*minValue) and (ip < NgainsGD-1):
-        #         VarOPD[ig+1:,:] = 100*np.ones([NgainsGD-ig-1,NIN])
-        #         VarCP[ig+1:,:] = 100*np.ones([NgainsGD-ig-1,NC])
-        #         FCArray[ig+1:,:] = 100*np.ones([NgainsGD-ig-1,NIN])
-        #         break
-            
+                    print(f"New minimal value={round(minValue,5)} better {round(minValue,5)} obtained with (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
+            else:
+                print(f"We keep minimal value={round(minValue,5)} obtained with gains (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
             Progress = LoopNumber/NumberOfLoops
             PassedTime = time.time() - time0
             RemainingTime = PassedTime/Progress - PassedTime
             
-            print(f'Gains (GD,PD)=({Ggd},{Gpd}) give value={round(Value,5)}')
-            print(f"Minimal value={round(minValue,5)} with gains (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
-            print(f"Progression: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)})")
-            print(f"Remaining time: {strtime(RemainingTime)}")
+            
+            print(f"\nProgression: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)}) - \
+Remains {strtime(RemainingTime)}")
 
         
     bestGains = GainsGD[iOptimGD], GainsPD[iOptimPD]
@@ -755,4 +662,4 @@ def strtime(time_to_write):
 
     """
     
-    return f"{int(time_to_write//3600)}h{(int(time_to_write%3600)/60)}m{int((time_to_write%3600)%60)}s"
+    return f"{int(time_to_write//3600)}h{int(time_to_write%3600/60)}m{int((time_to_write%3600)%60)}s"
