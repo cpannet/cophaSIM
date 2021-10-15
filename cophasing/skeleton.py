@@ -32,8 +32,7 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, N
              seedph=100, seedron=100, seeddist=100,
              starttracking=50, latencytime=0,
              piston_average=0,display=False,
-             checktime=True, checkperiod=10,
-             **kwargs):
+             checktime=True, checkperiod=10):
     
     """
     NAME: initialize - Initializes a structure to simulate an interferometer by \
@@ -218,16 +217,16 @@ SOURCE:
     config.TELref=TELref             # For display only: reference delay line
     config.checkperiod = checkperiod
     config.checktime = checktime
-    # config.ich = np.zeros([NIN,2])
-    # for ia in range(NA):
-    #     for iap in range(ia+1,NA):
-    #         config.ich[coh_tools.posk(ia,iap,NA)] = [ia,iap]
+    config.ich = np.zeros([NIN,2])
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            config.ich[coh_tools.posk(ia,iap,NA)] = [ia,iap]
     
     config.CPindex = np.zeros([NC,3])
     for ia in range(NA):
         for iap in range(ia+1,NA):
             for iapp in range(iap+1,NA):
-                config.CPindex[coh_tools.poskfai(ia,iap,iapp,NA)] = [ia,iap,iapp]
+                config.CPindex[coh_tools.poskfai(ia,iap,iapp,NA)] = [ia,iap,iapp]#int(''.join([ia+1,iap+1,iapp+1]))
 
     return 
 
@@ -243,12 +242,34 @@ def update_config(**kwargs):
     """
     
     for key,value in zip(list(kwargs.keys()),list(kwargs.values())):
-        setattr(config,key,value)
+        if not hasattr(config, key):
+            raise ValueError(f"{key} is not an attribute of config. Maybe it is in FS or FT ?")
+        else:    
+            setattr(config,key,value)
     
     if len(config.timestamps) != config.NT:
         config.timestamps = np.arange(config.NT)*config.dt
     
     return
+
+def save_config():
+    
+    a_dict={}
+
+    var_names = [name for name in dir(config) 
+                 if ("_" not in name) 
+                 and ("V2PM" not in name) 
+                 and ("P2VM" not in name)
+                 and ("timestamp" not in name)]
+    
+    for var_name in var_names:
+        a_dict[var_name] = eval(var_name)
+    # Tests with classes
+    # PC = FringeTracker.PistonCalculator()
+    # FS = FringeTracker.FringeSensor()
+    
+    with open('myfile.txt', 'w') as f:
+        print(a_dict, file=f)
 
 def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
                             spectra=[], RefLambda=0, NT=1000,dt=1,
@@ -893,7 +914,6 @@ Longueur timestamps: {len(timestamps)}")
         hdu.append(im3)
         hdu.append(im4)
 
-    
     print(f'Saving file into {filepath}')
     filedir = '/'.join(filepath.split('/')[:-1])    # remove the filename to get the file directory only
     if not os.path.exists(filedir):
@@ -906,7 +926,7 @@ Longueur timestamps: {len(timestamps)}")
 
       
 # @timer
-def loop(*args):
+def loop(*args, overwrite=False, verbose=False):
     """
     Core of the simulator. This routine calls the different modules according
     to the simulation timeline. 
@@ -1000,7 +1020,7 @@ def loop(*args):
             # LeftProcessingTime = (time.time()-time0)*(1-processedfraction)/processedfraction
             print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
 
-    
+    print(f"Done. (Total: {round(time.time()-time0)}s)")
     # Process observables for visualisation
     simu.PistonTrue = simu.PistonDisturbance - simu.CommandODL[:-config.latency]
 
@@ -1027,39 +1047,7 @@ def loop(*args):
     # print(args)
     if len(args):
         filepath = args[0]
-        print(f'Saving infos in {filepath}')
-        
-        fileexists = os.path.exists(filepath)
-        
-        if fileexists:
-            if 'overwrite' in args:
-                os.remove(filepath)
-            else:
-                overwrite = (input(f'{filepath} already exists. Do you want to overwrite it? (y/n)') == 'y')
-                if overwrite:
-                    os.remove(filepath)
-                else:
-                    return
-        
-        
-        hdr = fits.Header()
-        hdr['Date'] = time.strftime("%a, %d %b %Y %H:%M", time.localtime())
-        hdr['ObservationFile'] = config.ObservationFile
-        hdr['DisturbanceFile'] = config.DisturbanceFile
-        for key in ['NA', 'dt', 'ron', 'enf']:
-            print(key)     
-            hdr[key] = getattr(config, key)
-            
-        primary = fits.PrimaryHDU(header=hdr, data= config.spectra)
-        col1 = fits.Column(name='OPDTrue', format='15D', array=simu.OPDTrue)
-        col2 = fits.Column(name='PistonTrue', format='6D', array=simu.PistonTrue)
-        
-        coldefs = fits.ColDefs([col1, col2])
-        hdu1 = fits.BinTableHDU.from_columns(coldefs, name='Observables' )
-
-        hdu = fits.HDUList([primary, hdu1])
-        
-        hdu.writeto(filepath)
+        save_data(simu, config, filepath, overwrite=overwrite, verbose=verbose)
     
     return
 
@@ -1114,6 +1102,23 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     from . import simu
     
     from .simu import timestamps
+    
+    if 'which' in args:
+        print(f"Available observables to display:\n\
+              - Photometries: 'phot'\n\
+              - Disturbances: 'disturbances'\n\
+              - Pistons: 'piston'\n\
+              - Piston details: 'Pistondetails'\n\
+              - GD, PD, SNR evolution: 'perftable'\n\
+              - OPDs: 'opd'\n\
+              - OPD commands: 'OPDcmd'\n\
+              - OPD details: 'OPDdetails'\n\
+              - All OPDs on the same figure: 'OPDgathered'\n\
+              - Closure phases: 'cp'\n\
+              - Visibilities: 'vis'\n\
+              - Detector: 'detector'\n\
+              - State-machine: 'state'\n")
+        return
     
     ind = np.argmin(np.abs(config.spectraM-wl))
     wl = config.spectraM[ind]
@@ -1720,27 +1725,27 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 break
     
 
-        if 'OPDgathered' in args:
+    if 'OPDgathered' in args:
 
-            OPD_max = 1.1*np.max(np.abs(simu.OPDTrue[:,ib]))
-            OPD_min = -OPD_max
-            s = [OPD_min,OPD_max]
+        OPD_max = 1.1*np.max(np.abs(simu.OPDTrue))
+        OPD_min = -OPD_max
+        s = [OPD_min,OPD_max]
 
-            fig = plt.figure("OPD on one window")
-            ax = fig.subplots(nrows=1)
+        fig = plt.figure("OPD on one window")
+        ax = fig.subplots(nrows=1)
+        
+        for ib in range(config.NIN):
             
-            for ib in range(config.NIN):
-                
-                ax.plot(timestamps, simu.OPDTrue[:,ib], linestyle='-', label=f'{ich[ib]}: {np.sqrt(simu.VarOPD[ib])*1e3:.0f}nm RMS')
-                
-            ax.vlines(config.starttracking*dt,s[0],s[1],
-                   color='k', linestyle='--')
-            ax.set_ylim(s)
-            ax.set_xlabel('Time [ms]')
-            ax.set_ylabel('OPD [µm]')
-            plt.show()
-            ax.legend()
-            config.newfig+=1
+            ax.plot(timestamps, simu.OPDTrue[:,ib], linestyle='-', label=f'{ich[ib]}: {np.sqrt(simu.VarOPD[ib])*1e3:.0f}nm RMS')
+            
+        ax.vlines(config.starttracking*dt,s[0],s[1],
+               color='k', linestyle='--')
+        ax.set_ylim(s)
+        ax.set_xlabel('Time [ms]')
+        ax.set_ylabel('OPD [µm]')
+        plt.show()
+        ax.legend()
+        config.newfig+=1
 
 
 
@@ -2076,13 +2081,15 @@ WavelengthOfInterest
     
     Ndit = Period//DIT_NumberOfFrames
     simu.PhaseVar_atWOI = np.zeros([Ndit,NIN])
-    simu.Locked = np.zeros([Ndit,NIN])
+    simu.FTLocked = np.zeros([Ndit,NIN])
+    simu.PhaseStableEnough= np.zeros([Ndit,NIN])
     
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
         OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
         simu.PhaseVar_atWOI[it] = OPDVar*(2*np.pi/WavelengthOfInterest)**2
-        simu.Locked[it] = 1*(simu.PhaseVar_atWOI[it] < MaxPhaseVarForLocked)
+        simu.PhaseStableEnough[it] = 1*(simu.PhaseVar_atWOI[it] < MaxPhaseVarForLocked)
+        #simu.FTLocked[it] =  # Reste à définir en utilisant la matrice de poids.
         simu.VarOPD += 1/Ndit*OPDVar
         simu.TempVarPD += 1/Ndit*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
         simu.TempVarGD += 1/Ndit*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
@@ -2101,6 +2108,8 @@ WavelengthOfInterest
         
     simu.LockedRatio = np.mean(simu.Locked,axis=0)
     simu.WLockedRatio = np.mean(simu.Locked*simu.FringeContrast, axis=0)
+    simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
+    
     simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
     
     if not display:
@@ -2187,7 +2196,7 @@ WavelengthOfInterest
     plt.show()
     config.newfig += 1
     
-    return    
+    return
 
 
 def SpectralAnalysis(OPD = (1,2)):
@@ -2960,3 +2969,166 @@ def repeat_sequence(sequence, newNT):
                 newseq = np.concatenate([newseq,sequence])
             newseq = np.concatenate([newseq,sequence[:NumberOfRemainingElements]])
     return newseq
+
+
+
+def populate_hdr(objet, hdr, prefix="",verbose=False):
+    """
+    Function that puts all attributes (or keys if objet is a dictionary) into a header.
+    """
+    
+    if isinstance(objet, dict):
+        names = objet.keys()
+        
+    else:
+        names = dir(objet)
+        
+    names = [name for name in names if '_' not in name]
+    
+    DicoForImageHDU = {} # This dictionary will get all arrays that can't be inserted into header.
+    
+    supported_types = (str, float, int)
+    arrnames=[] ; notsupportednames=[]
+    for varname in names:
+        if isinstance(objet, dict):
+            value = objet.get(varname)
+        else:
+            value = getattr(objet, varname)
+
+        if isinstance(value, (np.ndarray,list)):
+            arrnames.append(varname)
+            DicoForImageHDU[f"{prefix}{varname}"] = value
+            
+        elif isinstance(value, dict):
+            if verbose:
+                print(f"{varname} is a ditionary")
+            _,dico_out = populate_hdr(value, hdr, f"{varname}.")
+            for key in dico_out.keys():
+                DicoForImageHDU[key] = dico_out[key]
+                
+        elif isinstance(value, str):
+            if len(value.encode('utf-8')) > 80:
+                value = value.split('/')[-1]
+                hdr[f"{prefix}{varname}"] = value
+                
+        elif isinstance(value, supported_types):
+            hdr[f"{prefix}{varname}"] = value
+            
+        else:
+            notsupportednames.append(varname)
+            if verbose:
+                print(f"{varname} is not of a supported type")
+
+    if len(arrnames):
+        if verbose:
+            print(f"These arrays can't be saved in header but will be in other hdus:{arrnames}")
+            
+    if len(notsupportednames):
+        if verbose:
+            print(f"These values had not a suitable type for being saved into fitsfile:{notsupportednames}")
+    
+    return hdr, DicoForImageHDU
+
+
+def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
+    
+    hdr = fits.Header()
+
+    hdr, DicoForImageHDU = populate_hdr(configobj, hdr, verbose=verbose)
+    
+    primary = fits.PrimaryHDU(header=hdr)
+    
+    cols=[] ; imhdu=[]
+    for key, array in DicoForImageHDU.items():
+        
+        if np.ndim(array) == 1:
+                if isinstance(array[0], str):
+                    form='A'
+                else:
+                    form='D'
+                cols.append(fits.Column(name=key, format=form, array=array))
+            
+        elif np.ndim(array) == 2:
+            imhdu.append(fits.ImageHDU(array, name=key))
+            
+    hdu = fits.BinTableHDU.from_columns(cols, name='config')
+    
+    hduL = fits.HDUList([primary,hdu])
+    for newhdu in imhdu:
+        hduL.append(newhdu)
+        
+    names = dir(simuobj) ; names = [name for name in names if '_' not in name]
+    
+    excludeddata=[]
+    cols=[] ; imhduL=[]
+    #AchromOPDspaceData=[] # Will get all arrays of size [NINxNT] and the truncatur of commands of size [NINxNT+2]
+    #MicChromOPDspaceData=[] # Will get all arrays of size [NINxNWxNT] 
+    #MacChromOPDspaceData=[] # Will get all arrays of size [NINxMWxNT]
+    #AchromPistonData=[] # Will get all arrays of size [NAxNT] and the truncatur of commands of size [NINxNT+2]
+    #MicChromPistonData=[] # Will get all arrays of size [NAxNWxNT] 
+    #MacChromPistonData=[] # Will get all arrays of size [NAxMWxNT] 
+    #ChromCfData=[] # Will get all arrays of size [NBxMWxNT]
+    
+    for varname in names:
+        value = getattr(simuobj, varname)
+
+        if isinstance(value, (np.ndarray,list)):
+            if np.ndim(value) == 1:
+                if isinstance(value[0], str):
+                    form='A'
+                else:
+                    form='1D'
+                
+                cols.append(fits.Column(name=varname, format=form, array=value))
+
+            elif np.ndim(value) >= 2:
+                if np.iscomplex(value).any():
+                    imhduL.append(fits.ImageHDU(np.real(value), name=f"{varname}R"))
+                    imhduL.append(fits.ImageHDU(np.imag(value), name=f"{varname}I"))
+
+                else:
+                    value = np.real(value)  # If the imaginary part is null, the test doesn't detect it as complex 
+                    #whereas FITS detect it as complex so it doesn't work.
+
+                    imhduL.append(fits.ImageHDU(value, name=varname))
+                    
+        else:
+            excludeddata.append(varname)
+    
+    if len(excludeddata):
+        if verbose:
+            print(f"These data couldn't be saved into fits file: {excludeddata}")
+    
+
+    hdu = fits.BinTableHDU.from_columns(cols, name='simu')
+    
+    
+    hduL.append(hdu)
+    
+    for newhdu in imhduL:
+        hduL.append(newhdu)
+        
+    print(f'Saving file into {filepath}')
+    if '/' in filepath:
+        filedir = '/'.join(filepath.split('/')[:-1])    # remove the filename to get the file directory only.
+    
+        if not os.path.exists(filedir):
+            os.makedirs(filedir)
+            
+    if os.path.exists(filepath):
+        if overwrite:
+            os.remove(filepath)
+            hduL.writeto(filepath)
+            hduL.close()
+            filedir=os.getcwd()
+            print("Overwrite on "+os.getcwd().replace('\\','/')+"/"+filepath)
+        else:
+            print(f"{filepath} already exists, and overwrite parameter is False.")
+    else:
+        hduL.writeto(filepath)
+        print("Write in "+os.getcwd().replace('\\','/')+"/"+filepath)
+        
+    print('Saved.')
+    
+    
+    

@@ -122,6 +122,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         P2VM = np.linalg.pinv(V2PM)    
         
         NW, MW = len(spectra), len(spectraM)
+        config.FS['MW']=MW
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
@@ -286,9 +287,10 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
                     k = ia*NA+iap
                     V2PM[ip, k] = M_spica[ip,ia]*np.transpose(np.conjugate(M_spica[ip,iap]))/(NA-1)
         
-        P2VM = np.linalg.pinv(V2PM)    
+        P2VM = np.linalg.pinv(V2PM)
         
         NW, MW = len(spectra), len(spectraM)
+        config.FS['MW']=MW
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
@@ -415,7 +417,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
     
     if init:
         
-        from .config import NW,MW,spectra
+        from .config import NW,spectra
         fitsfile = kwargs['fitsfile']
         
         hdul = fits.open(fitsfile)
@@ -460,13 +462,14 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         # We pick up the calibrated wavelengths and corresponding wavebands
         spectraM = wldico['EFF_WAVE']*1e6       # Convert to [µm]
         wavebandv2pm = np.abs(wldico['EFF_BAND'])*1e6   # Convert to [µm]
-            
+        
         # Spectral resolution of the first spectral channel
         config.FS['R'] = spectraM[0]/wavebandv2pm[0]
         
         # Number of wavelengths in V2PM and in the reference spectra
         MW = len(spectraM)
-
+        config.FS['MW'] = len(spectraM)
+        
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])             # Sky background (bias)
         np.random.seed(config.seedron)
@@ -774,7 +777,7 @@ def SPICAFS_TRUE2(*args, init=False, OW=10, wlinfo=False, **kwargs):
         config.spectra = spectra
         config.NW = NW
         config.spectraM = spectraM
-        config.MW = MW
+        config.FS['MW'] = MW
         config.OW = OW
         
         return

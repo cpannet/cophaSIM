@@ -13,13 +13,10 @@ saved during and after the simulation.
 
 import numpy as np
 
-try:
-    from .config import NA,NB,NC,NT,dt,MW,NW,NIN,FS,latency
-except:
-    raise Exception("The module 'config' must be imported and initialised \
-                    before importing simu")
+from .config import NA,NB,NC,NT,dt,NW,NIN,FS,latency
+from . import config
 
-
+MW = config.FS['MW']
 # Time
 it = 0
 timestamps = np.arange(NT)*dt
@@ -123,7 +120,7 @@ TempVarPD = np.zeros([NIN])
 TempVarGD = np.zeros([NIN])
 VarCPD = np.zeros([NC])
 VarCGD =np.zeros([NC])
-
+SNRSI=np.zeros([NIN])
 
 # Investigation Variables
 

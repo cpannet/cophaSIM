@@ -200,7 +200,6 @@ NT=512
 MT=NT
 OT=1
 NW=5
-MW=5
 OW=1
 
 NY=0
@@ -209,30 +208,30 @@ ND=0
 dyn=0
 
 # Source
-spectra=np.linspace(1.5,1.75,NW)      # Micro-sampling wavelength
-spectraM=spectra                    # Macro-sampling wavelength
-PDspectra=np.mean(spectra)          # Mean wavelength
-spectrum=np.ones_like(spectra)      # Source distribution spectral power
-CfObj=np.ones(4)
+spectra=np.linspace(1.5,1.75,NW)        # Micro-sampling wavelength
+spectraM=spectra                        # Macro-sampling wavelength
+PDspectra=np.mean(spectra)              # Mean wavelength
+spectrum=np.ones_like(spectra)          # Source distribution spectral power
+# CfObj=np.ones(4)
 
 
 # Fringe sensor
 fs='default'                # Default fringe sensor (one coherence = 2 pixels)
-NP = 4                      # Number of pixels
-V2PM=np.ones([NW,NP,NB])   # Matrix Visibility to Pixel, will be created by the FS chosen above
-P2VM=np.ones([NW,NB,NP])   # Matrix Pixel to Visibility, will be created by the FS chosen above
-MacroP2VM=np.ones([MW,NB,NP])
+
+# V2PM=np.ones([NW,NP,NB])   # Matrix Visibility to Pixel, will be created by the FS chosen above
+# P2VM=np.ones([NW,NB,NP])   # Matrix Pixel to Visibility, will be created by the FS chosen above
+# MacroP2VM=np.ones([MW,NB,NP])
 dt = 3                      # Frame time
-R = np.abs((MW-1)*PDspectra/(spectraM[-1] - spectraM[0]))
+# R = np.abs((MW-1)*PDspectra/(spectraM[-1] - spectraM[0]))
 
 # Create the dictionnary of the Fringe Sensor: will be completed by the fringesensor
 # Expected keys: NP, V2PM, P2VM, MacroP2VM, R
-FS = {'NP':NP}                 
-
+FS = {'NP':4}                 
+# FS={}
 
 # Noises
 noise=True   # No noise by default [0 if noise]
-qe = 0.7*np.ones(MW)    # Quantum efficiency
+qe = 0.7    # Quantum efficiency
 ron = 2     # Readout noise
 phnoise=0       # No photon noise by default [1 if ph noise]
 enf=1.5     # Excess Noise Factor defined as enf=<M²>/<M>² where M is the avalanche gain distrib
@@ -246,17 +245,17 @@ latency = 1                 # Latency in number of frames
 
 # Piston Calculator
 # pc='integrator'     # Default command calculator (integrator PD and GD without statemachine)
-state=0              # Statemachine starting mode (0=idle,1=search,2=track)
+# state=0              # Statemachine starting mode (0=idle,1=search,2=track)
 
-GainGD = 0.7
-GainPD = 0.3
-Ngd = 40
-Ncp = 150
-Sweep = 100
-Slope = Sweep*dt*1e-3
-Vfactor = np.array([0, -10,-9,-6,2,7])/10    # Non redundant SPICA
-Ncross = 1
-usePDref = True
+# GainGD = 0.7
+# GainPD = 0.3
+# Ngd = 40
+# Ncp = 150
+# Sweep = 100
+# Slope = Sweep*dt*1e-3
+# Vfactor = np.array([0, -10,-9,-6,2,7])/10    # Non redundant SPICA
+# Ncross = 1
+# usePDref = True
 
 # Piston Calculator dictionnary
 FT = {'Name':'integrator',
@@ -264,16 +263,34 @@ FT = {'Name':'integrator',
     
 
 # Simulation parameters
-filename='cohdefault'
-ich=np.array([NP,2])        # For display only: bases correspondances on pixels
+# filename='cohdefault'
+# ich=np.array([NP,2])        # For display only: bases correspondances on pixels
 TELref=0            # For display only: reference delay line
 newfig=0
 timestamp = np.arange(NT)*dt       # Timestamps in [ms]
 
+# a_dict={}
 
+# var_names = [name for name in dir() 
+#              if ("_" not in name) 
+#              and ("V2PM" not in name) 
+#              and ("P2VM" not in name)
+#              and ("timestamp" not in name)]
 
-# Tests with classes
-# PC = FringeTracker.PistonCalculator()
-# FS = FringeTracker.FringeSensor()
+# for var_name in var_names:
+#     a_dict[var_name] = eval(var_name)
+# # Tests with classes
+# # PC = FringeTracker.PistonCalculator()
+# # FS = FringeTracker.FringeSensor()
 
-        
+# with open('myfile.txt', 'w') as f:
+#     print(a_dict, file=f)
+    
+# f1=open("myfile.txt","r+")
+# input=f1.read()
+# input=input.replace('), ',')\n')
+# input=input.replace('}, ','}\n')
+# f2=open("myfile.txt","w+")
+# f2.write(input)
+# f1.close()
+# f2.close()

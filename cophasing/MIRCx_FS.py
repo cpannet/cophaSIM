@@ -141,6 +141,7 @@ given in config ({NA}).")
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
         config.FS['NP'] = NP
+        config.FS['MW'] = MW
         config.FS['posi'] = posi
         config.FS['posi_center'] = posi_center
         config.FS['MFD'] = MFD
@@ -208,7 +209,7 @@ given in config ({NA}).")
         
         return
     
-    from .config import NA, NB, NW, MW, OW
+    from .config import NA, NB
     from . import simu
     
     it = simu.it
@@ -227,7 +228,7 @@ given in config ({NA}).")
         simu.MacroImages[it,imw,:] += image_iw
         
         iow += 1
-        if iow == OW:
+        if iow == config.OW:
             imw+=1
             iow = 0      
 
@@ -240,8 +241,8 @@ given in config ({NA}).")
     #     print(f'Negative image value at t={it}')
     
     # estimates coherences
-    currCfEstimated = np.zeros([MW,NB])*1j
-    for imw in range(MW):
+    currCfEstimated = np.zeros([config.FS['MW'],NB])*1j
+    for imw in range(config.FS['MW']):
         Demodulation = config.FS['MacroP2VM'][imw,:,:]
         currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
     

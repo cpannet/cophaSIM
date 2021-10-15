@@ -104,7 +104,7 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         ThresholdGD, then this baseline is weighted down.
         DESCRIPTION. The default is 1.5.
     Threshold : BOOLEAN, optional
-        If False, the GD works also within a frange. Essentially for debugging.
+        If False, the GD works also within a frange. Essentially for debugging and optimisation of the GD gain.
     usePDref : BOOLEAN, optional
         If False, no reference vector
     useWmatrices: BOOLEAN, optional
@@ -132,7 +132,6 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         config.FT['GainGD'] = GainGD
         config.FT['GainPD'] = GainPD
         config.FT['state'] = np.zeros(NT)
-        config.FT['eps'] = np.ones(NA)
         config.FT['Ncross'] = Ncross
         config.FT['Ncp'] = Ncp
         config.FT['Nvar'] = Nvar
@@ -153,17 +152,28 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         config.FT['Sweep0'] = Sweep0        # Starting sweep in [s]
         config.FT['Sweep30s'] = Sweep30s    # Sweep at 30s
         config.FT['Slope'] = Slope          # Maximal slope given in µm/frame
-        config.FT['usaw'] = np.zeros([NT,NA])
-        config.FT['last_usaw'] = np.zeros(NA)
-        config.FT['it_last'] = np.zeros(NA)
-        config.FT['it0'] = np.zeros(NA)
+        
+        # Version usaw vector
+        # config.FT['usaw'] = np.zeros([NT,NA])
+        # config.FT['last_usaw'] = np.zeros(NA)
+        # config.FT['it_last'] = np.zeros(NA)
+        # config.FT['it0'] = np.zeros(NA)
+        # config.FT['eps'] = np.ones(NA)
+        
+        # Version usaw float
+        config.FT['usaw'] = np.zeros(NT)
+        config.FT['last_usaw'] = 0
+        config.FT['it_last'] = 0
+        config.FT['it0'] = 0
+        config.FT['eps'] = 1
+        
+        
         config.FT['ThresholdPhot'] = ThresholdPhot      # Minimal photometry SNR for launching search
 
         if len(Vfactors) != 0:
             config.FT['Vfactors'] = np.array(Vfactors)
         else:
             config.FT['Vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])/8.75
-            print(f"Searching velocity factors are {config.FT['Vfactors']}")
         
         config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*Slope     # The maximal OPD velocity is equal to slope/frame
         
@@ -189,8 +199,8 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         
         if config.TELref:
             iTELref = config.TELref - 1
-            L_ref = config.FT['OPD2Piston'][iTELref,:]
-            config.FT['OPD2Piston'] = config.FT['OPD2Piston'] - L_ref
+            # L_ref = config.FT['OPD2Piston'][iTELref,:]
+            config.FT['OPD2Piston'] = config.FT['OPD2Piston'] #- L_ref
         
         return
 
@@ -198,6 +208,8 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         for key, value in zip(list(kwargs_for_update.keys()),list(kwargs_for_update.values())):
             setattr(config.FT, key, value)
 
+        return
+    
     from . import simu
 
     it = simu.it
@@ -538,34 +550,46 @@ def CommandCalc(currPD,currGD):
                 
                 TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
                 
-                if (config.FT['state'][it-1] == 0):         # Last frame, all telescopes were tracked
-                    config.FT['it0'] = np.ones(NA)*it ; config.FT['it_last'] = np.ones(NA)*it
-                    config.FT['last_usaw'] = np.zeros(NA)
+                # if (config.FT['state'][it-1] == 0):         # Last frame, all telescopes were tracked
+                #     config.FT['it0'] = np.ones(NA)*it ; config.FT['it_last'] = np.ones(NA)*it
+                #     config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
                     
-                elif sum(TelescopesThatNeedARestart) > 0:
+                # elif sum(TelescopesThatNeedARestart) > 0:
                     
-                    # Version "Restart only concerned telescopes" (06-10-2021)
-                    # --> doesn't work because it avoids some OPDs.
-                    # for ia in TelescopesThatNeedARestart:
-                    #     config.FT['it0'][ia] = it ; config.FT['it_last'][ia] = it
-                    #     config.FT['last_usaw'][ia] = 0
+                #     # Version "Restart only concerned telescopes" (06-10-2021)
+                #     # --> doesn't work because it avoids some OPDs.
+                #     # for ia in TelescopesThatNeedARestart:
+                #     #     config.FT['it0'][ia] = it ; config.FT['it_last'][ia] = it
+                #     #     config.FT['last_usaw'][ia] = 0
                 
-                    # Version "Restart all" (06-10-2021)
-                    # Restart all telescope from their current position.
-                    config.FT['it0'] = np.ones(NA)*it
-                    config.FT['it_last'] = np.ones(NA)*it
-                    config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
+                #     # Version "Restart all" (06-10-2021)
+                #     # Restart all telescope from their current position.
+                #     config.FT['it0'] = np.ones(NA)*it
+                #     config.FT['it_last'] = np.ones(NA)*it
+                #     config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
                     
-                config.FT['usaw'][it] = searchfunction(config.FT['usaw'][it-1])         # Fonction search de vitesse 1µm/frame par piston
+                # config.FT['usaw'][it] = searchfunction(config.FT['usaw'][it-1])         # Fonction search de vitesse 1µm/frame par piston
                     
+                # Kernel = np.identity(NA) - Igdna
+                # simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
+                # Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)                 
+                
+                # # After multiplication by Kernel, the OPD velocities can only be lower or equal than before
+                
+                # usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
+            
+                if (config.FT['state'][it-1] == 0):# or (sum(TelescopesThatNeedARestart) >0) :
+                    config.FT['it0'] = it ; config.FT['it_last'] = it
+                    config.FT['last_usaw'] = config.FT['usaw'][it-1]
+            
+                usaw = np.copy(config.FT['usaw'][it-1])
+                config.FT['usaw'][it] = searchfunction2(usaw,it)      # In this version, usaw is a float
+            
                 Kernel = np.identity(NA) - Igdna
                 simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
-                Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)                 
-                
-                # After multiplication by Kernel, the OPD velocities can only be lower or equal than before
-                
-                usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
+                Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)
             
+                usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
                 
             else:
                 config.FT['state'][it] = 0
@@ -576,10 +600,19 @@ def CommandCalc(currPD,currGD):
             
     else:
         simu.time_since_loss[it] = 0
-        config.FT['state'][it] = 0 ; config.FT['eps'] = np.ones(NA)
+        config.FT['state'][it] = 0
+        # Version usaw vector
+        # config.FT['eps'] = np.ones(NA)
+        
+        # Version usaw float
+        config.FT['eps'] = 1
+        
         usearch = simu.SearchCommand[it-1]
         
-    usearch -= usearch[0]
+        
+    if config.TELref:
+        iTel = config.TELref-1
+        usearch = usearch - usearch[iTel]
     
     usearch = config.FT['search']*usearch
     simu.SearchCommand[it] = usearch
@@ -658,6 +691,12 @@ def CommandCalc(currPD,currGD):
         pass
     else:
         raise ValueError("The roundGD parameter of the fringe-tracker must be 'round', 'int' or 'no'.")
+        
+    if config.TELref:
+        iTel = config.TELref-1
+        uGD = uGD - uGD[iTel]
+        
+        
     simu.PistonGDCommand[it] = uGD
 
     """
@@ -702,6 +741,11 @@ def CommandCalc(currPD,currGD):
         currPistonPD = np.dot(FT['OPD2Piston'], currPDerr)
         # Integrator
         uPD = simu.PistonPDCommand[it-1] + FT['GainPD']*currPistonPD
+    
+    
+    if config.TELref:
+        iTel = config.TELref-1
+        uPD = uPD - uPD[iTel]
     
     simu.PistonPDCommand[it] = uPD
     
@@ -1015,4 +1059,45 @@ def searchfunction(usaw):
     
     return usaw
 
+def searchfunction2(usaw,it):
+    
+    a = config.FT['Sweep30s']/30
+    sweep = config.FT['Sweep0'] + a*(it-config.FT['it0'])*config.dt
+    
+    time_since_last_change = (it-config.FT['it_last'])*config.dt
+    
+    if time_since_last_change < sweep:
+        usaw = usaw + config.FT['eps']
+        # return config.FT['eps']*config.FT['Vfactors']*time_since_last_change
+    else:
+        utemp=usaw
+        config.FT['eps'] = -config.FT['eps']
+        config.FT['it_last'] = it
+        usaw = config.FT['last_usaw'] + config.FT['eps']
+        config.FT['last_usaw'] = utemp
 
+    config.FT['usaw'][it] = usaw
+        
+    return usaw
+
+def searchfunction3(usaw,it):
+    
+    a = config.FT['Sweep30s']/30
+    sweep = config.FT['Sweep0'] + a*(it-config.FT['it0'])*config.dt
+    
+    time_since_last_change = (it-config.FT['it_last'])*config.dt
+    
+    if time_since_last_change < sweep:
+        usaw = config.FT['eps']
+        # return config.FT['eps']*config.FT['Vfactors']*time_since_last_change
+    else:
+        utemp=usaw
+        diff = config.FT['last_usaw'] - usaw
+        config.FT['eps'] = -config.FT['eps']
+        config.FT['it_last'] = it
+        usaw = diff + config.FT['eps']
+        config.FT['last_usaw'] = utemp
+
+    config.FT['usaw'][it] = usaw
+        
+    return usaw

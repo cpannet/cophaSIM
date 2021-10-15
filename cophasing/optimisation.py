@@ -23,55 +23,55 @@ import glob
 
 from importlib import reload  # Python 3.4+ only.
 
-def OptimGainMultiprocess(GainsPD=[],GainsGD=[],optim='FC',
-                TimeBonds=100, WavelengthOfInterest=1.5, DIT=50,
-                telescopes=0):
+# def OptimGainMultiprocess(GainsPD=[],GainsGD=[],optim='FC',
+#                 TimeBonds=100, WavelengthOfInterest=1.5, DIT=50,
+#                 telescopes=0):
     
     
-    import multiprocessing
+#     import multiprocessing
     
-    pool = multiprocessing.Pool()
+#     pool = multiprocessing.Pool()
     
-    from .config import NIN, NC
+#     from .config import NIN, NC
     
-    if len(GainsGD):
-        gainstr='GainGD'
-        Ngains = len(GainsGD)
-        Gains = GainsGD
-    elif len(GainsPD):
-        gainstr='GainPD'
-        Ngains = len(GainsPD)
-        Gains = GainsPD
-    else:
-        raise Exception('Need GainsPD or GainsGD.')
+#     if len(GainsGD):
+#         gainstr='GainGD'
+#         Ngains = len(GainsGD)
+#         Gains = GainsGD
+#     elif len(GainsPD):
+#         gainstr='GainPD'
+#         Ngains = len(GainsPD)
+#         Gains = GainsPD
+#     else:
+#         raise Exception('Need GainsPD or GainsGD.')
         
-    print(f"Start {gainstr} optimisation with sample gains={Gains}")
+#     print(f"Start {gainstr} optimisation with sample gains={Gains}")
     
-    # SimpleIntegrator(init=True, GainPD=Gains[0], GainGD=0)
-    
-    
-    VarOPD = np.zeros([Ngains,NIN])     # Phase variances
-    VarCP = np.zeros([Ngains, NC])      # Cosure Phase variances
-    FCArray = np.zeros([Ngains, NIN])   # Contains the fringe contrasts
+#     # SimpleIntegrator(init=True, GainPD=Gains[0], GainGD=0)
     
     
-    minValue = 10000
-    iOptim = -1
+#     VarOPD = np.zeros([Ngains,NIN])     # Phase variances
+#     VarCP = np.zeros([Ngains, NC])      # Cosure Phase variances
+#     FCArray = np.zeros([Ngains, NIN])   # Contains the fringe contrasts
+    
+    
+#     minValue = 10000
+#     iOptim = -1
         
     
-    def GiveResults(G):
+    # def GiveResults(G):
         
-        config.FT['GainPD'] = G
+    #     config.FT['GainPD'] = G
         
-        print(f'{gainstr}={G}')
+    #     print(f'{gainstr}={G}')
         
-        # Launch the simulator
-        sk.loop()
-        # Load the performance observables into simu module
-        sk.ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=False)
+    #     # Launch the simulator
+    #     sk.loop()
+    #     # Load the performance observables into simu module
+    #     sk.ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=False)
                 
         
-        return simu.VarOPD, simu.VarCPD, simu.VarCGD, simu.FringeContrast
+    #     return simu.VarOPD, simu.VarCPD, simu.VarCGD, simu.FringeContrast
         
        
         # elif (Value > 10*minValue) and (ig < Ngains-1):
@@ -82,9 +82,9 @@ def OptimGainMultiprocess(GainsPD=[],GainsGD=[],optim='FC',
     
     
     # result = GiveResults(0.2)
-    myresult = pool.starmap(GiveResults, Gains.reshape([Ngains,1]))
+    # myresult = pool.starmap(GiveResults, Gains.reshape([Ngains,1]))
     
-    print(myresult)
+    # print(myresult)
     
     # for ig in range(Ngains):
         
@@ -147,7 +147,7 @@ def OptimGainMultiprocess(GainsPD=[],GainsGD=[],optim='FC',
     
 
 
-    return #bestGain, iOptim, VarOPD, VarCP, FCArray
+    # return #bestGain, iOptim, VarOPD, VarCP, FCArray
 
 
 def OptimGain(GainsPD=[],GainsGD=[],optim='FC',filedir='',
@@ -156,6 +156,7 @@ def OptimGain(GainsPD=[],GainsGD=[],optim='FC',filedir='',
     
     from . import simu
     from . import config
+    import pandas as pd
     
     from .config import NIN, NC
         
@@ -184,6 +185,8 @@ def OptimGain(GainsPD=[],GainsGD=[],optim='FC',filedir='',
     minValue = 10000
     iOptim = -1
     EarlyStop=0
+    NumberOfLoops = Ngains
+    time0 = time.time() ; LoopNumber = 0
     for ig in range(Ngains):
         
         if (ig-iOptim>4) and (np.mean(FCArray[iOptim+1:ig,:]) > minValue):
@@ -230,11 +233,11 @@ def OptimGain(GainsPD=[],GainsGD=[],optim='FC',filedir='',
         if optim=='opd':
             criteria = VarOPD
         elif optim=='FC':
-            criteria = 1/FCArray
+            criteria = 1-FCArray
         elif optim == 'LockedRatio':
-            criteria = 1/LockedRatio
+            criteria = 1-LockedRatio
         elif optim == 'WLockedRatio':
-            criteria = 1/WLockedRatio
+            criteria = 1-WLockedRatio
         elif optim == 'CP':
             if (not telescopes) and (len(telescopes) != 3):
                 raise Exception('For defining a closure phase, telescopes must be three.')
@@ -261,17 +264,67 @@ def OptimGain(GainsPD=[],GainsGD=[],optim='FC',filedir='',
     
         print(f'Current value={Value}, Minimal value={minValue} for Gain={Gains[iOptim]}')
         
+        LoopNumber+=1
+        Progress = LoopNumber/NumberOfLoops
+        PassedTime = time.time() - time0
+        RemainingTime = PassedTime/Progress - PassedTime
+        
+        
+        print(f"\nProgression: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)}) - \
+Remains {strtime(RemainingTime)}")
+        
     bestGain = Gains[iOptim]
     
     from tabulate import tabulate
-    ich = [12,13,14,15,16,23,24,25,26,34,35,36,45,46,56]
+    # ich = [12,13,14,15,16,23,24,25,26,34,35,36,45,46,56]
+    ichint = [int(''.join([str(int(ic[0]+1)),str(int(ic[1]+1))])) for ic in config.ich] # Convert list of tuples into list of int
     
-    dico_results = {"Base": ich, "LR [%]":np.transpose(np.round(LockedRatio[iOptim]*100)),
+    criteriasBase = ["LR [%]", "WLR [%]", "FC [%]", "VarOPD [µm]"]
+    
+    Ncb = len(criteriasBase)
+    A=list(np.repeat(Gains, Ncb)) ; B = criteriasBase*Ngains
+    
+    base_3d = np.array([LockedRatio,WLockedRatio,FCArray,VarOPD])
+    
+    base_2d = base_3d.reshape([Ncb*Ngains,NIN], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
+    
+    # Need another dataframe only for Closure Phase (dimension 10)
+    
+    resultsBasedf = pd.DataFrame(data=base_2d, columns=[A,B], index=ichint)
+    
+    CPindexint = [int(''.join([str(int(cpindex[0]+1)),str(int(cpindex[1]+1)),str(int(cpindex[2]+1))])) for cpindex in config.CPindex]
+    
+    criteriasClosure = ["VarCP [µm]", "LR [%]", "WLR [%]", "SNR"]
+    
+    Ncc = len(criteriasClosure)
+    A=list(np.repeat(Gains, Ncc)) ; B = criteriasClosure*Ngains
+    
+    # We only have VarCP so far so we populate the missing criteria with NaN values.
+    CPLR = np.ones([Ngains,NC])*np.nan
+    CPWLR = np.ones([Ngains,NC])*np.nan
+    CPSNR = np.ones([Ngains,NC])*np.nan
+    
+    closure_3d = np.array([VarCP,CPLR,CPWLR,CPSNR])
+    
+    closure_2d = closure_3d.reshape([Ncc*Ngains,NC], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
+
+    resultsClosuredf = pd.DataFrame(data=closure_2d, columns=[A,B],index=CPindexint)
+    
+    dico_results_base = {"Base": ichint, "LR [%]":np.transpose(np.round(LockedRatio[iOptim]*100)),
                 "WLR [%]":np.transpose(np.round(WLockedRatio[iOptim]*100)),
                 "FC [%]":np.transpose(np.round(FCArray[iOptim]*100)),
                 "Var [µm]":np.transpose(np.round(VarOPD[iOptim],2))}
+    
+    # dico_results_closure = {"Base": ichint, "LR [%]":np.transpose(np.round(LockedRatio[iOptim]*100)),
+    #             "WLR [%]":np.transpose(np.round(WLockedRatio[iOptim]*100)),
+    #             "FC [%]":np.transpose(np.round(FCArray[iOptim]*100)),
+    #             "Var [µm]":np.transpose(np.round(VarOPD[iOptim],2))}
+    
     print(f"Best performances reached with gain={bestGain}")
-    print(tabulate(dico_results, headers="keys"))
+    print(tabulate(dico_results_base, headers="keys"))
+    
+    print(f"Same for closure phases with gain={bestGain}")
+    print(tabulate(resultsClosuredf[bestGain], headers="keys"))
     
     if len(GainsGD):
         config.FT['GainGD'] = bestGain
@@ -279,14 +332,14 @@ def OptimGain(GainsPD=[],GainsGD=[],optim='FC',filedir='',
         config.FT['GainPD'] = bestGain
     
     
-    print("We launch again the simulation with the best gainsse gains on the last \
-disturbance file to show the results.")
+#     print("We launch again the simulation with the best gainsse gains on the last \
+# disturbance file to show the results.")
     
-    sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=50)
+#     sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=50)
 
-    # Launch the simulator
-    sk.loop()
-    sk.display('perftable',wl=WavelengthOfInterest)
+#     # Launch the simulator
+#     sk.loop()
+#     sk.display('perftable',wl=WavelengthOfInterest)
     
 #     print(f"Best gain: {Gains[iOptim]} \n\
 # Average OPD Variance: {list(np.round(VarOPD[iOptim],2))} \n\
@@ -295,7 +348,7 @@ disturbance file to show the results.")
 # Weighted Locked Ratio: {WLockedRatio[iOptim]} \n\
 # Locked Ratio: {LockedRatio[iOptim]}")
     
-    return bestGain, iOptim, WLockedRatio, LockedRatio, VarOPD, VarCP, FCArray, EarlyStop
+    return bestGain, iOptim, resultsBasedf,  resultsClosuredf, EarlyStop
 
 
 
@@ -435,6 +488,262 @@ gains={GainsGD}")
 
 
 
+
+
+def OptimGainsTogether_new(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20), optim='opd',filedir='',
+                TimeBonds=100, WavelengthOfInterest=1.5,
+                telescopes=0,display=False):
+    """
+    Estimates the best couple GD and PD gains after calculating the performance 
+    (residual phase) of the servo loop on all the files contained in filedir.
+
+    Parameters
+    ----------
+    GainsPD : TYPE, optional
+        DESCRIPTION. The default is [].
+    GainsGD : TYPE, optional
+        DESCRIPTION. The default is [].
+    optim : TYPE, optional
+        DESCRIPTION. The default is 'opd'.
+    filedir : TYPE, optional
+        DESCRIPTION. The default is ''.
+    TimeBonds : TYPE, optional
+        DESCRIPTION. The default is 100.
+    WavelengthOfInterest : TYPE, optional
+        DESCRIPTION. The default is 1.5.
+    DIT : TYPE, optional
+        DESCRIPTION. The default is 50.
+    telescopes : TYPE, optional
+        DESCRIPTION. The default is 0.
+
+    Raises
+    ------
+    Exception
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    from . import simu
+    from . import config
+    import pandas as pd
+    
+    from .config import NIN, NC
+        
+    if not (len(GainsPD) and len(GainsPD)):
+        raise Exception('Need GainsPD and GainsGD.')
+    
+    NgainsGD = len(GainsGD)
+    NgainsPD = len(GainsPD)
+    NDIT = len(DITs)
+        
+    print(f"Start optimisation with sample gains GD={GainsGD} and PD={GainsPD}")
+    
+    VarOPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])         # Phase variances
+    VarCP = np.zeros([NDIT,NgainsGD,NgainsPD,NC])           # Closure Phase variances
+    SNR = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])            # Signal-to-noise ratio in the scientific instrument
+    FCArray = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])        # Contains the fringe contrasts
+    LockedRatio = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])    # Locked ratio
+    WLockedRatio = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])   # Weigthed locked ratio
+    
+    minValue = 10000
+    
+    NumberOfLoops = NgainsGD*NgainsPD
+    
+    if len(filedir):
+        files = glob.glob(filedir+'*.fits')
+        Nfiles = len(files) ; print(f"Found: {Nfiles} files")
+    else:
+        files = [config.DisturbanceFile]
+        Nfiles = 1
+    
+    time0 = time.time() ; LoopNumber = 0
+    
+    for ig in range(NgainsGD):
+
+        Ggd = GainsGD[ig]    
+        print(f"-----------Start optimising with gain GD={Ggd}------------")   
+        
+        for ip in range(NgainsPD):
+            LoopNumber+=1
+            igp = ig*NgainsPD + ip  # Position in the tables
+            minindcurrentGD = ig*NgainsPD
+            maxindcurrentGD = minindcurrentGD + NgainsPD
+            # if (ip-iOptimPD>4) and (np.mean(FCArray[iOptimPD+1:ig,:]) > minValue):
+            #     print("The higher gains won't do better. We stop the optimisation.")
+            #     EarlyStop=ig
+            #     break
+            
+            Gpd = GainsPD[ip]
+            
+            config.FT['GainGD'] = Ggd
+            config.FT['GainPD'] = Gpd
+            
+            print("\n----------------------------------")
+            print(f'## Gain GD={Ggd}; GainPD={Gpd} ##')
+                
+            for ifile in range(Nfiles):
+                
+                DisturbanceFile = files[ifile]
+                print(f'File {ifile+1}/{Nfiles}')
+                
+                sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=40)
+            
+                # Launch the simulator
+                sk.loop()
+                # Load the performance observables into simu module
+                for idit in range(NDIT):
+                    DIT=DITs[idit]
+                    sk.ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, display=False)
+                    
+                    # VarOPD, VarCP, SNRSI, FringeContrast, LockedRatio, WLockedRatio = perfs
+                    
+                    # Initialise the comparison tables
+                    VarOPD[idit,ig,ip,:] += simu.VarOPD/Nfiles
+                    VarCP[idit,ig,ip,:] += simu.VarCPD/Nfiles
+                    # SNR[idit,ig,ip,:] += simu.SNRSI/Nfiles
+                    FCArray[idit,ig,ip,:] += simu.FringeContrast[0]/Nfiles
+                    LockedRatio[idit,ig,ip,:] += simu.LockedRatio/Nfiles
+                    WLockedRatio[idit,ig,ip,:] += simu.WLockedRatio/Nfiles
+            
+            
+            if optim=='opd':
+                criteria = VarOPD
+            elif optim=='FC':
+                criteria = 1-FCArray
+            elif optim == 'LockedRatio':
+                criteria = 1-LockedRatio
+            elif optim == 'WLockedRatio':
+                criteria = 1-WLockedRatio
+            elif optim == 'CP':
+                if (not telescopes) and (len(telescopes) != 3):
+                    raise Exception('For defining a closure phase, telescopes must be three.')
+                else:
+                    criteria = VarCP
+                    
+                    
+            if not telescopes:
+                Value = np.max(np.mean(criteria[:,ig,ip,:], axis=1))   # Maximum (over DITs) of the averaged value (over baselines)
+                bestDIT = DITs[np.argmax(np.mean(criteria[:,ig,ip,:], axis=1))]
+            else:
+                itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+                ib = ct.posk(itel1, itel2, config.NA)
+                Value = np.max(criteria[:,ig,ip,ib])
+                bestDIT = DITs[np.argmax(criteria[:,ig,ip,ib])]
+            
+            
+            print(f'\nComputed value={round(Value,5)}')
+            if Value < minValue:    
+                    minValue = Value
+                    iOptim = igp
+                    iOptimGD = ig
+                    iOptimPD = ip
+                    print(f"New minimal value={round(minValue,5)} better {round(minValue,5)} obtained with (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
+            else:
+                print(f"We keep minimal value={round(minValue,5)} obtained with gains (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
+            Progress = LoopNumber/NumberOfLoops
+            PassedTime = time.time() - time0
+            RemainingTime = PassedTime/Progress - PassedTime
+            
+            
+            print(f"\nProgression: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)}) - \
+Remains {strtime(RemainingTime)}")
+
+        
+    bestGains = GainsGD[iOptimGD], GainsPD[iOptimPD]
+    
+    
+    from tabulate import tabulate
+    # ich = [12,13,14,15,16,23,24,25,26,34,35,36,45,46,56]
+    ichint = [int(''.join([str(int(ic[0]+1)),str(int(ic[1]+1))])) for ic in config.ich] # Convert list of tuples into list of int
+    
+    criteriasBase = ["LR [%]", "WLR [%]", "FC [%]", "VarOPD [µm]"]
+    
+    Ncb = len(criteriasBase)
+    # A=list(np.repeat(GainsGD, Ncb)) ; B = criteriasBase*Ngains
+    
+    A = list(np.repeat(DITs, NgainsGD*NgainsPD*Ncb))
+    Btemp = list(np.repeat(GainsGD,Ncb*NgainsPD))
+    B = Btemp * NDIT
+    Ctemp = list(np.repeat(GainsPD,Ncb))
+    C = Ctemp * NDIT * NgainsGD
+    D = criteriasBase * NDIT * NgainsGD * NgainsPD 
+    
+    base_5d = np.array([LockedRatio,WLockedRatio,FCArray,VarOPD])
+    base_5d = np.transpose(base_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order in this order
+    
+    base_2d = base_5d.reshape([NDIT*Ncb*NgainsGD*NgainsPD,NIN], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
+    
+    # Need another dataframe only for Closure Phase (dimension 10)
+    
+    resultsBasedf = pd.DataFrame(data=base_2d, columns=[A,B,C,D], index=ichint)
+    
+    CPindexint = [int(''.join([str(int(cpindex[0]+1)),str(int(cpindex[1]+1)),str(int(cpindex[2]+1))])) for cpindex in config.CPindex]
+    
+    criteriasClosure = ["VarCP [µm]", "LR [%]", "WLR [%]", "SNR"]
+    
+    # Ncc = len(criteriasClosure)
+    # A=list(np.repeat(GainsGD, NgainsPD*Ncc))
+    # Btemp = list(np.repeat(GainsPD, Ncc))
+    # B = Btemp * NgainsGD
+    # C = criteriasClosure * NgainsGD * NgainsPD
+    
+    Ncc = len(criteriasClosure)
+    A = list(np.repeat(DITs, NgainsGD*NgainsPD*Ncc))
+    Btemp = list(np.repeat(GainsGD,Ncc*NgainsPD))
+    B = Btemp * NDIT
+    Ctemp = list(np.repeat(GainsPD,Ncc))
+    C = Ctemp * NDIT * NgainsGD
+    D = criteriasClosure * NDIT * NgainsGD * NgainsPD 
+    
+    
+    # We only have VarCP so far so we populate the missing criteria with NaN values.
+    CPLR = np.ones([NDIT,NgainsGD, NgainsPD,NC])*np.nan
+    CPWLR = np.ones([NDIT,NgainsGD,NgainsPD,NC])*np.nan
+    CPSNR = np.ones([NDIT,NgainsGD,NgainsPD,NC])*np.nan
+    
+    closure_5d = np.array([VarCP,CPLR,CPWLR,CPSNR])
+    closure_5d = np.transpose(closure_5d, (0,3,2,1,4))
+    
+    closure_2d = closure_5d.reshape([NDIT*Ncc*NgainsGD*NgainsPD,NC], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
+
+    resultsClosuredf = pd.DataFrame(data=closure_2d, columns=[A,B,C,D],index=CPindexint)
+    
+    # dico_results_base = {"Base": ichint, "LR [%]":np.transpose(np.round(LockedRatio[iOptimGD,iOptimPD]*100)),
+    #             "WLR [%]":np.transpose(np.round(WLockedRatio[iOptimGD,iOptimPD]*100)),
+    #             "FC [%]":np.transpose(np.round(FCArray[iOptimGD,iOptimPD]*100)),
+    #             "Var [µm]":np.transpose(np.round(VarOPD[iOptimGD,iOptimPD],2))}
+    
+    # dico_results_closure = {"Base": ichint, "LR [%]":np.transpose(np.round(LockedRatio[iOptim]*100)),
+    #             "WLR [%]":np.transpose(np.round(WLockedRatio[iOptim]*100)),
+    #             "FC [%]":np.transpose(np.round(FCArray[iOptim]*100)),
+    #             "Var [µm]":np.transpose(np.round(VarOPD[iOptim],2))}
+    
+    print(f"Best performances reached with gains={bestGains} and DIT={bestDIT}")
+    print(tabulate(resultsClosuredf[bestDIT,GainsGD[iOptimGD], GainsPD[iOptimPD]], headers="keys"))
+    
+    print(f"Same for closure phases with gain={bestGains}")
+    print(tabulate(resultsClosuredf[bestDIT,GainsGD[iOptimGD], GainsPD[iOptimPD]], headers="keys"))
+   
+    if display:
+        print("We launch again the simulation with these gains on the last\
+        disturbance file to show the results.")
+        
+        config.FT['GainGD'] = bestGains[0]
+        config.FT['GainPD'] = bestGains[1]
+        sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=40)
+        
+        # Launch the simulator
+        sk.loop()
+        sk.display(wl=WavelengthOfInterest)
+    
+    
+    Optimum = bestDIT, GainsGD[iOptimGD], GainsPD[iOptimPD]
+    
+    return Optimum, iOptimGD, iOptimPD, resultsBasedf,  resultsClosuredf
 
 
 def OptimGainsTogether(GainsPD=[],GainsGD=[],optim='opd',filedir='',
@@ -592,7 +901,6 @@ Remains {strtime(RemainingTime)}")
         
     bestGains = GainsGD[iOptimGD], GainsPD[iOptimPD]
     
-    
     from tabulate import tabulate
     ich = [12,13,14,15,16,23,24,25,26,34,35,36,45,46,56]
     
@@ -617,8 +925,6 @@ disturbance file to show the results.")
     sk.display(wl=WavelengthOfInterest)
     
     return bestGains, iOptim, iOptimPD, iOptimGD, LockedRatio, WLockedRatio, VarOPD, VarCP, FCArray
-
-
 
 
 def calcRMS(startframe):

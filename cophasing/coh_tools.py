@@ -901,7 +901,7 @@ def get_infos(file):
             FreqSampling = np.arange(NF)*df
             
         except:
-            print('No Disturbance PSD in FITSfile. The arrays FreqSampling, PSD and Filter are put to zero.')
+            # print('No Disturbance PSD in FITSfile. The arrays FreqSampling, PSD and Filter are put to zero.')
             FreqSampling = np.zeros(NT); PSD = np.zeros(NT); Filter = np.zeros(NT)
 
     return filetimestamps,filelmbdas, piston, transmission, FreqSampling, PSD, Filter,hdr
