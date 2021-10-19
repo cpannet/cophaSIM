@@ -561,7 +561,7 @@ def OptimGainsTogether_new(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20), opt
         Nfiles = 1
     
     time0 = time.time() ; LoopNumber = 0
-    
+    iOptimGD=0; iOptimPD=0
     for ig in range(NgainsGD):
 
         Ggd = GainsGD[ig]    
@@ -632,7 +632,7 @@ def OptimGainsTogether_new(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20), opt
                 itel1,itel2 = telescopes[0]-1, telescopes[1]-1
                 ib = ct.posk(itel1, itel2, config.NA)
                 Value = np.max(criteria[:,ig,ip,ib])
-                bestDIT = DITs[np.argmax(criteria[:,ig,ip,ib])]
+                bestDIT = DITs[np.argmax(criteria[:,ig,ip,ib])]o
             
             
             print(f'\nComputed value={round(Value,5)}')

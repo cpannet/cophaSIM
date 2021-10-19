@@ -2106,8 +2106,8 @@ WavelengthOfInterest
         
         InFrame += DIT_NumberOfFrames
         
-    simu.LockedRatio = np.mean(simu.Locked,axis=0)
-    simu.WLockedRatio = np.mean(simu.Locked*simu.FringeContrast, axis=0)
+    simu.LockedRatio = np.mean(simu.PhaseStableEnough,axis=0)
+    simu.WLockedRatio = np.mean(simu.PhaseStableEnough*simu.FringeContrast, axis=0)
     simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
     
     simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
