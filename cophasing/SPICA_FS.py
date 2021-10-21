@@ -73,6 +73,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         from .config import NA,NB
         
         # Created by the user here
+        # ich = np.array([12,13,23,24,14,15,25,16,26,36,34,35,45,46,56])
         ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
                   [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
         

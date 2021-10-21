@@ -953,7 +953,11 @@ def loop(*args, overwrite=False, verbose=False):
     reload(simu)
     
     # Importation of the object 
-    CfObj, CPObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
+    if NA>=3:
+        CfObj, CPObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
+    else:
+        CfObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
+        
     
     #scaling it to the spectral sampling  and integration time dt
     delta_wav = np.abs(spectra[1]-spectra[2])
@@ -961,7 +965,8 @@ def loop(*args, overwrite=False, verbose=False):
     CfObj = CfObj * delta_wav           # Photons/spectralchannel/second at the entrance of the FS
     CfObj = CfObj * config.dt*1e-3      # Photons/spectralchannel/DIT at the entrance of the FS
     
-    simu.ClosurePhaseObject = CPObj
+    if NA>=3:
+        simu.ClosurePhaseObject = CPObj
     simu.CoherentFluxObject = CfObj
     
     # Importation of the disturbance
@@ -1227,6 +1232,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         linestyle='solid',label='Estimated'))    
         linestyles.append(mlines.Line2D([], [], color='black',
                                         linestyle='dashed',label='Disturbance'))
+        linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking'))
     
     
         plt.figure("Photometries")
@@ -1239,7 +1246,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                      color=telcolors[ia+1],linestyle='solid')#,label='Estimated photometries')
             
         plt.vlines(config.starttracking*dt,s[0],s[1],
-                   color='k', linestyle='--')
+                   color='k', linestyle=':')
         plt.legend(handles=beam_patches+linestyles)
         plt.grid()
         plt.xlabel('Time (ms)')
@@ -1257,6 +1264,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         linestyle='solid',label='Estimated'))    
         linestyles.append(mlines.Line2D([], [], color='black',
                                         linestyle='dashed',label='Disturbance'))
+        linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking'))
         # linestyles.append(mlines.Line2D([], [], color='black',
         #                                 linestyle='dotted',label='Command'))
         
@@ -1282,9 +1291,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             plt.grid()
         
         ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle='--')
-        ax2.vlines(config.starttracking*dt,ax2ylim[0],ax2ylim[1],
-                       color='k', linestyle='--')
+                   color='k', linestyle=':')
+        # ax2.vlines(config.starttracking*dt,ax2ylim[0],ax2ylim[1],
+        #                color='k', linestyle=':')
         ax2.set_ylabel('True Pistons [µm]')
         ax2.set_ylim(ax2ylim)
         ax1.set_ylabel('Disturbance Pistons [µm]')
@@ -1309,6 +1318,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         label='GD Command'))
         linestyles.append(mlines.Line2D([], [], color=colors[4],
                                         label='Search Command'))
+        linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking'))
         # linestyles.append(mlines.Line2D([], [], color=colors[5],
         #                                 label='Modulation Command'))
     
@@ -1340,7 +1351,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             ax.grid()
         
             ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle='--')
+                   color='k', linestyle=':')
 
         plt.xlabel('Time (ms)')
         plt.legend(handles=linestyles)
@@ -1371,6 +1382,14 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                'figure.subplot.right':0.95
                }
     
+    
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+        if 'ThresholdGD' in config.FT.keys():
+            linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle='--', label='Squared Threshold GD'))
+                    
+
         from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
@@ -1411,19 +1430,30 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         
         for iBase in range(len1):   # First serie
             ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
-            ax1.hlines(config.FT['ThresholdGD']**2, t[timerange[0]],t[timerange[-1]], color='black', linestyle='dashed')
+            if 'ThresholdGD' in config.FT.keys():
+                ax1.hlines(config.FT['ThresholdGD']**2, t[timerange[0]],t[timerange[-1]], color='black', linestyle='dashed')
             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
             ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
             ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         for iBase in range(len1,NIN):   # Second serie
             ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
-            ax6.hlines(config.FT['ThresholdGD']**2,t[timerange[0]],t[timerange[-1]],color='black', linestyle='dashed')
+            if 'ThresholdGD' in config.FT.keys():
+                ax6.hlines(config.FT['ThresholdGD']**2,t[timerange[0]],t[timerange[-1]],color='black', linestyle='dashed')
             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
             ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
             ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         
+        
+        ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                   color='k', linestyle=':')
+        ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+                   color='k', linestyle=':')
+        ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                   color='k', linestyle=':')
+        ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+                   color='k', linestyle=':')
         
         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
         ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
@@ -1449,11 +1479,12 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         
         ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
         
-        ax3.set_xlabel('Frames', labelpad=-10) ; ax8.set_xlabel('Frames', labelpad=-10)
+        ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
         # figname = '_'.join(title.split(' ')[:3])
         # figname = 'GD&PD'
         # plt.savefig(datasave+f"{figname}.pdf")
+        ax7.legend(handles=linestyles, loc='upper right')
         fig.show()
 
 
@@ -1475,16 +1506,23 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         linestyle='solid',label='Disturbance'))
         linestyles.append(mlines.Line2D([], [], color='green',
                                         linestyle='dotted',label='Command'))
+        linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking'))
     
         DIT = min(50, config.NT - config.starttracking -1)
         ShowPerformance(float(timestamps[stationaryregim_start]), wl, DIT, display=False)
-        NumberOfBaselinesToShow = 3
+        NumberOfBaselinesToShow = np.min([NIN, 3])
         for ia in range(NumberOfBaselinesToShow):
             fig = plt.figure(f"OPD {ia+increment}")
     #         fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
     # including telescope {ia+increment}")
             axes = fig.subplots(nrows=NumberOfBaselinesToShow,ncols=2,sharex=True, gridspec_kw={'width_ratios': [4, 1]})
             iap,iax=0,0
+            
+            if np.ndim(axes)==1:
+                axes = [(axes[0], axes[1])]
+                
+            print(axes)
             for ax,axText in axes:
                 ax2 = ax.twinx()
                 ax2ymax = 1.1*np.max([np.max(np.abs(simu.OPDTrue[stationaryregim])),wl/2])
@@ -1508,7 +1546,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 ax2.hlines(np.mean(simu.OPDTrue[stationaryregim,ib]),0,NT*dt,
                            linestyle='-.',color='blue')
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle='--')
+                   color='k', linestyle=':')
                 
                 axText.text(0.5,0.5,f"{np.sqrt(simu.VarOPD[ib])*1e3:.0f}nm RMS")
                 axText.axis("off")
@@ -1536,8 +1574,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 iax+=1
             # plt.tight_layout()
             ax.set_xlabel('Time (ms)')
-            plt.show()
-            plt.legend(handles=linestyles)
+            axText.legend(handles=linestyles)
             config.newfig+=1
             
             if OneTelescope:
@@ -1561,7 +1598,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         color=colors[3],linestyle=':'))
         linestyles.append(mlines.Line2D([], [],label='Search command',
                                         color=colors[4],linestyle=':'))
-
+        linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking'))
+        
         for ia in range(NA):
             fig = plt.figure(f"OPD commands {ia+increment}")
             fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
@@ -1602,7 +1641,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                             color=colors[4])
                 
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle='--')
+                   color='k', linestyle=':')
 
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
@@ -1650,9 +1689,11 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         linestyles.append(mlines.Line2D([], [], color='green',
                                     linestyle='dotted',label='GD Command'))
         linestyles.append(mlines.Line2D([], [],label='GD Residuals',
-                                        color='black',linestyle=':'))
+                                        color='black',linestyle='-.'))
         linestyles.append(mlines.Line2D([], [],label='PD Residuals',
                                         color='black',linestyle='-'))
+        linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking'))
 
         for ia in range(NA):
             fig = plt.figure(f"OPD details {ia+increment}")
@@ -1673,7 +1714,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                     ax2.plot(timestamps, simu.GDCommand[:-config.latency,ib],
                             color='green',linestyle='dotted')
                     ax2.plot(timestamps, simu.GDResidual[:,ib]*wl/(2*np.pi),
-                             color='black',linestyle=':')
+                             color='black',linestyle='-.')
                     ax2.plot(timestamps, simu.PDResidual[:,ib]*wl/(2*np.pi),
                              color='black',linestyle='-')
                 else:
@@ -1682,12 +1723,12 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                     ax.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
                             color='green',linestyle='dotted')
                     ax2.plot(timestamps, -simu.GDResidual[:,ib]*wl/(2*np.pi), color='black',
-                             linestyle=':')
+                             linestyle='-.')
                     ax2.plot(timestamps, -simu.PDResidual[:,ib]*wl/(2*np.pi), color='black',
                              linestyle='-')
                 
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                          color='k', linestyle='--')
+                          color='k', linestyle=':')
                 
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
@@ -1739,7 +1780,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             ax.plot(timestamps, simu.OPDTrue[:,ib], linestyle='-', label=f'{ich[ib]}: {np.sqrt(simu.VarOPD[ib])*1e3:.0f}nm RMS')
             
         ax.vlines(config.starttracking*dt,s[0],s[1],
-               color='k', linestyle='--')
+               color='k', linestyle=':')
         ax.set_ylim(s)
         ax.set_xlabel('Time [ms]')
         ax.set_ylabel('OPD [µm]')
@@ -1760,6 +1801,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         label='Estimated'))    
         linestyles.append(mlines.Line2D([], [],linestyle='dashed',
                                         label='Object'))
+        linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking'))
         
         
         ymax = np.pi
@@ -1790,9 +1833,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                color=colors[colorindex], linestyle='--')
         
         ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle='--')
-        ax2.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle='--')
+                   color='k', linestyle=':')
+        # ax2.vlines(config.starttracking*dt,ylim[0],ylim[1],
+        #            color='k', linestyle=':')
         plt.xlabel('Time [ms]')
         plt.ylabel('Closure Phase [rad]')
         ax1.set_ylim(ylim)
@@ -1826,7 +1869,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                 iap += 1
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                       color='k', linestyle='--')
+                       color='k', linestyle=':')
             plt.xlabel('Time (ms)')
             plt.show()
             config.newfig+=1
@@ -1862,7 +1905,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 RMS_ax.text(0,0,f"{np.std(VisibilityPhase[stationaryregim,ib])/(2*np.pi):.2f}\u03BB RMS")
                 RMS_ax.axis("off")
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                       color='k', linestyle='--')
+                       color='k', linestyle=':')
             plt.xlabel('Time (ms)')
             plt.show()
             config.newfig+=1
@@ -1970,9 +2013,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ax.set_ylim(ylim)
         ax.set_yscale('log')
         ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle='--')
+                   color='k', linestyle=':')
         ax2.vlines(config.starttracking*dt,0,NA,
-                   color='k', linestyle='--')
+                   color='k', linestyle=':')
         ax.set_ylabel(f"<SNR>_{config.FT['Ngd']}")
         ax2.set_ylabel("Rank of Igd")
         ax2.set_xlabel('Time (ms)')
@@ -2684,7 +2727,7 @@ def SimpleCommandCalc(currPD,currGD):
     Group-Delay tracking
     """
     
-    currGDerr = currGD - simu.GDref
+    currGDerr = currGD - simu.GDref[it]
     
     # Keep the GD between [-Pi, Pi] (because the GDref could have make it
     # leave this interval)
@@ -2741,7 +2784,7 @@ def SimpleCommandCalc(currPD,currGD):
     Phase-Delay command
     """
     
-    currPDerr = currPD - simu.PDref
+    currPDerr = currPD - simu.PDref[it]
  
     # Keep the PD between [-Pi, Pi]
     # Eq. 35

@@ -865,21 +865,34 @@ def get_CfObj(filepath, spectra):
     NewImag = f(spectra)
     CoherentIrradiance = NewReal + NewImag*1j
     
-    NW, NB = CoherentIrradiance.shape
-    NA = int(np.sqrt(NB))
+    NW, NBfile = CoherentIrradiance.shape
+    NAfile = int(np.sqrt(NBfile))
+    
+    from .config import NA, NB
     NC = (NA-2)*(NA-1)
     ClosurePhase = np.zeros([NW,NC])
+    FinalCoherentIrradiance = np.zeros([NW,NB])*1j
+    
     for ia in range(NA):
-        for iap in range(ia+1,NA):
-            for iapp in range(iap+1,NA):
-                ic = poskfai(ia,iap,iapp,NA)
-                ci1 = CoherentIrradiance[:,ia*NA+iap]
-                ci2 = CoherentIrradiance[:,iap*NA+iapp]
-                ci3 = CoherentIrradiance[:,iapp*NA+ia]
-                ClosurePhase[:,ic] = np.angle(ci1*ci2*ci3)
+        for iap in range(NA):
+            ib = ia*NA+iap
+            FinalCoherentIrradiance[:,ib] = CoherentIrradiance[:,ia*NAfile+iap]
+            
+    if NA < 3:
+        return FinalCoherentIrradiance
+    
+    else:
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                for iapp in range(iap+1,NA):
+                    ic = poskfai(ia,iap,iapp,NAfile)
+                    ci1 = CoherentIrradiance[:,ia*NAfile+iap]
+                    ci2 = CoherentIrradiance[:,iap*NAfile+iapp]
+                    ci3 = CoherentIrradiance[:,iapp*NAfile+ia]
+                    ClosurePhase[:,ic] = np.angle(ci1*ci2*ci3)
         # ClosurePhase = hdu['Closure Phase'].data
         
-    return CoherentIrradiance, ClosurePhase
+    return FinalCoherentIrradiance, ClosurePhase
 
 
 def get_infos(file):
@@ -908,8 +921,11 @@ def get_infos(file):
     
     
 def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
-    from .config import piston_average
+    from .config import piston_average, NA
     filetimestamps, filespectra, PistonDisturbance, TransmissionDisturbance,_,_,_,_ = get_infos(DisturbanceFile)
+
+    PistonDisturbance = PistonDisturbance[:,:NA]
+    TransmissionDisturbance = TransmissionDisturbance[:,:,:NA]
 
     # Interpolate on the time axis   
     newobservables = []
@@ -1349,6 +1365,12 @@ def sortmatrix(matrix,ich,ABCDindex,direction='v2pm'):
     Nmod=len(ABCDindex) ; NIN = len(ich)
     baseline_sorted = np.zeros_like(matrix)
     
+    if np.ndim(ich) == 1:
+        ichtemp = ich
+        ich = np.zeros([len(ich), 2])
+        for ib in range(len(ichtemp)):
+            ich[ib] = [char for char in str(ichtemp[ib])]
+    
     for ib in range(NIN):
         # Sort the positions in the conventional order
         detectorpositions = range(ib*Nmod,(ib+1)*Nmod)
@@ -1373,7 +1395,7 @@ def sortmatrix(matrix,ich,ABCDindex,direction='v2pm'):
 
     return matrix_sorted
 
-def studyP2VM(nfig=0):
+def studyP2VM(*args,nfig=0):
     """
     Show the V2PM and the V2PM with grids that enable to see clearly the baselines
 
@@ -1396,11 +1418,11 @@ def studyP2VM(nfig=0):
     NIN = NA*(NA-1)//2
     ich=config.FS['ich']
     
-    if 'Nmod' in config.FS.keys():
+    if 'NMod' in config.FS.keys():
         ABCDchip=True
         Modulations = config.FS['Modulations']
         ABCDindex = config.FS['ABCDind']
-        Nmod=config.FS['Nmod']
+        Nmod=config.FS['NMod']
         v2pm_sorted = sortmatrix(v2pm, ich, ABCDindex)
         p2vm_sorted = sortmatrix(p2vm, ich, ABCDindex, direction='p2vm')
     else:
@@ -1413,101 +1435,166 @@ def studyP2VM(nfig=0):
         for iap in range(ia+1,NA+1):
             conventionalorder.append(f"B{ia}{iap}")
     
-    mod = v2pm_sorted[0]
     
-    newfig=nfig
-    fig = plt.figure('V2PM & P2VM',clear=True)
-    fig.suptitle("V2PM and P2VM")
-    
-    ax1,ax2 = fig.subplots(ncols=2)
-    ax1.set_title("V2PM")
-    ax2.set_title("P2VM")
-    
-    # Show the V2PM matrix
-    
-    ax1.imshow(mod)
-    
-    xticks=[] ; xticklabels=[]
-    xticks.append(NA//2) ; xticklabels.append('Photometries')
-    x = NA-0.5 ; xticks.append(NA+NIN//2) ; xticklabels.append('Real parts')
-    ax1.axvline(x = x, color = 'k', linestyle = '-')
-    x = NA+NIN-0.5 ; xticks.append(NA+3*NIN//2) ; xticklabels.append('Imaginary parts')
-    ax1.axvline(x = NA+NIN-0.5, color = 'k', linestyle = '-')
-
-    for ia in range(1,NA-1):
-        ib = posk(ia,ia+1,NA)
-        ax1.axvline(x = x, color = 'k', linestyle = '-', linewidth=.5)
-        ax1.axvline(x = x, color = 'k', linestyle = '-', linewidth=.5)
-    
+    """Photometries and phaseshifts"""
     if ABCDchip:
-        for ib in range(NIN):
-            ax1.axhline(y = ib*4-0.5, color = 'k', linestyle = '-', linewidth=.5)
+        photometries = np.zeros([NW,NIN,Nmod,2])
+        phases = np.zeros([NW,NIN,Nmod]) ; normphasors = np.zeros([NW,NIN,Nmod])
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib=posk(ia,iap,NA)
+                for k in range(Nmod):
+                    photometries[:,ib,k,0] = v2pm_sorted[:,4*ib+k,ia]*100
+                    photometries[:,ib,k,1] = v2pm_sorted[:,4*ib+k,iap]*100
+                    R = v2pm_sorted[:,4*ib+k,NA+ib] ; I = v2pm_sorted[:,4*ib+k,NA+NIN+ib] 
+                    phases[:,ib,k] = np.arctan2(I,R) ; normphasors[:,ib,k] = np.sqrt(R**2+I**2)
         
-        ax1.set_yticks(np.arange(NIN)*Nmod+Nmod//2-.5)
-        ax1.set_yticklabels(conventionalorder)
-        ax1.set_ylabel('Pixels sorted in ABCD')
-        
-        
-    else:
-        ax1.axhline(y = NA, color = 'k', linestyle = '-', linewidth=.5)
-        
-        ax1.set_yticks([NA//2, (NA+NP)//2])
-        ax1.set_yticklabels(['Photometries', 'Interferogram'])
-        
-    
-    ax1.set_xticks(xticks)
-    ax1.set_xticklabels(xticklabels)
-    ax1.xaxis.set_ticks_position('none')
-    ax1.set_xlabel("Coherent flux")
+        ModuleCoherentFlux = normphasors/2
     
     
-    # Show the P2VM matrix
+    """ Noise propagation"""
+    photons = 1e3
+    # Coherent vector of a perfectly coherent pair of fields.
+    CoherentFlux = np.zeros([NW,NB])
+    CoherentFlux[:,:NA+NIN]=photons # In Cassaing formalism: N=photons ; C=photons ; S=0
     
-    demod = p2vm_sorted[0]
+    DetectionCoherent = np.zeros([NW,NP])
+    for iw in range(NW):
+        DetectionCoherent[iw] = np.dot(v2pm_sorted[iw], CoherentFlux[iw])
     
-    ax2.imshow(demod)
+    QuadratureCoherentFlux = np.zeros([NW,NB])
+    QuadratureCoherentFlux[:,:NA] = photons
+    QuadratureCoherentFlux[:,NA+NIN:] = photons # In Cassaing formalism: N=photons ; C=0 ; S=photons
     
-    # Create a Rectangle patch
-    # rect = Rectangle((-0.5,11.5),1,1,linewidth=1,edgecolor='r',facecolor='none')
-    yticks=[] ; yticklabels=[]
-    yticks.append(-0.5) ; yticklabels.append('Photometries')
-    y = NA-0.5 ; yticks.append(y) ; yticklabels.append('Real parts')
-    ax2.axhline(y = y, color = 'k', linestyle = '-')
-    y = NA+0.5 ; yticks.append(y) ; yticklabels.append('B1X')
-    y = NA+NIN-0.5 ; yticks.append(y) ; yticklabels.append('Imaginary parts')
-    ax2.axhline(y = NA+NIN-0.5, color = 'k', linestyle = '-')
-    y = NA+NIN+0.5 ; yticks.append(y) ; yticklabels.append('B1X')
-    for ia in range(1,NA-1):
-        ib = posk(ia,ia+1,NA)
-        y = NA+ib-0.5 ; yticks.append(y) ; yticklabels.append(f'B{ia+1}X')
-        ax2.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
-        y = NA+NIN+ib-0.5 ; yticks.append(y) ; yticklabels.append(f'B{ia+1}X')
-        ax2.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
+    DetectionQuadrature = np.zeros([NW,NP])
+    for iw in range(NW):
+        DetectionQuadrature[iw] = np.dot(v2pm_sorted[iw], QuadratureCoherentFlux[iw])
     
+    # Covariance matrix
+    CovMatrixCoherent = np.zeros([NW,NB,NB])
+    CovMatrixQuadrature = np.zeros([NW,NB,NB])
     
-    if ABCDchip:
-        for ib in range(NIN):
-            ax2.axvline(x = ib*4-0.5, color = 'k', linestyle = '-', linewidth=.5)
+    for iw in range(NW):
+        CovMatrixCoherent[iw] = np.dot(p2vm_sorted[iw], np.dot(np.diag(DetectionCoherent[iw]),np.transpose(p2vm_sorted[iw])))
+        CovMatrixQuadrature[iw] = np.dot(p2vm_sorted[iw], np.dot(np.diag(DetectionQuadrature[iw]),np.transpose(p2vm_sorted[iw])))
             
-        ax2.set_xticks(np.arange(NIN)*Nmod+Nmod//2-.5)
-        ax2.set_xticklabels(conventionalorder)
-        ax2.set_xlabel('Pixels sorted in ABCD')
-        
+    if ABCDchip:
+        dico = {'v2pm_sorted':v2pm_sorted, 
+                'p2vm_sorted':p2vm_sorted, 
+                'photometries':photometries, 
+                'phases':phases,
+                'CovMatrixCoherent':CovMatrixCoherent, 
+                'CovMatrixQuadrature':CovMatrixQuadrature}
     else:
-        ax2.axvline(x = NA, color = 'k', linestyle = '-', linewidth=.5)
-        ax2.set_xticks([NA,(NA+NP)//2])
-        ax2.set_xticklabels(['Photometries', 'Interferogram'])
+        dico = {'v2pm_sorted':v2pm_sorted, 
+                'p2vm_sorted':p2vm_sorted,
+                'CovMatrixCoherent':CovMatrixCoherent, 
+                'CovMatrixQuadrature':CovMatrixQuadrature}
+        
     
-    ax2.set_yticks(yticks)
-    ax2.set_yticklabels(yticklabels)
-    ax1.grid(False)
-    ax2.grid(False)
+    if ('p2vm' in args) or ('displayall' in args):
+        mod = v2pm_sorted[0]
+        
+        newfig=nfig
+        fig = plt.figure('V2PM & P2VM',clear=True)
+        fig.suptitle("V2PM and P2VM")
+        
+        ax1,ax2 = fig.subplots(ncols=2)
+        ax1.set_title("V2PM")
+        ax2.set_title("P2VM")
+        
+        """Show the V2PM matrix"""
+        
+        ax1.imshow(mod)
+        
+        xticks=[] ; xticklabels=[]
+        xticks.append(NA//2-1) ; xticklabels.append('Photometries')
+        x = NA-0.5 ; xticks.append(NA+NIN//2-1) ; xticklabels.append('Real parts')
+        ax1.axvline(x = x, color = 'w', linestyle = '-')
+        x = NA+NIN-0.5 ; xticks.append(NA+3*NIN//2-1) ; xticklabels.append('Imaginary parts')
+        ax1.axvline(x = NA+NIN-0.5, color = 'w', linestyle = '-')
+    
+        for ia in range(1,NA-1):
+            ib = posk(ia,ia+1,NA)
+            ax1.axvline(x = x, color = 'w', linestyle = '-', linewidth=.5)
+            ax1.axvline(x = x, color = 'w', linestyle = '-', linewidth=.5)
+        
+        if ABCDchip:
+            for ib in range(NIN):
+                ax1.axhline(y = ib*4-0.5, color = 'w', linestyle = '-')
+            
+            ax1.set_yticks(np.arange(NIN)*Nmod+Nmod//2-.5)
+            ax1.set_yticklabels(conventionalorder)
+            ax1.set_ylabel('Pixels sorted in ABCD')
+            
+            
+        else:
+            ax1.axhline(y = NA, color = 'w', linestyle = '-', linewidth=.5)
+            
+            ax1.set_yticks([NA//2, (NA+NP)//2])
+            ax1.set_yticklabels(['Photometries', 'Interferogram'])
+            
+        
+        ax1.set_xlabel("Coherent flux")
+        ax1.set_xticks(xticks)
+        ax1.set_xticklabels(xticklabels, rotation=45)
+        ax1.xaxis.set_ticks_position('none')
+    
+    
+        """ Show the P2VM """
+    
+        demod = p2vm_sorted[0]
+        
+        ax2.imshow(demod)
+        
+        # Create a Rectangle patch
+        # rect = Rectangle((-0.5,11.5),1,1,linewidth=1,edgecolor='r',facecolor='none')
+        yticks=[] ; yticklabels=[]
+        yticks=[] ; yticklabels=[]
+        yticks.append(NA//2) ; yticklabels.append('Photometries')
+        y = NA-0.5 ; yticks.append(y) ; yticklabels.append('Real parts')
+        ax2.axhline(y = y, color = 'w', linestyle = '-')
+        y = NA+0.5 ; yticks.append(y) ; yticklabels.append('B1#')
+        y = NA+NIN-0.5 ; yticks.append(y) ; yticklabels.append('Imaginary parts')
+        ax2.axhline(y = NA+NIN-0.5, color = 'w', linestyle = '-')
+        y = NA+NIN+0.5 ; yticks.append(y) ; yticklabels.append('B1#')
+        for ia in range(1,NA-1):
+            ib = posk(ia,ia+1,NA)
+            y = NA+ib-0.5 ; yticks.append(y+0.5) ; yticklabels.append(f'B{ia+1}#')
+            ax2.axhline(y = y, color = 'w', linestyle = '-', linewidth=.5)
+            y = NA+NIN+ib-0.5 ; yticks.append(y+0.5) ; yticklabels.append(f'B{ia+1}#')
+            ax2.axhline(y = y, color = 'w', linestyle = '-', linewidth=.5)
+        
+        
+        if ABCDchip:
+            for ib in range(NIN):
+                ax2.axvline(x = ib*4-0.5, color = 'w', linestyle = '-', linewidth=.5)
+                
+            ax2.set_xticks(np.arange(NIN)*Nmod+Nmod//2-.5)
+            ax2.set_xticklabels(conventionalorder)
+            ax2.set_xlabel('Pixels sorted in ABCD')
+            
+        else:
+            ax2.axvline(x = NA, color = 'w', linestyle = '-', linewidth=.5)
+            ax2.set_xticks([NA,(NA+NP)//2])
+            ax2.set_xticklabels(['Photometries', 'Interferogram'], rotation=45)
+        
+        ax2.yaxis.tick_right()
+        ax2.set_yticks(yticks)
+        ax2.set_yticklabels(yticklabels)
+        ax1.yaxis.set_ticks_position('none')
+        ax2.yaxis.set_ticks_position('none')
+        ax1.xaxis.set_ticks_position('none')
+        ax2.xaxis.set_ticks_position('none')
+
+        ax1.grid(False)
+        ax2.grid(False)
     
 # =============================================================================
 #     Photometry and phaseshifts repartition in the P2VM
 # =============================================================================
     
-    cset = tol_cset('bright')
+    # cset = tol_cset('bright')
 
     # newfig+=1
     # fig=plt.figure(newfig, clear=True)
@@ -1616,134 +1703,122 @@ def studyP2VM(nfig=0):
     
     # fig.show()
     
-    
-    if ABCDchip:
-        newfig+=1
-        fig=plt.figure(newfig, clear=True)
-        fig.suptitle("Photometry repartitions and phaseshift of the beams")
-        (ax1,ax3),(ax2,ax4) = fig.subplots(nrows=2, ncols=2,gridspec_kw={'width_ratios': [9,1]})
-        
-        photometries = np.zeros([NW,NIN,Nmod,2])
-        phases = np.zeros([NW,NIN,Nmod]) ; normphasors = np.zeros([NW,NIN,Nmod])
-        for ia in range(NA):
-            for iap in range(ia+1,NA):
-                ib=posk(ia,iap,NA)
-                for k in range(Nmod):
-                    photometries[:,ib,k,0] = v2pm_sorted[:,4*ib+k,ia]*100
-                    photometries[:,ib,k,1] = v2pm_sorted[:,4*ib+k,iap]*100
-                    R = v2pm_sorted[:,4*ib+k,NA+ib] ; I = v2pm_sorted[:,4*ib+k,NA+NIN+ib] 
-                    phases[:,ib,k] = np.arctan2(I,R) ; normphasors[:,ib,k] = np.sqrt(R**2+I**2)
-        
-        ModuleCoherentFlux = normphasors/2
+    if ('repartition' in args) or ('displayall' in args):
+        cset = tol_cset('bright')
+        if ABCDchip:
+            newfig+=1
+            fig=plt.figure(newfig, clear=True)
+            fig.suptitle("Photometry repartitions and phaseshift of the beams")
+            (ax1,ax3),(ax2,ax4) = fig.subplots(nrows=2, ncols=2,gridspec_kw={'width_ratios': [9,1]})
+                        
+            NINtemp = NIN//2+1
+            xtop = np.arange(NINtemp)  # the label locations
+            xbot = np.arange(NINtemp,NIN)
+            
+            width=0.8
+            barwidth=width/8
+            
+            ax1_firstbar_positions = xtop-width/2+barwidth/2
+            ax2_firstbar_positions = xbot-width/2+barwidth/2
+            
+            bar_patches1=[] ; bar_patches2=[]
+            bar_patches1.append(mpatches.Patch(facecolor='gray',edgecolor='black',hatch='///',label="First beam"))
+            bar_patches1.append(mpatches.Patch(facecolor='gray',edgecolor='black', label="Second beam"))
+            
+            linestyles=[]
+            linestyles.append(mlines.Line2D([], [], color='black',
+                                            linestyle='--',label='Average flux'))    
+            linestyles.append(mlines.Line2D([], [], color='black',
+                                            linestyle=':',label='Coherent flux'))
+                
+            for k in range(Nmod):
+                
+                rects1 = ax1.bar(ax1_firstbar_positions + 2*k*barwidth, photometries[0,:NINtemp,k,0], 
+                                 barwidth, hatch='///',color=cset[k],edgecolor='black').patches
+                rects2 = ax1.bar(ax1_firstbar_positions + (2*k+1)*barwidth, photometries[0,:NINtemp,k,1], 
+                                 barwidth, color=cset[k],edgecolor='black').patches
+                rects_moy1 = ax1.bar(ax1_firstbar_positions + (2*k+1/2)*barwidth, np.mean(photometries[0,:NINtemp,k,:],axis=-1), 
+                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
+                rects_coh1 = ax1.bar(ax1_firstbar_positions + (2*k+1/2)*barwidth, ModuleCoherentFlux[0,:NINtemp,k]*100, 
+                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle=':').patches
+                
+                rects4 = ax2.bar(ax2_firstbar_positions + 2*k*barwidth, photometries[0,NINtemp:,k,0],
+                                 barwidth, hatch='///',color=cset[k],edgecolor='black').patches
+                rects5 = ax2.bar(ax2_firstbar_positions + (2*k+1)*barwidth, photometries[0,NINtemp:,k,1],
+                                 barwidth,color=cset[k],edgecolor='black').patches
+                rects_moy2 = ax2.bar(ax2_firstbar_positions + (2*k+1/2)*barwidth, np.mean(photometries[0,NINtemp:,k,:],axis=-1), 
+                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
+                rects_coh2 = ax2.bar(ax2_firstbar_positions + (2*k+1/2)*barwidth, ModuleCoherentFlux[0,NINtemp:,k]*100, 
+                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle=':').patches
+                
+                for rect1,rect2,rect_moy in zip(rects1,rects2,rects_moy1):
+                    height = np.max([rect1.get_height(),rect2.get_height(),rect_moy.get_height()])
+                    ax1.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
+                            ha='center', va='bottom')
                     
-        NINtemp = NIN//2+1
-        xtop = np.arange(NINtemp)  # the label locations
-        xbot = np.arange(NINtemp,NIN)
-        
-        width=0.8
-        barwidth=width/8
-        
-        ax1_firstbar_positions = xtop-width/2+barwidth/2
-        ax2_firstbar_positions = xbot-width/2+barwidth/2
-        
-        bar_patches1=[] ; bar_patches2=[]
-        bar_patches1.append(mpatches.Patch(facecolor='gray',edgecolor='black',hatch='///',label="First beam"))
-        bar_patches1.append(mpatches.Patch(facecolor='gray',edgecolor='black', label="Second beam"))
-        
-        linestyles=[]
-        linestyles.append(mlines.Line2D([], [], color='black',
-                                        linestyle='--',label='Average flux'))    
-        linestyles.append(mlines.Line2D([], [], color='black',
-                                        linestyle=':',label='Coherent flux'))
+                for rect1,rect2,rect_moy in zip(rects4,rects5,rects_moy2):
+                    height = np.max([rect1.get_height(),rect2.get_height(),rect_moy.get_height()])
+                    ax2.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
+                            ha='center', va='bottom')
+                    
+                bar_patches2.append(mpatches.Patch(color=cset[k],label="ABCD"[k]))
             
-        for k in range(Nmod):
+            ax1_xmin,ax1_xmax = ax1.get_xlim() ; ax2_xmin,ax2_xmax = ax2.get_xlim()
+            ax1_ymin,ax1_ymax = ax1.get_ylim() ; ax2_ymin,ax2_ymax = ax2.get_ylim()
+            ax1_normalised_width = 1/(ax1_ymax-ax1_ymin)*width*.7
+            ax1_normalised_height = 1/(ax1_ymax-ax1_ymin)*width
+            ax2_normalised_width = 1/(ax2_ymax-ax2_ymin)*width*.7
+            ax2_normalised_height = 1/(ax2_ymax-ax2_ymin)*width
+            ax1_bottomleft = 1/(ax1_xmax-ax1_xmin)*(ax1_firstbar_positions+barwidth/2-ax1_xmin)
+            ax2_bottomleft = 1/(ax2_xmax-ax2_xmin)*(ax2_firstbar_positions+barwidth/2-ax2_xmin)
             
-            rects1 = ax1.bar(ax1_firstbar_positions + 2*k*barwidth, photometries[0,:NINtemp,k,0], 
-                             barwidth, hatch='///',color=cset[k],edgecolor='black').patches
-            rects2 = ax1.bar(ax1_firstbar_positions + (2*k+1)*barwidth, photometries[0,:NINtemp,k,1], 
-                             barwidth, color=cset[k],edgecolor='black').patches
-            rects_moy1 = ax1.bar(ax1_firstbar_positions + (2*k+1/2)*barwidth, np.mean(photometries[0,:NINtemp,k,:],axis=-1), 
-                             barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
-            rects_coh1 = ax1.bar(ax1_firstbar_positions + (2*k+1/2)*barwidth, ModuleCoherentFlux[0,:NINtemp,k]*100, 
-                             barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle=':').patches
-            
-            rects4 = ax2.bar(ax2_firstbar_positions + 2*k*barwidth, photometries[0,NINtemp:,k,0],
-                             barwidth, hatch='///',color=cset[k],edgecolor='black').patches
-            rects5 = ax2.bar(ax2_firstbar_positions + (2*k+1)*barwidth, photometries[0,NINtemp:,k,1],
-                             barwidth,color=cset[k],edgecolor='black').patches
-            rects_moy2 = ax2.bar(ax2_firstbar_positions + (2*k+1/2)*barwidth, np.mean(photometries[0,NINtemp:,k,:],axis=-1), 
-                             barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
-            rects_coh2 = ax2.bar(ax2_firstbar_positions + (2*k+1/2)*barwidth, ModuleCoherentFlux[0,NINtemp:,k]*100, 
-                             barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle=':').patches
-            
-            for rect1,rect2,rect_moy in zip(rects1,rects2,rects_moy1):
-                height = np.max([rect1.get_height(),rect2.get_height(),rect_moy.get_height()])
-                ax1.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
-                        ha='center', va='bottom')
+            for ib in range(NINtemp):
+                subpos=(ax1_bottomleft[ib],0.75,ax1_normalised_width,ax1_normalised_height)#firstbar_pos[0] + 2*k*barwidth,
+                label = True if ib==0 else False
+                ax=add_subplot_axes(ax1,subpos,polar=True,label=label)
+                ax.set_ylim(0,1)
+                for k in range(Nmod):
+                    phase = phases[0,ib,k] ; norm = normphasors[0,ib,k]/np.max(normphasors[0,ib,:])
+                    ax.arrow(phase, 0, 0, norm, width = 0.05,
+                             edgecolor=cset[k],facecolor = cset[k], lw = 2, zorder = 5,length_includes_head=True)
+                    
+                # ax.set_thetagrids(phases[0,ib,:]*180/np.pi,labels=np.round(phases[0,ib,:]*180/np.pi))
+            for ib in range(NIN-NINtemp):
+                subpos=(ax2_bottomleft[ib],0.75,ax2_normalised_width,ax2_normalised_height)#firstbar_pos[0] + 2*k*barwidth,
+                label = False
+                ax=add_subplot_axes(ax2,subpos,polar=True,label=label)
+                ax.set_ylim(0,1)
                 
-            for rect1,rect2,rect_moy in zip(rects4,rects5,rects_moy2):
-                height = np.max([rect1.get_height(),rect2.get_height(),rect_moy.get_height()])
-                ax2.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
-                        ha='center', va='bottom')
-                
-            bar_patches2.append(mpatches.Patch(color=cset[k],label="ABCD"[k]))
-        
-        ax1_xmin,ax1_xmax = ax1.get_xlim() ; ax2_xmin,ax2_xmax = ax2.get_xlim()
-        ax1_ymin,ax1_ymax = ax1.get_ylim() ; ax2_ymin,ax2_ymax = ax2.get_ylim()
-        ax1_normalised_width = 1/(ax1_xmax-ax1_xmin)*width*.7
-        ax1_normalised_height = 1/(ax1_ymax-ax1_ymin)*width
-        ax2_normalised_width = 1/(ax2_xmax-ax2_xmin)*width*.7
-        ax2_normalised_height = 1/(ax2_ymax-ax2_ymin)*width
-        ax1_bottomleft = 1/(ax1_xmax-ax1_xmin)*(ax1_firstbar_positions+barwidth/2-ax1_xmin)
-        ax2_bottomleft = 1/(ax2_xmax-ax2_xmin)*(ax2_firstbar_positions+barwidth/2-ax2_xmin)
-        
-        for ib in range(NINtemp):
-            subpos=(ax1_bottomleft[ib],0.75,ax1_normalised_width,ax1_normalised_height)#firstbar_pos[0] + 2*k*barwidth,
-            label = True if ib==0 else False
-            ax=add_subplot_axes(ax1,subpos,polar=True,label=label)
-            ax.set_ylim(0,1)
-            for k in range(Nmod):
-                phase = phases[0,ib,k] ; norm = normphasors[0,ib,k]/np.max(normphasors[0,ib,:])
-                ax.arrow(phase, 0, 0, norm, width = 0.05,
-                         edgecolor=cset[k],facecolor = cset[k], lw = 2, zorder = 5,length_includes_head=True)
-                
-            # ax.set_thetagrids(phases[0,ib,:]*180/np.pi,labels=np.round(phases[0,ib,:]*180/np.pi))
-        for ib in range(NIN-NINtemp):
-            subpos=(ax2_bottomleft[ib],0.75,ax2_normalised_width,ax2_normalised_height)#firstbar_pos[0] + 2*k*barwidth,
-            label = False
-            ax=add_subplot_axes(ax2,subpos,polar=True,label=label)
-            ax.set_ylim(0,1)
+                for k in range(Nmod):
+                    phase = phases[0,NINtemp+ib,k] ; norm = normphasors[0,NINtemp+ib,k]/np.max(normphasors[0,NINtemp+ib,:])
+                    ax.arrow(phase, 0, 0, norm, width = 0.05,
+                             edgecolor=cset[k],facecolor = cset[k], lw = 2, zorder = 5,length_includes_head=True)
             
-            for k in range(Nmod):
-                phase = phases[0,NINtemp+ib,k] ; norm = normphasors[0,NINtemp+ib,k]/np.max(normphasors[0,NINtemp+ib,:])
-                ax.arrow(phase, 0, 0, norm, width = 0.05,
-                         edgecolor=cset[k],facecolor = cset[k], lw = 2, zorder = 5,length_includes_head=True)
-        
-        xticklabels=[]
-        for ia in range(NA):
-            for iap in range(ia+1,NA):
-                xticklabels.append(f"B{ia+1}{iap+1}")
-        
-        ax1.set_xticks(xtop)
-        ax1.set_xticklabels(xticklabels[:NINtemp])
-        
-        ax1.set_ylim(0,14)
-        ax2.set_ylim(0,14)
-        
-        ax2.set_xticks(xbot)
-        ax2.set_xticklabels(xticklabels[NINtemp:])
-        
-        # Set legend on ax3 and ax4    
-        ax3.axis("off"); ax4.axis("off")
-        ax3.legend(handles=bar_patches1+bar_patches2+linestyles, loc='upper left')
-        
-        
-        # ax1.set_ylabel("Phase [rad]")
-        ax1.set_ylabel("Transmission \n[% of the beam photometry]")
-        ax2.set_ylabel("Transmission \n[% of the beam photometry]")
-        ax1.grid(False)
-        ax2.grid(False)
-        fig.show()
+            xticklabels=[]
+            for ia in range(NA):
+                for iap in range(ia+1,NA):
+                    xticklabels.append(f"B{ia+1}{iap+1}")
+            
+            ax1.set_xticks(xtop)
+            ax1.set_xticklabels(xticklabels[:NINtemp])
+            
+            ax1.set_ylim(0,14)
+            ax2.set_ylim(0,14)
+            
+            ax2.set_xticks(xbot)
+            ax2.set_xticklabels(xticklabels[NINtemp:])
+            
+            # Set legend on ax3 and ax4    
+            ax3.axis("off"); ax4.axis("off")
+            ax3.legend(handles=bar_patches1+bar_patches2+linestyles, loc='upper left')
+            
+            
+            # ax1.set_ylabel("Phase [rad]")
+            ax1.set_ylabel("Transmission \n[% of the beam photometry]")
+            ax2.set_ylabel("Transmission \n[% of the beam photometry]")
+            ax1.grid(False)
+            ax2.grid(False)
+            fig.show()
     
         
     
@@ -1752,106 +1827,71 @@ def studyP2VM(nfig=0):
 #     Noise propagation through the matrix
 # =============================================================================
     
-    photons = 1e3
-    # Coherent vector of a perfectly coherent pair of fields.
-    CoherentFlux = np.zeros([NW,NB])
-    CoherentFlux[:,:NA+NIN]=photons # In Cassaing formalism: N=photons ; C=photons ; S=0
-    
-    DetectionCoherent = np.zeros([NW,NP])
-    for iw in range(NW):
-        DetectionCoherent[iw] = np.dot(v2pm_sorted[iw], CoherentFlux[iw])
-    
-    QuadratureCoherentFlux = np.zeros([NW,NB])
-    QuadratureCoherentFlux[:,:NA] = photons
-    QuadratureCoherentFlux[:,NA+NIN:] = photons # In Cassaing formalism: N=photons ; C=0 ; S=photons
-    
-    DetectionQuadrature = np.zeros([NW,NP])
-    for iw in range(NW):
-        DetectionQuadrature[iw] = np.dot(v2pm_sorted[iw], QuadratureCoherentFlux[iw])
-    
-    # Covariance matrix
-    CovMatrixCoherent = np.zeros([NW,NB,NB])
-    CovMatrixQuadrature = np.zeros([NW,NB,NB])
-    
-    for iw in range(NW):
-        CovMatrixCoherent[iw] = np.dot(p2vm_sorted[iw], np.dot(np.diag(DetectionCoherent[iw]),np.transpose(p2vm_sorted[iw])))
-        CovMatrixQuadrature[iw] = np.dot(p2vm_sorted[iw], np.dot(np.diag(DetectionQuadrature[iw]),np.transpose(p2vm_sorted[iw])))
-    
-    newfig+=1
-    fig = plt.figure('Noise propagation', clear=True)
-    fig.suptitle("Covariance matrices in photon noise regime (1000photons)")
-    ax1, ax2 = fig.subplots(ncols=2)
-    ax1.set_title('Covariance matrix when cophased')
-    ax2.set_title('Covariance matrix when phase in quadrature')
-    
-    ax1.imshow(CovMatrixCoherent[0])
-    ax2.imshow(CovMatrixQuadrature[0])
-    
-    xticks=[] ; xticklabels=[]
-    xticks.append(NA//2) ; xticklabels.append('Photometries')
-    x = NA-0.5 ; xticks.append(NA+NIN//2) ; xticklabels.append('Real parts')
-    ax1.axvline(x = x, color = 'k', linestyle = '-')
-    ax2.axvline(x = x, color = 'k', linestyle = '-')
-    # x = NA+0.5 ; xticks.append(x) ; xticklabels.append('B1X')
-    x = NA+NIN-0.5 ; xticks.append(NA+3*NIN//2) ; xticklabels.append('Imaginary parts')
-    ax1.axvline(x = NA+NIN-0.5, color = 'k', linestyle = '-')
-    ax2.axvline(x = NA+NIN-0.5, color = 'k', linestyle = '-')
+    if ('noise' in args) or ('displayall' in args):
+
+        newfig+=1
+        fig = plt.figure('Noise propagation', clear=True)
+        fig.suptitle("Covariance matrices in photon noise regime (1000photons)")
+        ax1, ax2 = fig.subplots(ncols=2)
+        ax1.set_title('Covariance matrix when cophased')
+        ax2.set_title('Covariance matrix when phase in quadrature')
         
-    yticks=[] ; yticklabels=[]
-    yticks.append(-0.5) ; yticklabels.append('Photometries')
-    y = NA-0.5 ; yticks.append(y) ; yticklabels.append('Real parts')
-    ax1.axhline(y = y, color = 'k', linestyle = '-')
-    ax2.axhline(y = y, color = 'k', linestyle = '-')
-    ax1.axvline(x = y, color = 'k', linestyle = '-')
-    ax2.axvline(x = y, color = 'k', linestyle = '-')
-    y = NA+0.5 ; yticks.append(y) ; yticklabels.append('B1X')
-    y = NA+NIN-0.5 ; yticks.append(y) ; yticklabels.append('Imaginary parts')
-    ax1.axhline(y = y, color = 'k', linestyle = '-')
-    ax2.axhline(y = y, color = 'k', linestyle = '-')
-    ax1.axvline(x = y, color = 'k', linestyle = '-')
-    ax2.axvline(x = y, color = 'k', linestyle = '-')
-    y = NA+NIN+0.5 ; yticks.append(y) ; yticklabels.append('B1X')
-    for ia in range(1,NA-1):
-        ib = posk(ia,ia+1,NA)
-        y = NA+ib-0.5 ; yticks.append(y) ; yticklabels.append(f'B{ia+1}X')
-        ax1.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
-        ax2.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
-        ax1.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
-        ax2.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
-        y = NA+NIN+ib-0.5 ; yticks.append(y) ; yticklabels.append(f'B{ia+1}X')
-        ax1.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
-        ax2.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
-        ax1.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
-        ax2.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
+        ax1.imshow(CovMatrixCoherent[0])
+        ax2.imshow(CovMatrixQuadrature[0])
+        
+        xticks=[] ; xticklabels=[]
+        xticks.append(NA//2) ; xticklabels.append('Photometries')
+        x = NA-0.5 ; xticks.append(NA+NIN//2) ; xticklabels.append('Real parts')
+        ax1.axvline(x = x, color = 'k', linestyle = '-')
+        ax2.axvline(x = x, color = 'k', linestyle = '-')
+        # x = NA+0.5 ; xticks.append(x) ; xticklabels.append('B1X')
+        x = NA+NIN-0.5 ; xticks.append(NA+3*NIN//2) ; xticklabels.append('Imaginary parts')
+        ax1.axvline(x = NA+NIN-0.5, color = 'k', linestyle = '-')
+        ax2.axvline(x = NA+NIN-0.5, color = 'k', linestyle = '-')
+            
+        yticks=[] ; yticklabels=[]
+        yticks.append(-0.5) ; yticklabels.append('Photometries')
+        y = NA-0.5 ; yticks.append(y) ; yticklabels.append('Real parts')
+        ax1.axhline(y = y, color = 'k', linestyle = '-')
+        ax2.axhline(y = y, color = 'k', linestyle = '-')
+        ax1.axvline(x = y, color = 'k', linestyle = '-')
+        ax2.axvline(x = y, color = 'k', linestyle = '-')
+        y = NA+0.5 ; yticks.append(y) ; yticklabels.append('B1X')
+        y = NA+NIN-0.5 ; yticks.append(y) ; yticklabels.append('Imaginary parts')
+        ax1.axhline(y = y, color = 'k', linestyle = '-')
+        ax2.axhline(y = y, color = 'k', linestyle = '-')
+        ax1.axvline(x = y, color = 'k', linestyle = '-')
+        ax2.axvline(x = y, color = 'k', linestyle = '-')
+        y = NA+NIN+0.5 ; yticks.append(y) ; yticklabels.append('B1X')
+        for ia in range(1,NA-1):
+            ib = posk(ia,ia+1,NA)
+            y = NA+ib-0.5 ; yticks.append(y) ; yticklabels.append(f'B{ia+1}X')
+            ax1.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
+            ax2.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
+            ax1.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
+            ax2.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
+            y = NA+NIN+ib-0.5 ; yticks.append(y) ; yticklabels.append(f'B{ia+1}X')
+            ax1.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
+            ax2.axhline(y = y, color = 'k', linestyle = '-', linewidth=.5)
+            ax1.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
+            ax2.axvline(x = y, color = 'k', linestyle = '-', linewidth=.5)
+    
+        ax1.set_yticks(xticks)
+        # ax1.set_yticklabels(xticklabels)
+        ax1.set_yticks(yticks)
+        ax1.set_yticklabels(yticklabels)
+    
+        ax2.set_yticklabels([])
+        # ax2.set_yticks(xticks)
+        # ax2.set_yticklabels(xticklabels)
+        # ax2.set_yticks(yticks)
+        # ax2.set_yticklabels(yticklabels)
+    
+        ax1.set_xticks(xticks) ; ax1.set_xticklabels(xticklabels)
+        ax2.set_xticks(xticks) ; ax2.set_xticklabels(xticklabels)
+        ax1.grid(False)
+        ax2.grid(False)
 
-    ax1.set_yticks(xticks)
-    # ax1.set_yticklabels(xticklabels)
-    ax1.set_yticks(yticks)
-    ax1.set_yticklabels(yticklabels)
-
-    ax2.set_yticklabels([])
-    # ax2.set_yticks(xticks)
-    # ax2.set_yticklabels(xticklabels)
-    # ax2.set_yticks(yticks)
-    # ax2.set_yticklabels(yticklabels)
-
-    ax1.set_xticks(xticks) ; ax1.set_xticklabels(xticklabels)
-    ax2.set_xticks(xticks) ; ax2.set_xticklabels(xticklabels)
-    ax1.grid(False)
-    ax2.grid(False)
-
-    if ABCDchip:
-        dico = {'v2pm_sorted':v2pm_sorted, 
-                'p2vm_sorted':p2vm_sorted, 
-                'photometries':photometries, 
-                'phases':phases,
-                'CovMatrixCoherent':CovMatrixCoherent, 
-                'CovMatrixQuadrature':CovMatrixQuadrature}
-    else:
-        dico = {'v2pm_sorted':v2pm_sorted, 
-                'p2vm_sorted':p2vm_sorted,
-                'CovMatrixCoherent':CovMatrixCoherent, 
-                'CovMatrixQuadrature':CovMatrixQuadrature}
         
     return dico
 
@@ -1941,6 +1981,107 @@ def NB2NIN(vector):
     
     return ninvec
 
+
+def makeA2P(descr, modulator, clean_up=False):
+    """Builds an A2P matrix from a high-level description descr of the FTchip.
+       descr (NIN,2) gives for each baseline (order 01,02,..,12,13,...) the amplitude ratio for pups 1 & 2"""
+    
+    
+    descr = np.array(descr) # Make sure it is an array so that the indexation works well
+    nb_in=len(descr)
+    
+    NA=round((1+np.sqrt(1+8*nb_in))/2) # inversion analytique de la ligne suivante
+    NIN=NA*(NA-1)//2
+    if NIN != nb_in:
+        print('Taille descr bizarre, attendu=',NIN)
+        
+    NQ = np.shape(modulator)[0] ; NP=NIN*NQ
+    alphabet = ['A','B','C','D']
+    
+    conventional_ich = []
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            for iq in range(NQ):
+                conventional_ich.append((int(f"{ia+1}{iap+1}"),alphabet[iq]))
+    
+    ich = conventional_ich
+
+    A2Pgen=np.zeros((NIN,4,NA),dtype=complex) #(base_out=[ia,iap],ABCD,ia_in)
+    ib=0
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            #print(ia,iap,ib)
+            A2Pgen[ib,:,ia ]=modulator[:,0]*descr[ib,0]
+            A2Pgen[ib,:,iap]=modulator[:,1]*descr[ib,0]
+            ib+=1
+            
+    A2P=np.reshape(A2Pgen,(NP,NA))
+    lightA2P=np.copy(A2P)
+    
+    if clean_up:
+        inc=0
+        for ip in range(NP):
+            if (A2P[ip,:] == np.zeros(NA)).all():
+                #print(f"Remove {conventional_ich[ip]} because line of the matrix is {A2P[ip,:]}")
+                lightA2P = np.delete(lightA2P, ip-inc, axis=0) # Remove the line at position ip because it doesn't receive any flux
+                del ich[ip-inc]
+                inc+=1
+
+    return(lightA2P, ich)
+
+
+def MakeV2PfromA2P(Amat):
+    NP,NA = Amat.shape
+    NB=NA**2
+    Bmat = np.zeros([NP,NB])*1j
+    for ip in range(NP):
+        for ia in range(NA):
+            for iap in range(NA):
+                k = ia*NA+iap
+                Bmat[ip, k] = Amat[ip,ia]*np.transpose(np.conjugate(Amat[ip,iap]))/(NA-1)
+
+    return Bmat
+
+
+
+def check_nrj(A2P):
+    """
+    Checks if a (NP,NA) A2P matrix is normalized.
+    If it is normalised, it means the PIC it accounts for conserves energy.
+    """
+    
+    A2Pmod2=A2P*np.conj(A2P)
+    nrjpup=np.real(np.sum(A2Pmod2,axis=0))   # Somme du carré des éléments de chaque ligne --> vecteur de dimension NA
+    if (nrjpup > 1+1e-15).any():             # Check si la somme des carrés de tous les éléments est inférieure à 1.
+        print('Pb: A2P is not normalized (creation of energy?)')
+        print(nrjpup)
+        
+    elif (nrjpup < 1-1e-15).any():
+        print("The PIC absorbs energy")
+        
+    return
+
+def check_semiunitary(A2P):
+    """
+    Check if the A2P matrix is pseudo-inversible and if it absorbs, or not, energy.
+    """
+    
+    Rank = np.linalg.rank(A2P)
+    
+    if not Rank == np.shape(A2P)[1]:
+        print(f"The matrix is not semi-unitary")
+    
+    
+    # Not sure about that.
+    # u,s,vh = np.linalg.svd(A2P)
+    
+    # if not (s<=1).all():   # Check if all singular values are lower than 1
+    #     print(f"The matrix creates energy.")
+        
+    # elif not (s==1).all(): # Check if all singular values are equal to 1
+    #     print(f"The matrix absorbs energy.")
+    
+    return
 
 def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
     fig = plt.gcf()
