@@ -94,12 +94,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
 
     """
 
-
-    from . import config
-    
     if init:
-        
-        from .config import NA,NB
         
         if not posi:    # Positions of the fibers on the V-groove.
             posi = [-2.75,-2.25,-0.5,0.75,2.25,3.25]
@@ -108,18 +103,14 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
             # posp = [3.84,3.74,3.52,3.41,3.19,3.12]
             posp = [0.84,0.94, 1.16, 1.27, 1.49, 1.56]
         
-        
-        if len(posp) != NA:
-            raise Exception(f"The FS takes a different number of beams ({len(posp)}) than the one\
-given in config ({NA}).")
-        
         if not PSDwindow:
             if Dc:
                 PSDwindow = Dc
             else:   # Minimum between the detector available space and the minimal separation between the 2 channels.
                 PSDwindow = np.min([posi_center - np.max(posp), Dsize[0]*24-posi_center]) 
         
-        NIN = int(NA*(NA-1)/2)
+        NA=len(posp)
+        NIN = int(NA*(NA-1)/2) ; NB=NA**2
         NW = len(spectra) ; MW = len(spectraM)
         NP = int(NA + 2*PSDwindow//p)  # 6 photometric beams + the interferogram
         
@@ -134,12 +125,14 @@ given in config ({NA}).")
         ich = np.array([[1,2], [1,3], [1,4], [1,5], [1,6], [2,3],
                         [2,4], [2,5], [2,6], [3,4],[3,5],[3,6],
                         [4,5],[4,6],[5,6]])
+        ich = ['12','13','14','15','16','23','24','25','26','34','35','36','45','46','56']
         
         ichorder = np.arange(NIN)
         
         config.FS['func'] = MIRCxFS
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
+        config.FS['active_ich'] = np.ones(NIN)
         config.FS['NP'] = NP
         config.FS['MW'] = MW
         config.FS['posi'] = posi
@@ -247,3 +240,6 @@ given in config ({NA}).")
         currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
     
     return currCfEstimated
+
+
+

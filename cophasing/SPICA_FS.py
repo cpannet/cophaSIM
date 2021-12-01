@@ -82,6 +82,8 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['func'] = SPICAFS_PERFECT
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
+        config.FS['active_ich'] = np.ones_like(ichorder)
+        
         NG = np.shape(ich)[0]       # should always be equal to NIN
         
         # Classic balanced ABCD modulation of each baseline

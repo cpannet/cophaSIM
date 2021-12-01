@@ -29,6 +29,16 @@ from .coh_tools import posk, poskfai,NB2NIN
 from . import config
 
 
+def updateFTparams(verbose=True,**kwargs):
+    
+    print("Update fringe-tracker parameters:")
+    for key, value in zip(list(kwargs.keys()),list(kwargs.values())):
+        oldval=config.FT[key]
+        config.FT[key] = value
+        if verbose:
+            print(f' - Parameter "{key}" changed from {oldval} to {value}')
+    
+
 def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
             search=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, Slope=6, Vfactors = [], 
             CPref=True, Ncp = 300, Nvar = 5,cmdOPD=True, switch=1,
@@ -186,27 +196,31 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
             config.FS['imsky'] = cp.asnumpy(config.FS['imsky'])    # Sky image before observation
         
         # if not config.TELref:
+        active_ich = config.FS['active_ich']
         for ia in range(NA):
             for iap in range(ia+1,NA):
                 ib = posk(ia,iap,NA)
-                config.FT['Piston2OPD'][ib,ia] = 1
-                config.FT['Piston2OPD'][ib,iap] = -1
-                config.FT['OPD2Piston'][ia,ib] = 1
-                config.FT['OPD2Piston'][iap,ib] = -1
-            # config.FT['OPD2Piston'] = np.linalg.pinv(config.FT['Piston2OPD'])   # OPD to pistons matrix
-        
-        config.FT['OPD2Piston'] = config.FT['OPD2Piston']/NA
+                config.FT['Piston2OPD'][ib,ia] = 1*active_ich[ib]
+                config.FT['Piston2OPD'][ib,iap] = -1*active_ich[ib]
+                # config.FT['OPD2Piston'][ia,ib] = 1*active_ich[ib]
+                # config.FT['OPD2Piston'][iap,ib] = -1*active_ich[ib]
+            
+        config.FT['OPD2Piston'] = np.linalg.pinv(config.FT['Piston2OPD'])   # OPD to pistons matrix
+        config.FT['OPD2Piston'][np.abs(config.FT['OPD2Piston'])<1e-15]=0
+        # config.FT['OPistonPD2Piston'] = config.FT['OPD2Piston']/NA
         
         if config.TELref:
             iTELref = config.TELref - 1
-            # L_ref = config.FT['OPD2Piston'][iTELref,:]
-            config.FT['OPD2Piston'] = config.FT['OPD2Piston'] #- L_ref
+            L_ref = config.FT['OPD2Piston'][iTELref,:]
+            config.FT['OPD2Piston'] = config.FT['OPD2Piston'] - L_ref
         
         return
 
     elif update:
+        print("Update fringe-tracker parameters with:")
         for key, value in zip(list(kwargs_for_update.keys()),list(kwargs_for_update.values())):
             setattr(config.FT, key, value)
+            print(f" - {key}: {getattr(config.FT, key, value)}")
 
         return
     
@@ -307,7 +321,7 @@ def ReadCf(currCfEstimated):
         # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref[it])
         
     # Current Phase-Delay
-    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))
+    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))*config.FS['active_ich']
         
     """
     Group-Delays extration
@@ -340,7 +354,7 @@ def ReadCf(currCfEstimated):
         cfGDlmbdas = simu.CfGD[it,:-Ncross,ib]*np.conjugate(simu.CfGD[it,Ncross:,ib])
         cfGDmoy = np.sum(cfGDlmbdas)
 
-        currGD[ib] = np.angle(cfGDmoy)    # Group-delay on baseline (ib).
+        currGD[ib] = np.angle(cfGDmoy)*config.FS['active_ich'][ib]    # Group-delay on baseline (ib).
     
     """
     Closure phase calculation
@@ -357,20 +371,23 @@ def ReadCf(currCfEstimated):
     bispectrumPD = np.zeros([NC])*1j
     bispectrumGD = np.zeros([NC])*1j
     
-    timerange = range(it+1-Ncp,it+1)
+    timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
     for ia in range(NA):
         for iap in range(ia+1,NA):
-            ib = posk(ia,iap,NA)      # coherent flux (ia,iap)    
+            ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
+            valid1=config.FS['active_ich'][ib]
             cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
             cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
             cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
             for iapp in range(iap+1,NA):
                 ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                valid2=config.FS['active_ich'][ib]
                 cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
                 ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                valid3=config.FS['active_ich'][ib]
                 cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
@@ -378,12 +395,12 @@ def ReadCf(currCfEstimated):
                 # The bispectrum of one time and one triangle adds up to
                 # the Ncp last times
                 ic = poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
-                
+                validcp[ic]=valid1*valid2*valid3
                 bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
                 bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
     
-    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)
-    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)
+    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
+    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
     
     if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
         for ia in range(1,NA-1):
@@ -593,10 +610,10 @@ def CommandCalc(currPD,currGD):
                 
             else:
                 config.FT['state'][it] = 0
-                usearch = simu.SearchCommand[it-1]
+                usearch = simu.SearchCommand[it]
         else:
             config.FT['state'][it] = 0
-            usearch = simu.SearchCommand[it-1]
+            usearch = simu.SearchCommand[it]
             
     else:
         simu.time_since_loss[it] = 0
@@ -607,15 +624,16 @@ def CommandCalc(currPD,currGD):
         # Version usaw float
         config.FT['eps'] = 1
         
-        usearch = simu.SearchCommand[it-1]
+        usearch = simu.SearchCommand[it]
         
         
-    if config.TELref:
-        iTel = config.TELref-1
-        usearch = usearch - usearch[iTel]
+    # if config.TELref:
+    #     iTel = config.TELref-1
+    #     usearch = usearch - usearch[iTel]
     
     usearch = config.FT['search']*usearch
-    simu.SearchCommand[it] = usearch
+    # The command is sent at the next time, that's why we note it+1
+    simu.SearchCommand[it+1] = usearch
     
     
     """
@@ -644,7 +662,7 @@ def CommandCalc(currPD,currGD):
     simu.GDResidual2[it] = currGDerr
     
     # Threshold function (eq.36)
-    if FT['Threshold']:     
+    if FT['Threshold']:
     
         # Array elements verifying the condition
         higher_than_pi = (currGDerr > np.pi/R*FT['switch'])
@@ -661,28 +679,27 @@ def CommandCalc(currPD,currGD):
     # Integrator (Eq.37)
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.GDCommand[it] = simu.GDCommand[it-1] + FT['GainGD']*currGDerr
+        simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*currGDerr*config.PDspectra*config.FS['R']/2/np.pi
         
         # From OPD to Pistons
-        uGD = np.dot(FT['OPD2Piston'], simu.GDCommand[it])
+        uGD = np.dot(FT['OPD2Piston'], simu.GDCommand[it+1])
         
     else:                       # integrator on Pistons
         # From OPD to Piston
-        currPistonGD = np.dot(FT['OPD2Piston'], currGDerr)
+        currPistonGD = np.dot(FT['OPD2Piston'], currGDerr)*config.PDspectra*config.FS['R']/2/np.pi
         # Integrator
-        uGD = simu.PistonGDCommand[it-1] + FT['GainGD']*currPistonGD
+        uGD = simu.PistonGDCommand[it+1] + FT['GainGD']*currPistonGD
         
     # simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*currGDerr
     
     # From OPD to Piston
     # uGD = np.dot(FT['OPD2Piston'], simu.GDCommand[it+1])
     
-    simu.PistonGDCommand_beforeround[it] = uGD
+    simu.PistonGDCommand_beforeround[it+1] = uGD
     
     if config.FT['roundGD']=='round':
-        for ia in range(NA):
-            jumps = round(uGD[ia]/config.PDspectra)
-            uGD[ia] = jumps*config.PDspectra
+        jumps = np.round(uGD/config.PDspectra)
+        uGD = jumps*config.PDspectra
     elif config.FT['roundGD']=='int':
         for ia in range(NA):
             jumps = int(uGD[ia]/config.PDspectra)
@@ -697,7 +714,7 @@ def CommandCalc(currPD,currGD):
         uGD = uGD - uGD[iTel]
         
         
-    simu.PistonGDCommand[it] = uGD
+    simu.PistonGDCommand[it+1] = uGD
 
     """
     Phase-Delay command
@@ -732,22 +749,22 @@ def CommandCalc(currPD,currGD):
             
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.PDCommand[it] = simu.PDCommand[it-1] + FT['GainPD']*currPDerr
+        simu.PDCommand[it+1] = simu.PDCommand[it] + FT['GainPD']*currPDerr*config.PDspectra/2/np.pi
         # From OPD to Pistons
-        uPD = np.dot(FT['OPD2Piston'], simu.PDCommand[it])
+        uPD = np.dot(FT['OPD2Piston'], simu.PDCommand[it+1])
         
     else:                       # integrator on Pistons
         # From OPD to Piston
-        currPistonPD = np.dot(FT['OPD2Piston'], currPDerr)
+        currPistonPD = np.dot(FT['OPD2Piston'], currPDerr)*config.PDspectra/2/np.pi
         # Integrator
-        uPD = simu.PistonPDCommand[it-1] + FT['GainPD']*currPistonPD
+        uPD = simu.PistonPDCommand[it] + FT['GainPD']*currPistonPD
     
     
     if config.TELref:
         iTel = config.TELref-1
         uPD = uPD - uPD[iTel]
     
-    simu.PistonPDCommand[it] = uPD
+    simu.PistonPDCommand[it+1] = uPD
     
     # if config.mode == 'track':
     #     if np.linalg.matrix_rank(currIgd) < NA-1:

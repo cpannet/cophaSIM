@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 # import cupy as cp # NumPy-equivalent module accelerated with NVIDIA GPU  
+import pandas as pd
 
 import matplotlib.pyplot as plt
 
@@ -91,30 +92,15 @@ SOURCE:
     LOAD INTERFEROMETER INFOS
     """
 
-    filepath = Interferometer
-    if not os.path.exists(filepath):
-        raise Exception(f"{filepath} doesn't exist.")
-    
-    with fits.open(filepath) as hdu:
-        ArrayParams = hdu[0].header
-        NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
-        # TelData = hdu[1].data
-        # BaseData = hdu[2].data
-        
-        # TelNames = TelData['TelNames']
-        # TelCoordinates = TelData['TelCoordinates']
-        # TelTransmissions = TelData['TelTransmissions']
-        # TelSurfaces = TelData['TelSurfaces']
-        # BaseNames = BaseData['BaseNames']
-        # BaseCoordinates = BaseData['BaseCoordinates']
-        
-        
+    InterfArray = coh_tools.get_array(name=Interferometer)
+
+    NA=InterfArray.NA
     # Redundant number of baselines
     NB = NA**2
     
     # Non-redundant number of Closure Phase
     NC = int((NA-2)*(NA-1))
-   
+    NIN = int(NA*(NA-1)/2)
     # NP = config.FS['NP']
     
 # TEMPORAL PARAMETERS
@@ -231,7 +217,7 @@ SOURCE:
     return 
 
 
-def update_config(**kwargs):
+def update_config(verbose=True,**kwargs):
     """
     Update any parameter the same way than first done in initialise function.
 
@@ -241,15 +227,20 @@ def update_config(**kwargs):
 
     """
     
+    print("Update config parameters:")
     for key,value in zip(list(kwargs.keys()),list(kwargs.values())):
         if not hasattr(config, key):
             raise ValueError(f"{key} is not an attribute of config. Maybe it is in FS or FT ?")
         else:    
+            oldval = getattr(config,key)
             setattr(config,key,value)
-    
+            if verbose:
+                print(f' - Parameter "{key}" changed from {oldval} to {value}')
+            
     if len(config.timestamps) != config.NT:
         config.timestamps = np.arange(config.NT)*config.dt
-    
+        if verbose:
+            print(' - New NT \u2260 len(timestamps) so we change timestamps.')
     return
 
 def save_config():
@@ -592,17 +583,9 @@ Longueur timestamps: {len(timestamps)}")
             if 'baselines' in kwargs.keys():
                 baselines = kwargs['baselines']
             else:
-                _,_,basedist,coords = coh_tools.get_array(config.Name, getcoords=True)
-                
-                
-                
-                baselines = np.zeros(NIN)
-                for ia in range(NA):
-                    for iap in range(ia+1,NA):
-                        ib=coh_tools.posk(ia,iap,NA)
-                        baselines[ib] = np.abs(basedist[ia*NA+iap])
-                
-                baselines = np.linalg.norm(BaseCoordinates, axis=1)
+                InterfArray = coh_tools.get_array(config.Name)
+                baselines = InterfArray.BaseNorms
+                coords = InterfArray.TelCoordinates
             
             V = 0.31*r0/t0*1e3              # Average wind velocity in its direction [m/s]
             L0 = L0                         # Outer scale [m]
@@ -705,17 +688,9 @@ Longueur timestamps: {len(timestamps)}")
             if 'baselines' in kwargs.keys():
                 baselines = kwargs['baselines']
             else:
-                _,_,basedist,coords = coh_tools.get_array(config.Name, getcoords=True)
-                
-                
-                
-                baselines = np.zeros(NIN)
-                for ia in range(NA):
-                    for iap in range(ia+1,NA):
-                        ib=coh_tools.posk(ia,iap,NA)
-                        baselines[ib] = np.abs(basedist[ia*NA+iap])
-                
-                baselines = np.linalg.norm(BaseCoordinates, axis=1)
+                InterfArray = coh_tools.get_array(name=config.Name)
+                baselines = InterfArray.BaseNorms
+                coords = InterfArray.TelCoordinates
             
             V = 0.31*r0/t0*1e3              # Average wind velocity in its direction [m/s]
             L0 = L0                         # Outer scale [m]
@@ -991,7 +966,7 @@ def loop(*args, overwrite=False, verbose=False):
         simu.it = it
         
         # Coherence of the ODL
-        CfODL = coh__pis2coh(-simu.CommandODL[it,:],1/config.spectra)
+        CfODL = coh__pis2coh(-simu.EffectiveMoveODL[it,:],1/config.spectra)
         
         currCfTrue = CfObj * simu.CfDisturbance[it,:,:] * CfODL
         simu.CfTrue[it,:,:] = currCfTrue
@@ -1014,10 +989,14 @@ def loop(*args, overwrite=False, verbose=False):
             config.FT['GainPD'] = 0
         fringetracker = config.FT['func']
         CmdODL = fringetracker(currCfEstimated)
+        
         config.FT['GainGD'] = GainGD
         config.FT['GainPD'] = GainPD
         
-        simu.CommandODL[it+config.latency,:] = CmdODL
+        simu.CommandODL[it+1,:] = CmdODL
+        
+        # Very simple step response of the delay lines: if latency==1, the odl response is instantaneous.
+        simu.EffectiveMoveODL[it+config.latency] = CmdODL
         
         checkpoint = int(checkperiod/100 * NT)
         if (it%checkpoint == 0) and (it!=0) and checktime:
@@ -1027,7 +1006,7 @@ def loop(*args, overwrite=False, verbose=False):
 
     print(f"Done. (Total: {round(time.time()-time0)}s)")
     # Process observables for visualisation
-    simu.PistonTrue = simu.PistonDisturbance - simu.CommandODL[:-config.latency]
+    simu.PistonTrue = simu.PistonDisturbance - simu.EffectiveMoveODL[:-config.latency]
 
     # Save true OPDs in an observable
     for ia in range(config.NA):
@@ -1036,7 +1015,10 @@ def loop(*args, overwrite=False, verbose=False):
             simu.OPDTrue[:,ib] = simu.PistonTrue[:,ia] - simu.PistonTrue[:,iap]
             simu.OPDDisturbance[:,ib] = simu.PistonDisturbance[:,ia] - simu.PistonDisturbance[:,iap]
             simu.OPDCommand[:,ib] = simu.CommandODL[:,ia] - simu.CommandODL[:,iap]    
-            simu.OPDSearchCommand[:,ib] = simu.SearchCommand[:,ia] - simu.SearchCommand[:,iap]
+            simu.EffectiveOPDMove[:,ib] = simu.EffectiveMoveODL[:,ia] - simu.EffectiveMoveODL[:,iap]    
+            
+            # if 'search' in config.FT.keys():
+            #     simu.OPDSearchCommand[:,ib] = simu.SearchCommand[:,ia] - simu.SearchCommand[:,iap]
             
             for iow in range(MW):
                 GammaObject = simu.CoherentFluxObject[iow*OW,ia*NA+iap]/np.sqrt(simu.CoherentFluxObject[iow*OW,ia*(NA+1)]*simu.CoherentFluxObject[iow*OW,iap*(NA+1)])
@@ -1078,7 +1060,7 @@ def loop(*args, overwrite=False, verbose=False):
     
         
 def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
-            OneTelescope=True, pause=False):
+            OneTelescope=True, pause=False, savedir='',ext='pdf'):
     
     '''
     NAME:
@@ -1108,6 +1090,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     
     from .simu import timestamps
     
+    import time
+    timestr = time.strftime("%Y%m%d-%H%M%S")
+    
     if 'which' in args:
         print(f"Available observables to display:\n\
               - Photometries: 'phot'\n\
@@ -1125,6 +1110,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
               - State-machine: 'state'\n")
         return
     
+    if (len(savedir)) and (not os.path.exists(savedir)):
+        os.makedirs(savedir)
+    
     ind = np.argmin(np.abs(config.spectraM-wl))
     wl = config.spectraM[ind]
     
@@ -1135,12 +1123,15 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     dt=config.dt
 
     increment=0
-    if np.min(ich) == 1:
+    if np.min(float(ich[0][0])) == 1:
         increment = 1
 
     stationaryregim_start = config.starttracking+(config.starttracking-config.NT)*2//3
     if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
     stationaryregim = range(stationaryregim_start,NT)
+    
+    DIT = min(50, config.NT - config.starttracking -1)
+    ShowPerformance(float(timestamps[stationaryregim_start]), wl, DIT, display=False)
     
     print('Displaying observables...')
     print(f'First fig is Figure {config.newfig}')
@@ -1169,7 +1160,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     
     beam_patches = []
     for ia in range(NA):
-        beam_patches.append(mpatches.Patch(color=telcolors[ia+1],label=f"Telescope {ia+increment}"))
+        beam_patches.append(mpatches.Patch(color=telcolors[ia+1],label=f"Telescope {ia+1}"))
     
     pis_max = 1.1*np.max([np.max(np.abs(simu.PistonDisturbance)),wl/2])
     pis_min = -pis_max
@@ -1237,7 +1228,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     
     
         plt.figure("Photometries")
-        plt.suptitle('Photometries at {:.2f}µm'.format(wl))
+        plt.suptitle('Photometries in the spectral channel containing {:.2f}µm'.format(wl))
         
         for ia in range(NA):
             plt.plot(timestamps, np.sum(simu.PhotometryDisturbance[:,OW*ind:OW*(ind+1),ia],axis=1),
@@ -1280,7 +1271,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             iTELref = config.TELref - 1
             PistonRef=simu.PistonTrue[:,iTELref]
         else:
-            PistonRef=0
+            PistonRef=np.mean(simu.PistonTrue, axis=1)
         
         for ia in range(NA):
             
@@ -1346,7 +1337,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             #          color='blue',linestyle='solid')
             ax.set_ylim(ylim)
             # ax2.set_ylim(ax2ylim)
-            ax.set_ylabel(f'Tel {ia+increment} \n[µm]')
+            ax.set_ylabel(f'Tel {ia+1} \n[µm]')
             # ax2.set_ylabel(f'Residual Piston {ia+increment} [µm]')
             ax.grid()
         
@@ -1414,6 +1405,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         
         RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
         RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+        RMStrueOPD = np.sqrt(simu.VarOPD)
         # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
         # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
         
@@ -1456,17 +1448,21 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                    color='k', linestyle=':')
         
         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
+        ax4.bar(baselines[:len1],simu.LR3[:len1],fill=False,edgecolor='black',linestyle='-')
         ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
+        ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
         
         ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
+        ax9.bar(baselines[len1:],simu.LR3[len1:],fill=False,edgecolor='black',linestyle='-')
         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
+        ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
         ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=SquaredSNR,ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=GDmic)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=simu.OPDDisturbance)
         ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
         ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=RMSgdmic,ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),[wl/5]]),ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),[wl/5],np.stack(RMStrueOPD)]),ymin=0)
         
         ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
         ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
@@ -1487,6 +1483,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ax7.legend(handles=linestyles, loc='upper right')
         fig.show()
 
+        if len(savedir):
+            plt.savefig(savedir+f"Simulation{timestr}_perftable.{ext}")
 
     if displayall or ('opd' in args):
         """
@@ -1495,7 +1493,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         
         OPD_max = 1.1*np.max([np.max(np.abs([simu.OPDDisturbance,
                               simu.OPDTrue,
-                              simu.OPDCommand[:-config.latency,:]])),wl/2])
+                              simu.OPDCommand[:-1],simu.EffectiveOPDMove[:-config.latency]])),wl/2])
         OPD_min = -OPD_max
         ylim = [OPD_min,OPD_max]
     
@@ -1506,23 +1504,22 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         linestyle='solid',label='Disturbance'))
         linestyles.append(mlines.Line2D([], [], color='green',
                                         linestyle='dotted',label='Command'))
+        linestyles.append(mlines.Line2D([], [], color='green',
+                                        linestyle='solid',label='Effective Move ODL'))
         linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking'))
     
-        DIT = min(50, config.NT - config.starttracking -1)
-        ShowPerformance(float(timestamps[stationaryregim_start]), wl, DIT, display=False)
-        NumberOfBaselinesToShow = np.min([NIN, 3])
+        
+        NumberOfBaselinesToShow = np.min([NIN, NA-1])
         for ia in range(NumberOfBaselinesToShow):
-            fig = plt.figure(f"OPD {ia+increment}")
-    #         fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
-    # including telescope {ia+increment}")
+            fig = plt.figure(f"OPD {ia+1}")
+
             axes = fig.subplots(nrows=NumberOfBaselinesToShow,ncols=2,sharex=True, gridspec_kw={'width_ratios': [4, 1]})
             iap,iax=0,0
             
             if np.ndim(axes)==1:
                 axes = [(axes[0], axes[1])]
                 
-            print(axes)
             for ax,axText in axes:
                 ax2 = ax.twinx()
                 ax2ymax = 1.1*np.max([np.max(np.abs(simu.OPDTrue[stationaryregim])),wl/2])
@@ -1533,14 +1530,18 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 if ia < iap:
                     ib = coh_tools.posk(ia,iap,NA)
                     ax.plot(timestamps, simu.OPDDisturbance[:,ib],color='red')
-                    ax.plot(timestamps, simu.OPDCommand[:-config.latency,ib],
+                    ax.plot(timestamps, simu.OPDCommand[:-1,ib],
                             color='green',linestyle='dotted')
-                    ax2.plot(timestamps, simu.OPDTrue[:,ib],color='blue')
+                    ax.plot(timestamps, simu.EffectiveOPDMove[:-config.latency,ib],
+                            color='green',linestyle='solid')
+                    ax.plot(timestamps, simu.OPDTrue[:,ib],color='blue')
                 else:
                     ib = coh_tools.posk(iap,ia,NA)
-                    ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
-                    ax.plot(timestamps, -simu.OPDCommand[:-config.latency,ib],
-                            color='green',linestyle='dotted')                
+                    ax2.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
+                    ax2.plot(timestamps, -simu.OPDCommand[:-1,ib],
+                            color='green',linestyle='dotted')   
+                    ax2.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                            color='green',linestyle='-')
                     ax2.plot(timestamps, -simu.OPDTrue[:,ib],color='blue')
                 
                 ax2.hlines(np.mean(simu.OPDTrue[stationaryregim,ib]),0,NT*dt,
@@ -1579,32 +1580,39 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             
             if OneTelescope:
                 break
+            
+            
+        if len(savedir):
+            print("Saving opd figure.")
+            plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
         
     
     if 'OPDcmd' in args:
         OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
-                              simu.GDCommand[:-config.latency,:],simu.OPDCommand[:-config.latency,:]]))
+                              simu.GDCommand[:-1,:],simu.OPDCommand[:-1,:]]))
         OPD_min = -OPD_max
         ylim = [OPD_min,OPD_max]
     
         linestyles=[]
         linestyles.append(mlines.Line2D([], [],label='Disturbance',
-                                        color=colors[0],linestyle='solid'))
+                                        color=colors[0],linestyle='-'))
         linestyles.append(mlines.Line2D([], [],label='Total command',
-                                        color=colors[1],linestyle='solid'))
+                                        color=colors[1],linestyle='-'))
         linestyles.append(mlines.Line2D([], [],label='PD command',
-                                        color=colors[2],linestyle='--'))
+                                        color=colors[2],linestyle='-'))
         linestyles.append(mlines.Line2D([], [],label='GD command',
-                                        color=colors[3],linestyle=':'))
+                                        color=colors[3],linestyle='-'))
         linestyles.append(mlines.Line2D([], [],label='Search command',
-                                        color=colors[4],linestyle=':'))
+                                        color=colors[4],linestyle='-'))
+        linestyles.append(mlines.Line2D([], [],label='Effective Move ODL',
+                                        color=colors[5],linestyle='-'))
         linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking'))
         
         for ia in range(NA):
-            fig = plt.figure(f"OPD commands {ia+increment}")
+            fig = plt.figure(f"OPD commands {ia+1}")
             fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
-    including telescope {ia+increment}")
+    including telescope {ia+1}")
             axes = fig.subplots(nrows=NA-1,ncols=3,sharex=True,gridspec_kw={'width_ratios': [8, 1,1]})
             iap,iax=0,0
             for ax,axText,axLegend in axes:
@@ -1617,28 +1625,31 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                     ib = coh_tools.posk(ia,iap,NA)
                     ax.plot(timestamps, simu.OPDDisturbance[:,ib],
                             color=colors[0])
-                    ax.plot(timestamps, simu.OPDCommand[:-config.latency,ib],
+                    ax.plot(timestamps, simu.OPDCommand[:-1,ib],
                             color=colors[1])
-                    ax.plot(timestamps, simu.PDCommand[:-config.latency,ib],
+                    ax.plot(timestamps, simu.PDCommand[:-1,ib],
                             color=colors[2])
-                    ax.plot(timestamps, simu.GDCommand[:-config.latency,ib],
+                    ax.plot(timestamps, simu.GDCommand[:-1,ib],
                             color=colors[3])
-                    ax.plot(timestamps, simu.OPDSearchCommand[:-config.latency,ib],
+                    ax.plot(timestamps, simu.OPDSearchCommand[:-1,ib],
                             color=colors[4])
-                    
+                    ax.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                            color=colors[5])
 
                 else:
                     ib = coh_tools.posk(iap,ia,NA)
                     ax2.plot(timestamps, -simu.OPDDisturbance[:,ib],
                             color=colors[0])
-                    ax2.plot(timestamps, -simu.OPDCommand[:-config.latency,ib],
+                    ax2.plot(timestamps, -simu.OPDCommand[:-1,ib],
                             color=colors[1])
-                    ax2.plot(timestamps, -simu.PDCommand[:-config.latency,ib],
+                    ax2.plot(timestamps, -simu.PDCommand[:-1,ib],
                             color=colors[2])
-                    ax2.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
+                    ax2.plot(timestamps, -simu.GDCommand[:-1,ib],
                             color=colors[3])
-                    ax2.plot(timestamps, -simu.OPDSearchCommand[:-config.latency,ib],
+                    ax2.plot(timestamps, -simu.OPDSearchCommand[:-1,ib],
                             color=colors[4])
+                    ax2.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                            color=colors[5])
                 
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
                    color='k', linestyle=':')
@@ -1696,9 +1707,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                                         linestyle=':', label='Start tracking'))
 
         for ia in range(NA):
-            fig = plt.figure(f"OPD details {ia+increment}")
+            fig = plt.figure(f"OPD details {ia+1}")
             fig.suptitle(f"OPD evolution at {wl:.2f}µm for baselines \n\
-    including telescope {ia+increment}")
+    including telescope {ia+1}")
             axes = fig.subplots(nrows=NA-1,ncols=3,sharex=True,gridspec_kw={'width_ratios': [8, 1,1]})
             iap,iax=0,0
             for ax,axText,axLegend in axes:
@@ -1796,10 +1807,12 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         """
         
         
-        linestyles=[]
+        linestyles=[] ; linestyles1=[] ; linestyles2=[]
         linestyles.append(mlines.Line2D([], [],linestyle='solid',
-                                        label='Estimated'))    
-        linestyles.append(mlines.Line2D([], [],linestyle='dashed',
+                                        label='Estimated PD'))    
+        linestyles.append(mlines.Line2D([], [],linestyle=':',
+                                        label='Estimated GD')) 
+        linestyles.append(mlines.Line2D([], [],linestyle='--',
                                         label='Object'))
         linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking'))
@@ -1809,17 +1822,21 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ylim = [-ymax, ymax]
         fig = plt.figure('Closure Phases')
         fig.suptitle('Closure Phases')
-        ax1,ax2 = fig.subplots(nrows=2, ncols=1)
+        (ax1,ax3), (ax2,ax4) = fig.subplots(nrows=2, ncols=2, gridspec_kw={"width_ratios":[5,1]})
         
         # Plot on ax1 the (NA-1)(NA-2)/2 independant Closure Phases
         for ia in range(1,NA):
             for iap in range(ia+1,NA):
                 ic = coh_tools.poskfai(0,ia,iap,NA)
-                # if ia == 0
+                
                 ax1.plot(timestamps, simu.ClosurePhasePD[:,ic],
                          color=colors[ic])
+                ax1.plot(timestamps, simu.ClosurePhaseGD[:,ic],
+                         color=colors[ic],linestyle=':')
                 ax1.hlines(simu.ClosurePhaseObject[ind,ic], 0, timestamps[-1], 
                            color=colors[ic], linestyle='--')
+                linestyles1.append(mlines.Line2D([],[], color=colors[ic],
+                                                linestyle='-', label=f'{1}{ia+1}{iap+1}'))
                 
         # Plot on ax2 the (NA-1)(NA-2)/2 (independant?) other Closure Phases
         for ia in range(1,NA):
@@ -1829,8 +1846,12 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                     colorindex = int(ic - config.NC//2)
                     ax2.plot(timestamps, simu.ClosurePhasePD[:,ic],
                              color=colors[colorindex])
+                    ax2.plot(timestamps, simu.ClosurePhaseGD[:,ic],
+                             color=colors[colorindex],linestyle=':')
                     ax2.hlines(simu.ClosurePhaseObject[ind,ic], 0, timestamps[-1],
                                color=colors[colorindex], linestyle='--')
+                    linestyles2.append(mlines.Line2D([],[], color=colors[colorindex],
+                                                    linestyle='-', label=f'{ia+1}{iap+1}{iapp+1}'))
         
         ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
                    color='k', linestyle=':')
@@ -1840,8 +1861,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         plt.ylabel('Closure Phase [rad]')
         ax1.set_ylim(ylim)
         ax2.set_ylim(ylim)
-        plt.show()
-        plt.legend(handles=linestyles)
+        ax1.legend(handles=linestyles)
+        ax3.legend(handles=linestyles1,loc='upper left') ; ax3.axis('off')
+        ax4.legend(handles=linestyles2,loc='upper left') ; ax4.axis('off')
         config.newfig+=1
         
 
@@ -1853,9 +1875,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ylim =[0,1.1]
         # Squared Visibilities
         for ia in range(NA):
-            fig = plt.figure(f"Squared Vis {ia+increment}")
+            fig = plt.figure(f"Squared Vis {ia+1}")
             fig.suptitle(f"Squared visibility |V|² at {wl:.2f}µm for baselines \n\
-    including telescope {ia+increment}")
+    including telescope {ia+1}")
             axes = fig.subplots(nrows=NA-1,ncols=1,sharex=True)
             iap=0
             for ax in axes:
@@ -1883,9 +1905,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ymax = np.pi #2*np.max(np.abs(VisibilityPhase))
         ylim = [-ymax,ymax]
         for ia in range(NA):
-            fig = plt.figure(f"Phase Vis {ia+increment}")
+            fig = plt.figure(f"Phase Vis {ia+1}")
             fig.suptitle(f"Visibility phase \u03C6 at {wl:.2f}µm for baselines \n\
-    including telescope {ia+increment}")
+    including telescope {ia+1}")
             axes = fig.subplots(nrows=NA-1,ncols=1,sharex=True)
             iap=0
             for iax in range(len(axes)):
@@ -1989,6 +2011,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             plt.xlabel(f'Image at wl={round(config.spectraM[ind],2)}µm')
             plt.grid(False)
             config.newfig +=1
+
+        if len(savedir):
+            fig.savefig(savedir+f"Simulation{timestr}_detector.{ext}")
             
 
     if ('state' in args):
@@ -2120,18 +2145,25 @@ WavelengthOfInterest
     simu.VarCPD =np.zeros(NC); simu.VarCGD=np.zeros(NC)
     simu.LockedRatio=np.zeros(NIN) ; simu.WLockedRatio = np.zeros(NIN)
     
+    simu.LR2 = np.zeros(NIN) ; simu.LR3= np.zeros(NIN)
+    
     MaxPhaseVarForLocked = (2*np.pi/p)**2
+    MaxVarOPDForLocked = (WavelengthOfInterest/p)**2
     
     Ndit = Period//DIT_NumberOfFrames
     simu.PhaseVar_atWOI = np.zeros([Ndit,NIN])
     simu.FTLocked = np.zeros([Ndit,NIN])
     simu.PhaseStableEnough= np.zeros([Ndit,NIN])
+    simu.TrackedBaselines = (simu.SquaredSNRMovingAverage >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
+    simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
+    simu.InCentralFringe = np.abs(simu.OPDTrue < WavelengthOfInterest/2)
+    simu.LR3 = np.mean(simu.InCentralFringe[InFrame:], axis=0)    # Array [NIN]
     
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
         OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
-        simu.PhaseVar_atWOI[it] = OPDVar*(2*np.pi/WavelengthOfInterest)**2
-        simu.PhaseStableEnough[it] = 1*(simu.PhaseVar_atWOI[it] < MaxPhaseVarForLocked)
+        simu.PhaseVar_atWOI[it] = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/WavelengthOfInterest,axis=0)
+        simu.PhaseStableEnough[it] = 1*(OPDVar < MaxVarOPDForLocked)
         #simu.FTLocked[it] =  # Reste à définir en utilisant la matrice de poids.
         simu.VarOPD += 1/Ndit*OPDVar
         simu.TempVarPD += 1/Ndit*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
@@ -2143,18 +2175,21 @@ WavelengthOfInterest
         for iw in range(NW):
             wl = WOI[iw]
             for ib in range(NIN):
-                simu.CoherenceEnvelopModulation[iw,ib] = np.mean(np.sinc(simu.OPDTrue[:,ib]/Lc[iw]))
-                simu.FringeContrast[iw,ib] += 1/Ndit*np.abs(np.mean(np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)))
-                simu.FringeContrast[iw,ib] *= simu.CoherenceEnvelopModulation[iw,ib]
+                CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
+                Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
+                simu.FringeContrast[iw,ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
         
         InFrame += DIT_NumberOfFrames
         
     simu.LockedRatio = np.mean(simu.PhaseStableEnough,axis=0)
     simu.WLockedRatio = np.mean(simu.PhaseStableEnough*simu.FringeContrast, axis=0)
-    simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
     
     simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
-    
+
+    simu.WLR2 = np.mean(simu.InCentralFringe * simu.SquaredSNRMovingAverage, axis=0)
+    simu.WLR3 = np.mean(simu.TrackedBaselines * simu.SquaredSNRMovingAverage, axis=0)
+
+
     if not display:
         return
 
@@ -2171,7 +2206,6 @@ WavelengthOfInterest
     plt.grid()
     plt.show()
     config.newfig += 1
-    
     
     observable = simu.TempVarPD*(config.PDspectra/2/np.pi)
     
@@ -2242,7 +2276,7 @@ WavelengthOfInterest
     return
 
 
-def SpectralAnalysis(OPD = (1,2)):
+def SpectralAnalysis(OPD = (1,2),TimeBonds=0):
     """
     Plot the three Transfer Function of the servo loop controlling the OPD between
     the telescopes OPD[0] and OPD[1]
@@ -2258,54 +2292,63 @@ def SpectralAnalysis(OPD = (1,2)):
 
     """
     from . import simu
-    from .config import NA, NT, dt, latency
+    from .config import NA, NT, dt
     
     tel1 = OPD[0]-1
     tel2 = OPD[1]-1
     
     ib = coh_tools.posk(tel1, tel2, NA)
     
-    FrequencySampling = np.fft.fftfreq(NT, dt*1e-3)
+    if isinstance(TimeBonds,(float,int)):
+        BeginSample = round(TimeBonds/dt)
+        EndSample = NT
+    elif isinstance(TimeBonds,(np.ndarray,list)):
+        BeginSample = round(TimeBonds[0]/dt)
+        EndSample = round(TimeBonds[1]/dt)
+    else:
+        raise '"TimeBonds" must be instance of (float,int,np.ndarray,list)'
+    
+    SampleIndices = range(BeginSample,EndSample) ; nNT = len(SampleIndices)
+    
+    FrequencySampling = np.fft.fftfreq(nNT, dt*1e-3)
     PresentFrequencies = (FrequencySampling >= 0) & (FrequencySampling < 200)
     FrequencySampling = FrequencySampling[PresentFrequencies]
     
-    Residues = simu.OPDTrue[:,ib]
-    Turb = simu.OPDDisturbance[:,ib]
-    Command = simu.OPDCommand[:,ib]
+    Residues = simu.OPDTrue[SampleIndices,ib]
+    Turb = simu.OPDDisturbance[SampleIndices,ib]
+    Command = simu.OPDCommand[SampleIndices,ib]
     
     FTResidues = np.fft.fft(Residues)[PresentFrequencies]
     FTTurb = np.fft.fft(Turb)[PresentFrequencies]
-    FTCommand = np.fft.fft(Command[:-latency])[PresentFrequencies]
+    FTCommand = np.fft.fft(Command)[PresentFrequencies]
     
     FTrej = FTResidues/FTTurb
     FTBO = FTCommand/FTResidues
     FTBF = FTCommand/FTTurb
 
 
-    plt.figure('Rejection Transfer Function')
-    plt.plot(FrequencySampling, np.abs(FTrej))
+    fig = plt.figure('Rejection Transfer Function')
+    ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+    
+    ax1.plot(FrequencySampling, np.abs(FTrej))
     # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
-    plt.xlabel('Frequencies [Hz]')
-    plt.ylabel('Normalised')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.show()
+    ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
+    ax1.set_ylabel('FTrej')
     
-    plt.figure('FTBO')
-    plt.plot(FrequencySampling, np.abs(FTBO))
-    plt.xlabel('Frequencies [Hz]')
-    plt.ylabel('Normalised')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.show()
+    ax2.plot(FrequencySampling, np.abs(FTBO))
+    ax2.set_yscale('log') #; ax2.set_ylim(1e-3,5)
+    ax2.set_ylabel("FTBO")
     
-    plt.figure('FTBF')
-    plt.plot(FrequencySampling, np.abs(FTBF))
-    plt.xlabel('Frequencies [Hz]')
-    plt.ylabel('Normalised')
-    plt.xscale('log')
-    plt.yscale('log')
-    plt.show()
+    ax3.plot(FrequencySampling, np.abs(FTBF))
+
+    ax3.set_xlabel('Frequencies [Hz]')
+    ax3.set_ylabel('FTBF')
+    ax3.set_xscale('log')
+    ax3.set_yscale('log')
+    #ax3.set_ylim(1e-2,1e1)
+
+    pass
+
 
 
 def FSdefault(NA, NW):
@@ -2392,8 +2435,8 @@ def ReadCf(currCfEstimated):
         - simu.ClosurePhasePD                       [NT,MW,NC]
         - simu.ClosurePhaseGD                       [NT,MW,NC]
         - simu.PhotometryEstimated                  [NT,MW,NA]
-        - simu.VisibilityEstimated                    [NT,MW,NIN]*1j
-        - simu.SquaredCoherenceDegree                      [NT,MW,NIN]
+        - simu.VisibilityEstimated                  [NT,MW,NIN]*1j
+        - simu.SquaredCoherenceDegree               [NT,MW,NIN]
     """
 
     from . import simu
@@ -2581,7 +2624,7 @@ def ReadCf(currCfEstimated):
 
 
 def SimpleIntegrator(*args, init=False, Ngd=1, Npd=1, Ncp = 1, GainPD=0, GainGD=0,
-                      Ncross = 1, CPref=True,roundGD=True,Threshold=True, usePDref=True):
+                      Ncross = 1, CPref=True,roundGD='round',Threshold=True, usePDref=True):
     """
     Calculates, from the measured coherent flux, the new positions to send to the delay lines.
     
@@ -2762,24 +2805,34 @@ def SimpleCommandCalc(currPD,currGD):
     """
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.GDCommand[it] = simu.GDCommand[it-1] + FT['GainGD']*currGDerr
+        simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*config.PDspectra*config.FS['R']/(2*np.pi)*currGDerr
         # From OPD to Pistons
-        simu.PistonGDCommand[it] = np.dot(FT['OPD2Piston'], simu.GDCommand[it])
+        simu.PistonGDCommand[it+1] = np.dot(FT['OPD2Piston'], simu.GDCommand[it+1])
         
     else:                       # integrator on PD
         # From OPD to Piston
         currPistonGD = np.dot(FT['OPD2Piston'], currGDerr)
         # Integrator
-        simu.PistonGDCommand[it] = simu.PistonGDCommand[it-1] + FT['GainPD']*currPistonGD
+        simu.PistonGDCommand[it+1] = simu.PistonGDCommand[it] + FT['GainPD']*currPistonGD
     
-    uGD = simu.PistonGDCommand[it]
+    uGD = simu.PistonGDCommand[it+1]
     
-    if config.FT['roundGD']:
+    if config.FT['roundGD']=='round':
         for ia in range(NA):
             jumps = round(uGD[ia]/config.PDspectra)
             uGD[ia] = jumps*config.PDspectra
+
+    elif config.FT['roundGD']=='int':
+        for ia in range(NA):
+            jumps = int(uGD[ia]/config.PDspectra)
+            uGD[ia] = jumps*config.PDspectra
             
-    
+    elif config.FT['roundGD']=='no':
+        pass
+
+    else:
+        print("roundGD must be either 'round', 'int' or 'no'.")
+       
     """
     Phase-Delay command
     """
@@ -2799,17 +2852,17 @@ def SimpleCommandCalc(currPD,currGD):
     
     if config.FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.PDCommand[it] = simu.PDCommand[it-1] + FT['GainPD']*currPDerr
+        simu.PDCommand[it+1] = simu.PDCommand[it] + FT['GainPD']*config.PDspectra/(2*np.pi)*currPDerr
         # From OPD to Pistons
-        simu.PistonPDCommand[it] = np.dot(FT['OPD2Piston'], simu.PDCommand[it])
+        simu.PistonPDCommand[it+1] = np.dot(FT['OPD2Piston'], simu.PDCommand[it+1])
         
     else:                       # integrator on PD
         # From OPD to Piston
         currPistonPD = np.dot(FT['OPD2Piston'], currPDerr)
         # Integrator
-        simu.PistonPDCommand[it] = simu.PistonPDCommand[it-1] + FT['GainPD']*currPistonPD
+        simu.PistonPDCommand[it+1] = simu.PistonPDCommand[it] + FT['GainPD']*currPistonPD
     
-    uPD = simu.PistonPDCommand[it]
+    uPD = simu.PistonPDCommand[it+1]
 
     """
     ODL command
@@ -3144,9 +3197,10 @@ def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
     
 
     hdu = fits.BinTableHDU.from_columns(cols, name='simu')
-    
-    
     hduL.append(hdu)
+    
+    t = PandasToTableHDU()
+    hdu = fits.BinTableHDU(t, name="Perf")
     
     for newhdu in imhduL:
         hduL.append(newhdu)
@@ -3174,4 +3228,30 @@ def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
     print('Saved.')
     
     
+def PandasToTableHDU(DataFrame_or_Table, direct=True):
+    from astropy.table import Table
     
+    if direct:
+        df = DataFrame_or_Table.copy()
+        df.reset_index(level=0, inplace=True)
+        df.columns = ["_".join([str(ind) for ind in col]) if isinstance(col,tuple) else col for col in df.columns.values]
+        t = Table.from_pandas(df)
+        return t
+    
+    else:
+        t = DataFrame_or_Table
+        df = t.to_pandas()
+        
+        L = []
+        for colname in df.columns.values:
+            if '.' in colname:
+                L.append([float(value) if '.' in value else value for value in colname.split('_')])
+            else:
+                indval = df[colname].values
+        
+        arr = np.array(L)
+        L2 = list(arr.T)
+        
+        MultiIndexdf = pd.DataFrame(data=df.T.iloc[1:].values.T, columns=L2, index=indval)
+        MultiIndexdf.index.name = "Base"
+        return MultiIndexdf

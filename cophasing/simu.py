@@ -52,9 +52,11 @@ SquaredSNRMovingAverage = np.zeros([NT,NIN])    # Estimated SNR² averaged over 
 TemporalVariancePD = np.zeros([NT,NIN])         # Temporal Variance PD estimator
 TemporalVarianceGD = np.zeros([NT,NIN])         # Temporal Variance GD estimator
 GDEstimated = np.zeros([NT,NIN])                # Estimated baselines GD [rad]
-OPDCommand = np.zeros([NT+latency,NIN])         # OPD-space command ODL
-PDCommand = np.zeros([NT+latency,NIN])          # OPD-space PD command
-GDCommand = np.zeros([NT+latency,NIN])          # OPD-space GD command
+OPDCommand = np.zeros([NT+1,NIN])               # OPD-space command ODL
+PDCommand = np.zeros([NT+1,NIN])                # OPD-space PD command
+GDCommand = np.zeros([NT+1,NIN])                # OPD-space GD command
+EffectiveOPDMove = np.zeros([NT+latency,NIN])   # Effective move of the delay lines in OPD-space
+
 PDResidual = np.zeros([NT,NIN])                 # Estimated residual PD = PD-PDref
 GDResidual = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref
 GDResidual2 = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref
@@ -64,12 +66,13 @@ OPDSearchCommand = np.zeros([NT+latency,NIN])           # Search command project
 # Piston-space observables [NA]
 PistonTrue = np.zeros([NT,NA])                  # True Pistons
 PistonDisturbance = np.zeros([NT,NA])           # Piston disturbances
-PistonPDCommand = np.zeros([NT+latency,NA])     # Piston-space PD command
-PistonGDCommand = np.zeros([NT+latency,NA])     # Piston-space GD command
-PistonGDCommand_beforeround = np.zeros([NT+latency,NA])
+PistonPDCommand = np.zeros([NT+1,NA])           # Piston-space PD command
+PistonGDCommand = np.zeros([NT+1,NA])           # Piston-space GD command
+PistonGDCommand_beforeround = np.zeros([NT+1,NA])
 
-SearchCommand = np.zeros([NT+latency,NA])       # Piston-space Search command
-CommandODL = np.zeros([NT+latency,NA])          # Delay lines positionnal command
+SearchCommand = np.zeros([NT+1,NA])             # Piston-space Search command
+CommandODL = np.zeros([NT+1,NA])                # Delay lines positionnal command calculated at time it
+EffectiveMoveODL = np.zeros([NT+latency,NA])    # Effective move of the delay lines
 
 TransmissionDisturbance = np.ones([NT,NW,NA])   # Transmission disturbance of the telescopes
 PhotometryDisturbance = np.zeros([NT,NW,NA])    # Resulting photometry disturbances (scaled by the object photometry)

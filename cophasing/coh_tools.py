@@ -143,7 +143,7 @@ def info_array(array, band):
     return transmission, surface
     
 
-def get_array(name,getcoords=False):
+def get_array(name='',getcoords=False):
     """
     Returns the coordinates, baselines and base names of a given array
 
@@ -178,46 +178,77 @@ def get_array(name,getcoords=False):
     
     """
     
-    print(name)
-    if name == 'CHARA':         
+    class Interferometer:
+        def __init__(self):
+            pass
+    InterfArray = Interferometer()
+    
+    if "fits" in name:
+        filepath = name
+        if not os.path.exists(filepath):
+            raise Exception(f"{filepath} doesn't exist.")
+
+        with fits.open(filepath) as hdu:
+            ArrayParams = hdu[0].header
+            NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
+            InterfArray.NA = NA
+            InterfArray.NIN = NIN
+            TelData = hdu[1].data
+            BaseData = hdu[2].data
+        
+            InterfArray.TelNames = TelData['TelNames']
+            InterfArray.TelCoordinates = TelData['TelCoordinates']
+            InterfArray.TelTransmissions = TelData['TelTransmissions']
+            InterfArray.TelSurfaces = TelData['TelSurfaces']
+            InterfArray.BaseNames = BaseData['BaseNames']
+            InterfArray.BaseCoordinates = BaseData['BaseCoordinates']
+            
+        InterfArray.BaseNorms = np.linalg.norm(InterfArray.BaseCoordinates[:,:2],axis=1)
+    
+        
+    elif name == 'CHARA':         
             
         #official coordinates in [µm]
-        coords = np.array([[125333989.819,305932632.737,-5909735.735],\
+        TelCoordinates= np.array([[125333989.819,305932632.737,-5909735.735],\
                                  [70396607.118,269713282.258,-2796743.645],\
                                      [0,0,0],\
                                          [-5746854.437,33580641.636,636719.086],\
                                              [-175073332.211,216320434.499,-10791111.235],\
                                                  [-69093582.796,199334733.235,467336.023]])
-        coords=coords*1e-6      # [m]
+        TelCoordinates=TelCoordinates*1e-6      # [m]
+        
+        NA = np.shape(TelCoordinates)[0]
+        
+        TelNames = ['E1','E2','S1','S2','W1','W2']
+        BaseNames = []
+        BaseCoordinates =[]
+
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                BaseNames.append(str(TelNames[ia]+TelNames[iap]))
+                BaseCoordinates.append([TelCoordinates[ia,0]-TelCoordinates[iap,0],
+                                        TelCoordinates[ia,1]-TelCoordinates[iap,1],
+                                        TelCoordinates[ia,2]-TelCoordinates[iap,2]])
+        BaseCoordinates = np.array(BaseCoordinates)        
+        BaseNorms = np.linalg.norm(BaseCoordinates[:,:2],axis=1)
+
+        InterfArray.NA = NA
+        InterfArray.TelNames=TelNames
+        InterfArray.BaseNorms=BaseNorms
+        InterfArray.BaseNames = BaseNames
+        InterfArray.TelCoordinates = TelCoordinates
+        InterfArray.BaseCoordinates = BaseCoordinates
         
     else:
-        raise NameError('Array name must be "CHARA"')
+        raise Exception("For defining the array, you must give a file \
+or a name (currently only CHARA is available).")
         
-    NA = np.shape(coords)[0]
-    
-    TelNames = ['E1','E2','S1','S2','W1','W2']
-    BaseNames = []
-    BaseNorms =[]
-    config.BasesVectors = np.array([])
-    for ia in range(NA):
-        for iap in range(NA):
-            
-            BaseNames.append(str(TelNames[ia]+TelNames[iap]))
-            BaseNorms.append(np.sqrt((coords[ia,0]-coords[iap,0])**2 + \
-                                    (coords[ia,1]-coords[iap,1])**2 + \
-                                  (coords[ia,2]-coords[iap,2])**2))
-               
-            
-    if getcoords:
-        return TelNames, BaseNames, BaseNorms, coords
-        
-    config.BasesVectors
-    return TelNames, BaseNames, BaseNorms
+    return InterfArray
     
 
 def get_Bproj(baseline, theta):
     """
-    Calculates projected bases acording to the viewed angle in radian
+    Calculates projected bases according to the viewed angle in radian
 
     Parameters
     ----------
@@ -264,7 +295,7 @@ def get_visibility(alpha, baseline, spectra, model='disk'):
     """
     spectra = spectra*1e-6
     if model == 'disk':
-        if base == 0:
+        if baseline == 0:
             V = 1
         else:
             V = np.abs(2*jv(1, np.pi*alpha*baseline/spectra)/(np.pi*alpha*baseline/spectra))
@@ -273,7 +304,7 @@ def get_visibility(alpha, baseline, spectra, model='disk'):
 
 
 @deco.timer
-def VanCittert(spectra, Obs, Target,display=False):
+def VanCittert(spectra, Obs, Target, plottrace=60, display=False):
     """
     Create the Coherent flux matrix of an object in the (u,v) plane according
     to:
@@ -345,19 +376,15 @@ def VanCittert(spectra, Obs, Target,display=False):
     # dtheta = 2*thetamax/Npix
     
     # dtheta must well sample the smallest star
-    if BinaryObject:
-        dtheta = np.min((angular_diameter1,angular_diameter2))/5
-    else:
-        dtheta = angular_diameter1/5
-    
-    # thetamax must be sufficiently high compared to the widest star
-    # if BinaryObject:
-    #     thetamax = 100*np.max((angular_diameter1,angular_diameter2))
-    # else:
-    #     thetamax = 100*angular_diameter1
-    
+    #if BinaryObject:
+    #    dtheta = np.min((angular_diameter1,angular_diameter2))/5
+    #else:
+    #    dtheta = angular_diameter1/5
+        
+    du = 0.005
     Npix = 5000     #2*int(thetamax/dtheta)
-
+    dtheta = 1/(du*Npix)   # 0.04mrad
+    
     thetamax = dtheta*Npix/2
 
     obj_plane = np.zeros([Npix,Npix])
@@ -380,18 +407,18 @@ def VanCittert(spectra, Obs, Target,display=False):
     ticks = np.linspace(0,Npix,Nticks)
         
     if display:            
-
+        fig = plt.figure(config.newfig, figsize=(16,9))
+        (ax1,ax2,ax3) = fig.subplots(ncols=3)
+        
         spaceticks = (ticks-round(Npix/2))*dtheta
         spaceticks = spaceticks.round(decimals=1)
         
-        plt.figure(config.newfig), plt.title('Object')
-        plt.imshow(obj_plane)
-        plt.xticks(ticks,spaceticks)
-        plt.yticks(ticks,-spaceticks)
-        plt.xlabel('\u03B1 [mas]')
-        plt.ylabel('\u03B2 [mas]')
-        plt.show()
-        config.newfig +=1
+        ax1.set_title('Object in direct plane')
+        ax1.imshow(obj_plane)
+        ax1.set_xticks(ticks) ; ax1.set_xticklabels(spaceticks)
+        ax1.set_yticks(ticks) ; ax1.set_yticklabels(-spaceticks)
+        ax1.set_xlabel('\u03B1 [mas]')
+        ax1.set_ylabel('\u03B2 [mas]')
     
     # Van-Cittert theorem (calculation of the visibility)
     
@@ -406,22 +433,22 @@ def VanCittert(spectra, Obs, Target,display=False):
     freqticks = freqticks.round(decimals=1)
     
     if display:        
-        plt.figure(config.newfig), plt.title('Module of the visibility')
-        plt.imshow(np.abs(uv_plane))
-        plt.xticks(ticks,freqticks)
-        plt.yticks(ticks,-freqticks)
-        plt.xlabel('u [mas-1]')
-        plt.ylabel('v [mas-1]')
-        plt.show()
-        config.newfig+=1
+
+        ax2.set_title('Module of the visibility')
+        ax2.imshow(np.abs(uv_plane))
+        ax2.set_xticks(ticks) ; ax2.set_xticklabels(freqticks)
+        ax2.set_yticks(ticks) ; ax2.set_yticklabels(-freqticks)
+        ax2.set_xlabel('u [mas-1]')
+        ax2.set_ylabel('v [mas-1]')
         
-        plt.figure(config.newfig), plt.title('Phase of the visibility')
-        plt.imshow(np.angle(uv_plane))
-        plt.xticks(ticks,freqticks)
-        plt.yticks(ticks,-freqticks)
-        plt.xlabel('u [mas-1]')
-        plt.ylabel('v [mas-1]')
-        plt.show()
+        ax3.set_title('Phase of the visibility')
+        ax3.imshow(np.angle(uv_plane))
+        ax3.set_xticks(ticks) ; ax3.set_xticklabels(freqticks)
+        ax3.set_yticks(ticks) ; ax3.set_yticklabels(-freqticks)
+        ax3.set_xlabel('u [mas-1]')
+        ax3.set_ylabel('v [mas-1]')
+        
+        fig.show()
         config.newfig+=1
     
     """
@@ -429,9 +456,15 @@ def VanCittert(spectra, Obs, Target,display=False):
     """
     
     # Get telescopes coordinates and names
-    TelNames,_,_,CHARAcoords = get_array(config.Name, getcoords=True)    
+    InterfArray = get_array(config.Name, getcoords=True)    
+    
+    TelNames = InterfArray.TelNames
+    CHARAcoords = InterfArray.TelCoordinates
+    basecoords = InterfArray.BaseCoordinates
     
     CHARAcoords *= 1e6          # Convert to [µm]
+    basecoords *= 1e6          # Convert to [µm]
+    
     NA = len(CHARAcoords)
     
     CHARAaltaz = np.zeros([NA,2])
@@ -475,17 +508,43 @@ def VanCittert(spectra, Obs, Target,display=False):
         (altitude, azimuth) = (theta*np.pi/180 for theta in Obs.AltAz)
         print(f"User defined {Target.Name} object with AltAz={Obs.AltAz}")
         
+        
     
-    # Projection baselines on (u,v) plane
-    baselines = np.transpose(basedist)*np.sin(altitude-basealtaz[:,0])
+    """
+    Altazimuthal coordinates definition:
+        - azimuth: angular distance between the intersection of the target meridian with 
+        the horizon and the north horizon: East = 90° Azimuth.
+        - altitude: angular distance between the horizon and the target, along its meridian.
+    
+    CHARA coordinates definition:
+        - X: toward East
+        - Y: toward North
+        - Z: toward Zenith
+    """
+    
+    
+    # Coordinates of the (u,v) plane in the (E,N,Z) referential
+    u_Ep = np.array([np.cos(azimuth),np.sin(azimuth),0])
+    u_Np = np.array([np.sin(altitude)*np.sin(azimuth),np.sin(altitude)*np.cos(azimuth),np.cos(altitude)])
+    u_Zp = np.array([np.cos(altitude)*np.sin(azimuth),np.cos(altitude)*np.cos(azimuth),np.sin(altitude)])
+    
+    
+    # Projection baselines on the target's (u,v) plane
+    B_Ep = np.dot(basecoords, np.transpose(u_Ep))
+    B_Np = -np.dot(basecoords, np.transpose(u_Np))
+    B_Zp = np.dot(basecoords, np.transpose(u_Zp))
+    
+    
+    # baselines = np.transpose(basedist)*np.sin(altitude-basealtaz[:,0])
     
     NW = len(spectra)
     # Projection baselines on the u,v coordinates (oriented with the star north-east)
     chara_uv = np.zeros([NW,NIN,2])
     for iw in range(NW):
         lmbda=spectra[iw]
-        chara_uv[iw,:,0] = baselines*np.cos(azimuth-basealtaz[:,1])/lmbda
-        chara_uv[iw,:,1] = baselines*np.sin(azimuth-basealtaz[:,1])/lmbda
+        chara_uv[iw,:,0] = B_Ep/lmbda#np.dot(basecoords[0], np.transpose(u_Sp))/lmbda #baselines*np.dot(basecoords, np.transpose(u_Np))/lmbda
+        chara_uv[iw,:,1] = B_Np/lmbda#baselines*np.dot(basecoords, np.transpose(u_Ep))/lmbda
+        #chara_uv[iw,:,1] = baselines*np.sin(azimuth-basealtaz[:,1])/lmbda
     
     # Conversion functions
     mas2rad = lambda mas : 1/3600*1e-3*np.pi/180*mas
@@ -511,31 +570,34 @@ def VanCittert(spectra, Obs, Target,display=False):
         ticks = np.linspace(0,Ndisplay-1,Nticks)
         freqticks = (ticks+1-round(Ndisplay/2))*dfreq
         freqticks = freqticks.round(decimals=1)
-        
         # Display the Visibility and the interferometer baselines on the (u,v) plane
         fig = plt.figure(config.newfig)
         ax = fig.subplots()
         fig.suptitle('(u,v) coverage')
         ax.imshow(np.abs(uv_crop))
-        ax.plot(chara_plot[:,0], chara_plot[:,1], '.', linewidth=1, color='firebrick')
+        ax.scatter(chara_plot[:,0], chara_plot[:,1], marker='.', linewidth=1, color='firebrick')
         plt.xticks(ticks,freqticks)
         plt.yticks(ticks,-freqticks)
-        plt.xlabel('u [mas-1]')
-        plt.ylabel('v [mas-1]')
+        plt.xlabel('u (W-E) [mas-1]')
+        plt.ylabel('v (S-N) [mas-1]')
         config.newfig += 1
         
     # Return the complex visibility vector of the source
     visibilities = np.zeros([NW,NIN])*1j
     for iw in range(NW):
         for ib in range(NIN):
-            baselinecoords = chara_uv[iw,ib]
-            closestfreq = ((ucoords - baselinecoords[0])**2+(vcoords - baselinecoords[1])**2).argmin()
-            Nx = closestfreq//Npix
-            Ny = closestfreq%Npix
-            visibilities[iw,ib] = uv_plane[Nx,Ny]
+            
+            ub=chara_uv[iw,ib,0] ; vb=chara_uv[iw,ib,1]
+            
+            
+            Nu = int(round(ub*1e3/5)*5/1000)
+            Nv = int(round(vb*1e3/5)*5/1000)
+            
+            visibilities[iw,ib] = uv_plane[Nu,Nv]
     
     print("Visibilities calculated.")
     return visibilities
+
 
 def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, display=False):
     """
@@ -590,6 +652,13 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
             os.remove(savingfilepath)
         else:
             raise Exception("You didn't ask to overwrite it.")          
+
+    
+    filedir = '/'.join(savingfilepath.split('/')[:-1])+'/'
+
+    
+    if not os.path.exists(filedir):
+        os.makedirs(filedir)
 
     # spectra = 1/sigma     # [µm] Wavelengths
     NW = len(spectra)     # [int] Wavelengths number
@@ -964,8 +1033,8 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
 
 def get_subarray(pup_used, dsp_all, TelNames, base):
     """
-    From the visibility matrix of the whole array (dependant on the object)
-    returns, the visibility matrix of the array made of the given pupils.
+    From the visibility matrix of the whole array (dependant on the object),
+    returns the visibility matrix of the array made of the given pupils.
 
     Parameters
     ----------
@@ -1420,7 +1489,7 @@ def studyP2VM(*args,nfig=0):
     
     if 'NMod' in config.FS.keys():
         ABCDchip=True
-        Modulations = config.FS['Modulations']
+        Modulation = config.FS['Modulation']
         ABCDindex = config.FS['ABCDind']
         Nmod=config.FS['NMod']
         v2pm_sorted = sortmatrix(v2pm, ich, ABCDindex)
@@ -1996,7 +2065,10 @@ def makeA2P(descr, modulator, clean_up=False):
         print('Taille descr bizarre, attendu=',NIN)
         
     NQ = np.shape(modulator)[0] ; NP=NIN*NQ
-    alphabet = ['A','B','C','D']
+    if NQ==4:
+        alphabet = ['A','B','C','D']
+    elif NQ==2:
+        alphabet = ['A','C']
     
     conventional_ich = []
     for ia in range(NA):
@@ -2006,13 +2078,16 @@ def makeA2P(descr, modulator, clean_up=False):
     
     ich = conventional_ich
 
-    A2Pgen=np.zeros((NIN,4,NA),dtype=complex) #(base_out=[ia,iap],ABCD,ia_in)
+    A2Pgen=np.zeros((NIN,NQ,NA),dtype=complex) #(base_out=[ia,iap],ABCD,ia_in)
+    active_ich=[1]*NIN
     ib=0
     for ia in range(NA):
         for iap in range(ia+1,NA):
             #print(ia,iap,ib)
             A2Pgen[ib,:,ia ]=modulator[:,0]*descr[ib,0]
-            A2Pgen[ib,:,iap]=modulator[:,1]*descr[ib,0]
+            A2Pgen[ib,:,iap]=modulator[:,1]*descr[ib,1]
+            if not descr[ib,0]*descr[ib,1]:
+                active_ich[ib]=0        # This baseline is not measured
             ib+=1
             
     A2P=np.reshape(A2Pgen,(NP,NA))
@@ -2027,7 +2102,7 @@ def makeA2P(descr, modulator, clean_up=False):
                 del ich[ip-inc]
                 inc+=1
 
-    return(lightA2P, ich)
+    return lightA2P, ich, active_ich
 
 
 def MakeV2PfromA2P(Amat):
@@ -2053,11 +2128,14 @@ def check_nrj(A2P):
     A2Pmod2=A2P*np.conj(A2P)
     nrjpup=np.real(np.sum(A2Pmod2,axis=0))   # Somme du carré des éléments de chaque ligne --> vecteur de dimension NA
     if (nrjpup > 1+1e-15).any():             # Check si la somme des carrés de tous les éléments est inférieure à 1.
-        print('Pb: A2P is not normalized (creation of energy?)')
-        print(nrjpup)
+        T = np.sum(nrjpup)/len(nrjpup)    
+        print(f'Pb: A2P is not normalized, transmission is {round(T*100)}%')
+        print(f"Detail: {nrjpup}")
         
     elif (nrjpup < 1-1e-15).any():
-        print("The PIC absorbs energy")
+        T = np.sum(nrjpup)/len(nrjpup)
+        print(f"The PIC absorbs {round((1-T)*100)}% of energy")
+        print(f"Detail: {nrjpup}")
         
     return
 
@@ -2082,6 +2160,19 @@ def check_semiunitary(A2P):
     #     print(f"The matrix absorbs energy.")
     
     return
+
+def check_cp(gd):
+    NIN=len(gd) ; 
+    NA = int(1/2+np.sqrt(1/4+2*NIN))
+    NC=(NA-1)*(NA-2)/2
+    NA=6;NC=10
+    cp=np.zeros(NC)
+    for iap in range(1,NA):
+        for iapp in range(iap+1,NA):
+            ib1=posk(0,iap,NA); ib2=posk(iap,iapp,NA);ib3=posk(0,iapp,NA)
+            ic=poskfai(0,iap,iapp,NA)
+            cp[ic]=gd[ib1]+gd[ib2]-gd[ib3]
+    return cp
 
 def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
     fig = plt.gcf()

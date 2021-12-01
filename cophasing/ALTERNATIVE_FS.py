@@ -14,42 +14,56 @@ Calculated and stored observables:
 """
 
 import numpy as np
-from astropy.io import fits
-
+import matplotlib.pyplot as plt
+import os
 
 from . import coh_tools as ct
 from . import config
 from .FS_DEFAULT import ABCDmod, realisticABCDmod
 
+from . import tol_colors as tc
+colors=tc.tol_cset('muted')
 
 
-def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=[[1,1],[1,1],[1,1]]/np.sqrt(2), modulation='ABCD', clean_up=False):
+def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=np.ones([3,3])/np.sqrt(2), modulation='ABCD', clean_up=False, display=False, savedir='',ArrayDetails=0):
     
     if init:
+        NA=np.shape(description)[0] ; NIN=NA*(NA-1)//2
+        
+        d=np.zeros([NIN,2])     # Transmissions basewise in amplitude
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib=ct.posk(ia,iap,NA)
+                d[ib,0]=np.sqrt(description[ia,iap])
+                d[ib,1]=np.sqrt(description[iap,ia])
         
         if modulation == 'ABCD':
             modulator=ABCDmod()  # Classic balanced ABCD modulation in the right order (matrix [4x2])
-        
-        modulations = [char for char in modulation]
+            ModulationIndices = [0,1,2,3]
+            
+        if modulation == 'AC':
+            from .FS_DEFAULT import ACmod
+            modulator=ACmod()  # Balanced AC modulation in the right order (matrix [2x2])
+            ModulationIndices = [0,1]
+            
         NMod = len(modulation)
         
-        A2P,ichdetails=ct.makeA2P(description, modulator)
+        A2P,ichdetails,active_ich=ct.makeA2P(d, modulator)
         
         A2P = A2P * np.sqrt(T)          # Add the transmission loss into the matrix elements.
         
         ct.check_nrj(A2P)               # Check if A2P is the matrix of a physical system.
       
-        ich = [ichdetails[4*k][0] for k in range(len(ichdetails)//NMod)]
+        ich = [str(ichdetails[NMod*k][0]) for k in range(len(ichdetails)//NMod)]
         NINmes = len(ich)  
       
         NP, NA = np.shape(A2P)
         
-        ABCDind = [0,1,2,3]
-        
         config.FS['func'] = PAIRWISE
         config.FS['ich'] = ich
-        config.FS['Modulations'] = modulations
-        config.FS['ABCDind'] = ABCDind
+        config.FS['active_ich'] = active_ich
+        config.FS['Modulation'] = modulation
+        config.FS['ABCDind'] = ModulationIndices
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
         config.FS['T'] = T
@@ -60,8 +74,6 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=[[1,1]
         
         P2VM = np.linalg.pinv(V2PM)
         
-        
-            
         NW, MW = len(spectra), len(spectraM)
         
         # Noise maps
@@ -82,6 +94,47 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=[[1,1]
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        
+        if display:
+            
+            if not ArrayDetails:
+                print("No interferometric array has been given so we can't display the combination architecture.")
+                return
+            
+            InterfArray=ct.get_array(name=ArrayDetails)
+            
+            plt.rcParams['figure.figsize']=(16,12)
+            font = {'family' : 'DejaVu Sans',
+                    'weight' : 'normal',
+                    'size'   : 22}
+            
+            plt.rc('font', **font)
+            fig,ax=plt.subplots()
+            for ia in range(NA):
+                name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+                ax.scatter(x1,y1,color='k',linewidth=10)
+                ax.annotate(name1, (x1+10,y1+1),color="k")
+                ax.annotate(f"({ia+1})", (x1+23,y1+1),color=colors[0])
+                for iap in range(ia+1,NA):
+                    ib=ct.posk(ia,iap,NA)
+                    x2,y2 = InterfArray.TelCoordinates[iap,:2]
+                    T1=d[ib][0] ; T2=d[ib][1]
+                    PhotometricCoherence = 2*np.sqrt(T1*T2)/(T1+T2)
+                    UncoherentPhotometry = T1*T2*(NA-1) # Normalised by the maximal photometry
+                    PhotometricSNR = UncoherentPhotometry * PhotometricCoherence
+                    if T1*T2:
+                        ax.plot([x1,x2],[y1,y2],color=colors[0],linestyle='-',linewidth=5*PhotometricCoherence)
+                        ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
+            ax.set_xlabel("X [m]")
+            ax.set_ylabel("Y [m]")
+            ax.set_xlim([-210,160]) ; ax.set_ylim([-50,350])
+            fig.suptitle("All baselines")
+            
+            if len(savedir):
+                if not os.path.exists(savedir):
+                    os.makedirs(savedir, exist_ok=True)
+                
+                fig.savefig(savedir+'CombinationArchitecture.pdf')
         
         return
 
@@ -117,14 +170,266 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=[[1,1]
     # if np.min(simu.MacroImages[it]) < 0:
     #     print(f'Negative image value at t={it}')
     
+    
+        
+        
+    if config.FS['Modulation']=='ABCD':
+        # estimates coherences
+        currCfEstimated = np.zeros([FS['MW'],NB])*1j
+        for imw in range(FS['MW']):
+            Demodulation = config.FS['MacroP2VM'][imw,:,:]
+            currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
+            
+        return currCfEstimated
+        
+    elif config.FS['Modulation']=='AC':  # Necessary patch for AC demodulation
+        # estimates coherences
+        specialCf = np.zeros([FS['MW'],NB])*1j
+        for imw in range(FS['MW']):
+            Demodulation = config.FS['MacroP2VM'][imw,:,:]
+            specialCf[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
+            
+        currCfEstimated = np.zeros([FS['MW'],NB])*1j
+        for ia in range(NA):
+            currCfEstimated[:,ia*(NA+1)] = specialCf[:,ia*(NA+1)]
+            for iap in range(ia+1,NA):
+                ib=ia*NA+iap
+                Module = np.sqrt(specialCf[:,ia*(NA+1)]*specialCf[:,iap*(NA+1)])
+                phase = np.imag(specialCf[:,ib]/Module)
+                currCfEstimated[:,ib] = Module*np.exp(1j*phase)
+                currCfEstimated[:,iap*NA+ia] = Module*np.exp(-1j*phase)
+                
+        return currCfEstimated
+
+
+def ALLINONE(*args,init=False, T=1, spectra=[], spectraM=[], NA=2, 
+             posi=[-0.25, 0.25], MFD=0.254, posi_center=0.05, posp=[-0.456, -0.38],F=40, p=0.024, 
+             Dsize=(320,256), Dc=0.396, PSDwindow=0.396, Tphot=0.1, Tint=0.9):
+    """
+    From the oversampled coherent fluxes, simulates the noisy image on the detector 
+    and estimates the macrosampled coherent fluxes.
+    
+    INPUT:
+        - If init: all the below parameters.
+        - If not init: currCfTrue - Oversampled True Coherent Flux   [NW,NB]
+
+    OUTPUT: 
+        - currCfEstimated - Macrosampled measured coherent flux [MW,NB]
+
+    USED OBSERVABLES/PARAMETERS:
+        - config.FS
+    UPDATED OBSERVABLES/PARAMETERS:
+        - simu.MacroImages: [NT,MW,NIN] Estimated PD before subtraction of the reference
+        
+    SUBROUTINES:
+        - skeleton.add_camera_noise
+
+    Parameters
+    ----------
+    *args : ARRAY [NW,NB]
+        Expect oversampled coherent flux currCfTrue.
+    init : BOOLEAN, optional
+        If True, initialize the parameters of the fringe sensor.
+        Needs spectra, spectraM
+        All this parameters are stored in the dictionnary config.FS.
+        Needs to be called before starting the simulation.
+        The default is False.
+    spectra : ARRAY [NW], necessary if INIT
+        Spectral microsampling. The default is [].
+    spectraM : ARRAY [MW], necessary if INIT
+        Spectral macrosampling. The default is [].
+    posi : LIST [NA], optional
+        Positions [mm] of the fibers output on the V-groove 
+        (it defines the spatial frequencies)
+    MFD : FLOAT, optional
+        Mode-field diameter in the microlenses plane of the V-groove.
+    posi_center : FLOAT, optional
+        Position of the center of the interferogram.
+    posp : LIST [NA], optional
+        Positions [mm] of the photometric beams on the detector.
+        It has an impact on the SNR of the photometric signal if no field stop 
+        is used (Dc=0)
+    F : FLOAT, optional
+        Focal length [mm] of the imaging lens
+    p : FLOAT, optional
+        Pixel size [mm] of the camera
+    Dsize : TUPLE, optional
+        Size [H,L] in number of pixels of the detector.
+    Dc : FLOAT, optional
+        Semi-Diameter [mm] of field stop. If zero, no field stop.
+    PSDwindow : FLOAT, optional
+        Semi-diameter [mm] of the window used for the calculation of the
+        interferogram PSD.
+    Tphot : FLOAT, optional
+        Transmission in the photometric channel.
+    Tint : FLOAT, optional
+        Transmission in the interferometric channel.
+    
+    
+    Returns
+    -------
+    currCfEstimated : ARRAY [MW,NB]
+        Macrosampled measured coherent flux.
+
+    """
+    
+    if init:
+        
+        if NA!=2:
+            
+            if not posi:    # Positions of the fibers on the V-groove.
+                # These positions give the most compact non redondant positions (from Lacour thesis)
+                if NA==3:
+                    posi = [-0.75, -0.25, 0.75]
+                elif NA==4:
+                    posi = [-1.5, -1, 0.5, 1.5]
+                elif NA==5:
+                    posi = [-2.5, -2, 0.5, 1.5, 2.5]
+                elif NA==6:
+                    posi = [-4.5, -4, -2.5, 0.5, 1.5, 4]
+                elif NA==7:
+                    posi = [-6, -5.5, -4, -1, 3, 5.5, 6.5]
+                    
+            if not posp:    # Positions of the photometric beams on the detector.
+                # We put at the extremity of the detector
+                Bout=2*p ; Bin = np.min(np.abs(posi[:-1]-posi[1:]))
+                alpha = Bout/Bin
+                posp = (np.array(posi) - posi[0])*alpha - Dsize[1]/2*p +2*p
+                    
+        if len(posp) != NA:
+            raise Exception(f"The FS takes a different number of beams ({len(posp)}) than the one\
+given in config ({NA}).")
+        
+        if not PSDwindow:
+            if Dc:
+                PSDwindow = Dc
+            else:   # Minimum between the detector available space and the minimal separation between the 2 channels.
+                PSDwindow = np.min([posi_center - np.max(posp), Dsize[0]*24-posi_center]) 
+        
+        NIN = int(NA*(NA-1)/2) ; NB = NA**2
+        NW = len(spectra) ; MW = len(spectraM)
+        NP = int(NA + 2*PSDwindow//p)  # 6 photometric beams + the interferogram
+        
+        Baselines = np.zeros(NIN)
+        pixel_positions = np.linspace(-PSDwindow,PSDwindow,NP-NA)
+        
+        # Approximation
+        detectorMFD = 2*np.mean(spectra)*F/MFD
+        
+        ich = np.array([[1,2]])
+        
+        ichorder = np.arange(NIN)
+        
+        config.FS['func'] = ALLINONE
+        config.FS['ich'] = ich
+        config.FS['ichorder'] = ichorder
+        config.FS['NP'] = NP
+        config.FS['MW'] = MW
+        config.FS['posi'] = posi
+        config.FS['posi_center'] = posi_center
+        config.FS['MFD'] = MFD
+        config.FS['detectorMFD'] = detectorMFD
+        config.FS['posp'] = posp
+        config.FS['F'] = F
+        config.FS['p'] = p
+        config.FS['Dc'] = Dc
+        config.FS['PSDwindow'] = PSDwindow
+        config.FS['Tphot'] = Tphot ; config.FS['Tint'] = Tint
+        
+        # Noise maps
+        config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
+        config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+        
+        # Resolution of the fringe sensor
+        midlmbda = np.mean(spectra)
+        deltalmbda = (np.max(spectra) - np.min(spectra))/MW
+        config.FS['R'] = midlmbda/deltalmbda        
+        
+        # Hard coding of the P2VM
+        V2PM = np.zeros([NW,NP,NB])*1j; MacroV2PM = np.zeros([MW,NP,NB])*1j
+        
+        GaussianEnvelop = np.exp(-2*(2*pixel_positions/detectorMFD)**2)
+        EnergyDistribution = GaussianEnvelop/np.sum(GaussianEnvelop)*Tint
+        
+        # Creation of the oversampled V2PM
+        iow=0 ; imw=0; OW = NW/MW
+        for iw in range(NW):
+            wl = spectra[iw]
+            for ia in range(NA):
+                V2PM[iw,ia,ia*(NA+1)] = Tphot               # Photometric beams
+                V2PM[iw,NA:,ia*(NA+1)] = np.ones(NP-NA)*EnergyDistribution     # Interferometric beams
+                for iap in range(ia+1,NA):
+                    ib = ct.posk(ia,iap,NA)
+                    Baselines[ib] = np.abs(posi[iap]-posi[ia])
+                    
+                    OPD = Baselines[ib]/F * pixel_positions*1e3
+                    PhaseDelays = 2*np.pi/spectra[iw] * OPD
+                    PhaseDelaysM = 2*np.pi/spectra[imw] * OPD
+                    
+                    V2PM[iw,NA:,ia*NA+iap] = np.exp(PhaseDelays*1j)*EnergyDistribution
+                    V2PM[iw,NA:,iap*NA+ia] = np.exp(-PhaseDelays*1j)*EnergyDistribution
+            
+            MacroV2PM[imw] += V2PM[iw]/OW
+                    
+            iow+=1
+            if iow==OW:
+                imw+=1
+                iow=0
+        
+        # Oversampled Pixel-to-Visibility matrix
+        P2VM = np.linalg.pinv(V2PM)
+        
+        # Undersampled Pixel-to-Visibility matrix
+        MacroP2VM = np.linalg.pinv(MacroV2PM)
+        
+        config.FS['V2PM'] = V2PM
+        config.FS['P2VM'] = P2VM
+        config.FS['MacroP2VM'] = MacroP2VM
+
+        config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
+        config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
+        config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        
+        return
+    
+    from .config import NA, NB
+    from . import simu
+    
+    it = simu.it
+    
+    iow = 0
+    imw=0
+    image_iw = np.zeros(config.FS['NP'])
+    
+    currCfTrue = args[0]
+               
+    for iw in range(config.NW):
+        
+        Modulation = config.FS['V2PM'][iw,:,:]
+        image_iw = np.abs(np.dot(Modulation,currCfTrue[iw,:]))
+        
+        simu.MacroImages[it,imw,:] += image_iw
+        
+        iow += 1
+        if iow == config.OW:
+            imw+=1
+            iow = 0      
+
+    
+    if config.noise:
+        from .skeleton import addnoise
+        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
+    
+    # if np.min(simu.MacroImages[it]) < 0:
+    #     print(f'Negative image value at t={it}')
+    
     # estimates coherences
-    currCfEstimated = np.zeros([FS['MW'],NB])*1j
-    for imw in range(FS['MW']):
+    currCfEstimated = np.zeros([config.FS['MW'],NB])*1j
+    for imw in range(config.FS['MW']):
         Demodulation = config.FS['MacroP2VM'][imw,:,:]
         currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
     
     return currCfEstimated
-
 
 
 
@@ -196,7 +501,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         
         M_ABCD = ABCDmod()          # A2P ABCD modulation
         NMod = len(M_ABCD)          # Number of modulations for each baseline
-        config.FS['Modulations'] = ['A','B','C','D']
+        config.FS['Modulation'] = 'ABCD'
         ABCDind = [0,1,2,3]
         config.FS['ABCDind'] = ABCDind
         NP = NMod*NG
@@ -357,7 +662,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         
 #         M_ABCD = realisticABCDmod(phaseshifts, transmissions)          # A2P ABCD modulation
 #         NMod = len(M_ABCD)          # Number of modulations for each baseline
-#         config.FS['Modulations'] = ['A','B','C','D']
+#         config.FS['Modulation'] = 'ABCD'
 #         ABCDind = [0,1,2,3]
 #         config.FS['ABCDind'] = ABCDind
 #         config.FS['Phaseshifts'] = [k*np.pi/2 for k in phaseshifts]

@@ -9,6 +9,13 @@ def ABCDmod():  #r=|coef refl en chp|, t=|coef trans en chp|
     
     return A2P_ABCD
 
+def ACmod():  #r=|coef refl en chp|, t=|coef trans en chp|
+    
+    i = 1j
+    A2P_ABCD = np.array([[1,i],[1,-i]])/np.sqrt(2)
+    #V2PM_ABCD=np.array([[1,i,-i,1],[1,1,1,1],[1,-i,i,1],[1,-1,-1,1]])/4
+    
+    return A2P_ABCD
 
 def realisticABCDmod(phaseshifts,transmissions):
     """
