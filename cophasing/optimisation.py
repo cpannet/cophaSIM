@@ -776,7 +776,7 @@ Remains {strtime(RemainingTime)}")
     
     return bestCombi, resultsBasedf,  resultsClosuredf
 
-a
+
 def OptimGainsTogether_20220119(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20), 
                            optimCriteria="FC",filedir='',Nsamples=5,
                            TimeBonds=100, WavelengthOfInterest=1.5,
