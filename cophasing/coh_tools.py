@@ -36,6 +36,8 @@ c_ = 3.0e+8     # Light velocity
 k_ = 1.38e-23    # Boltzmann's constant
 
 
+colors = tol_cset('bright')
+
 class Error(Exception):
     """Base class for exceptions in this module."""
     pass
@@ -304,7 +306,7 @@ def get_visibility(alpha, baseline, spectra, model='disk'):
 
 
 @deco.timer
-def VanCittert(spectra, Obs, Target, plottrace=60, display=False):
+def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext='pdf'):
     """
     Create the Coherent flux matrix of an object in the (u,v) plane according
     to:
@@ -331,6 +333,9 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False):
         DESCRIPTION.
 
     """
+        
+    if (len(savedir)) and (not os.path.exists(savedir)):
+        os.makedirs(savedir)
         
     print("Calculation of object's visibilities from Van Cittert theorem\n ...")
 
@@ -435,14 +440,14 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False):
     if display:        
 
         ax2.set_title('Module of the visibility')
-        ax2.imshow(np.abs(uv_plane))
+        ax2.imshow(np.abs(uv_plane),vmin=0,vmax=1)
         ax2.set_xticks(ticks) ; ax2.set_xticklabels(freqticks)
         ax2.set_yticks(ticks) ; ax2.set_yticklabels(-freqticks)
         ax2.set_xlabel('u [mas-1]')
         ax2.set_ylabel('v [mas-1]')
         
         ax3.set_title('Phase of the visibility')
-        ax3.imshow(np.angle(uv_plane))
+        ax3.imshow(np.angle(uv_plane),vmin=-np.pi,vmax=np.pi)
         ax3.set_xticks(ticks) ; ax3.set_xticklabels(freqticks)
         ax3.set_yticks(ticks) ; ax3.set_yticklabels(-freqticks)
         ax3.set_xlabel('u [mas-1]')
@@ -555,7 +560,33 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False):
     chara_uv_direct_mas = rad2mas(chara_uv_direct)
     chara_uv = 1/chara_uv_direct_mas
     
+    # Return the complex visibility vector of the source
+    visibilities = np.zeros([NW,NIN])*1j
+    for ib in range(NIN):
+        for iw in range(NW):     
+            ub=chara_uv[iw,ib,0] ; vb=chara_uv[iw,ib,1]
+            Nu = int(round(ub/dfreq)+Npix/2)
+            Nv = int(round(vb/dfreq)+Npix/2)
+            visibilities[iw,ib] = uv_plane[Nu,Nv]
+        
+    UVcoords = (ucoords,vcoords)
+    print("Visibilities calculated.")
+    
+    
     if display:         # Display (u,v) plane with interferometer projections (first wavelength)
+        
+        if 'active_ich' in config.FS.keys():
+            active_ich = config.FS['active_ich']
+            PhotSNR = config.FS['PhotometricSNR']
+        else:
+            active_ich=np.ones(NIN)
+            PhotSNR = np.ones(NIN)
+            
+        actindNIN = np.array(active_ich)==1
+        actind = np.concatenate([actindNIN[::-1], actindNIN])
+        
+        PhotometricSNR = np.concatenate([PhotSNR[::-1],PhotSNR])
+        
         print(f'Plot CHARA (u,v) coverage on figure {config.newfig}')    
         chara_uv_complete = np.concatenate((chara_uv[0], -chara_uv[0]),axis=0)
         
@@ -574,29 +605,28 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False):
         fig = plt.figure(config.newfig)
         ax = fig.subplots()
         fig.suptitle('(u,v) coverage')
-        ax.imshow(np.abs(uv_crop))
-        ax.scatter(chara_plot[:,0], chara_plot[:,1], marker='.', linewidth=1, color='firebrick')
+        im=ax.imshow(np.abs(uv_crop),vmin=0,vmax=1)
+        
+        ax.scatter(chara_plot[actind,0], chara_plot[actind,1], marker='x', s=50*np.sqrt(PhotometricSNR[actind]),linewidth=1, color='firebrick')
+        ax.scatter(chara_plot[actind==False,0], chara_plot[actind==False,1], marker='x', s=50, linewidth=1,color='black')
         plt.xticks(ticks,freqticks)
         plt.yticks(ticks,-freqticks)
-        plt.xlabel('u (W-E) [mas-1]')
-        plt.ylabel('v (S-N) [mas-1]')
+        ax.set_xlabel('u (W-E) [$mas^{-1}$]')
+        ax.set_ylabel('v (S-N) [$mas^{-1}$]')
+        
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        fig.colorbar(im, cax=cbar_ax)
+        
         config.newfig += 1
         
-    # Return the complex visibility vector of the source
-    visibilities = np.zeros([NW,NIN])*1j
-    for iw in range(NW):
-        for ib in range(NIN):
-            
-            ub=chara_uv[iw,ib,0] ; vb=chara_uv[iw,ib,1]
-            
-            
-            Nu = int(round(ub*1e3/5)*5/1000)
-            Nv = int(round(vb*1e3/5)*5/1000)
-            
-            visibilities[iw,ib] = uv_plane[Nu,Nv]
+        
+        if len(savedir):
+            import time
+            timestr = time.strftime("%Y%m%d-%H%M%S")
+            plt.savefig(savedir+f"UVplane{timestr}.{ext}")
     
-    print("Visibilities calculated.")
-    return visibilities
+    return visibilities, chara_uv, uv_plane, UVcoords
 
 
 def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, display=False):
@@ -644,21 +674,6 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
     TelNames : STRING ARRAY [NA]
         Names of the telescopes.
     """
-
-    fileexists = os.path.exists(savingfilepath)
-    if fileexists:
-        print(f'{savingfilepath} already exists.')
-        if overwrite:
-            os.remove(savingfilepath)
-        else:
-            raise Exception("You didn't ask to overwrite it.")          
-
-    
-    filedir = '/'.join(savingfilepath.split('/')[:-1])+'/'
-
-    
-    if not os.path.exists(filedir):
-        os.makedirs(filedir)
 
     # spectra = 1/sigma     # [µm] Wavelengths
     NW = len(spectra)     # [int] Wavelengths number
@@ -712,22 +727,23 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
         BaseNames = BaseData['BaseNames']
         BaseCoordinates = BaseData['BaseCoordinates']
         
+        
+    InterfArray = get_array(name=filepath)
+    
     NB = NA**2
     NC = (NA-2)*(NA-1)
     
     # Transportation of the star light into the interferometer
-    Throughput = np.reshape(TelSurfaces*TelTransmissions,[1,NA])
+    Throughput = np.reshape(InterfArray.TelSurfaces*InterfArray.TelTransmissions,[1,NA])
     ThroughputMatrix = np.sqrt(np.dot(np.transpose(Throughput), Throughput))
     ThroughputMatrix = ThroughputMatrix.reshape([1,NB])
     # Matrix where the element at the (ia*NA+iap) position is Ta*Tap
     # UncohIrradianceAfterTelescopes = np.dot(np.diag(TelTransmissions),np.transpose(UncohIrradiance))
-        
-    BaseNorms = np.linalg.norm(BaseCoordinates, axis=1)
     
     # Projection of the base on the (u,v) plane
-    BaseNorms = get_Bproj(np.array(BaseNorms), Obs.AltAz[0])
+    #BaseNorms = get_Bproj(np.array(InterfArray.BaseNorms), Obs.AltAz[0])
     
-    VisObj = np.zeros([NW,NB])*1j       # Object Visibility [normalised]
+    VisObj = np.zeros([NW,NB])*1j               # Object Visibility [normalised]
     CohIrradiance = np.zeros([NW,NB])*1j        # Source coherent Irradiance [phot/s/m²/deltalmbda]    
       
     # UncohIrradianceAfterTelescopes = UncohIrradiance*TelTransmissions*TelSurfaces
@@ -759,8 +775,7 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
         CPObj = np.angle(bispectrum)
         
     else:           # Van-Cittert theorem visibility
-        visibilities = VanCittert(spectra, Obs, Target,display=display)
-        
+        visibilities,_,_,_ = VanCittert(spectra, Obs, Target,display=display)
         
         bispectrum = np.zeros([NW,NC])*1j
         
@@ -781,110 +796,136 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
         
     for iw in range(NW):    
         CohIrradiance[iw] = UncohIrradiance[iw] * ThroughputMatrix * VisObj[iw]
-            
-    # hdr = ArrayParams
-    hdr = fits.Header()
-    
-    hdr['Filepath'] = savingfilepath.split('/')[-1]
-    hdr['ARRAY'] = Obs.ArrayName
-    hdr['Target'] = Target.Name
-    hdr['NA'] = NA
-    hdr['NIN'] = NIN
-    hdr['MINWAVE'] = spectra[0]
-    hdr['MAXWAVE'] = spectra[-1]
-    hdr['DWAVE'] = spectra[1] - spectra[0]
 
-    for attr in vars(Target).keys():
-        if type(getattr(Target, attr)) is not dict:            
-            if attr not in ['Name','Filepath', 'Phases']:
-                hdr[attr] = getattr(Target, attr)
-        else:
-            for key in getattr(Target, attr).keys():
-                if key == 'Position':
-                    hdr[f"{attr}_alpha"] = getattr(Target, attr)[key][0]
-                    hdr[f"{attr}_beta"] = getattr(Target, attr)[key][1]
-                else:
-                    hdr[f"{attr}_{key}"] = getattr(Target, attr)[key]
-                
-    for attr in vars(Obs).keys():
-        if isinstance(getattr(Obs, attr),
-                      (str, int, float, complex, bool,
-                       np.floating, np.integer, np.complexfloating,
-                       np.bool_)):
-            
-            if attr != 'Filepath':
-                if attr != ArrayName:
-                    hdr[attr] = getattr(Obs, attr)
-            else:
-                hdr['ArrayFile'] = getattr(Obs, attr).split('/')[-1]
-        
+    BaseNorms, TelNames = InterfArray.BaseNorms, InterfArray.TelNames
     
-    primary = fits.PrimaryHDU(header=hdr)
-    
-    im1 = fits.ImageHDU(np.real(VisObj), name='VReal')
-    im2 = fits.ImageHDU(np.imag(VisObj), name='VImag')
-    im3 = fits.ImageHDU(np.real(CohIrradiance), name='CfReal')
-    im4 = fits.ImageHDU(np.imag(CohIrradiance), name='CfImag')
-    im5 = fits.ImageHDU(CPObj, name='Closure Phase')
-    
-    col1 = fits.Column(name='WLsampling', format='1D', array=spectra)
-    hdu1 = fits.BinTableHDU.from_columns([col1], name='spectra' )
-    
-    hdu = fits.HDUList([primary,hdu1,im1,im2,im3,im4,im5])
-    
-    print(f'Saving file into {savingfilepath}')
-    hdu.writeto(savingfilepath)
-
-
     if display:
-        plt.figure(config.newfig), plt.title('Absolute Visibility of the star on different baselines')
-        plt.plot(spectra, np.abs(VisObj[:,0]), label='{0:}:{1:.1f}m'.format(TelNames[0]+TelNames[0],BaseNorms[0]))  
-        for ia in range(NA):
-            for iap in range(ia+1,NA):
-                k = posk(ia,iap,NA)
-                plt.plot(spectra, np.abs(VisObj[:,k]), label='{0:}:{1:.1f}m'.format(TelNames[ia]+TelNames[iap],BaseNorms[k]))  
-        plt.xlabel('Wavelengths [µm]')
-        plt.ylabel('Coherence Degree Module')
-        plt.legend()
-        plt.grid()
-        plt.show()
-        config.newfig+=1
+        from . import config
         
-        plt.figure(config.newfig), plt.title('Phase Visibility of the star on different baselines')
-        plt.plot(spectra, np.angle(VisObj[:,0]), label='{0:}'.format('Uncoherent flux'))  
+        fig = plt.figure("Visibility of the star",figsize=(12,9))
+        linestyles=[]
+        (ax1,ax2,ax5),(ax3,ax4,ax6) = fig.subplots(nrows=2,ncols=3,gridspec_kw={'width_ratios':[3,3,1]})
+        
+        gs=ax3.get_gridspec()
+        ax3.remove() ; ax4.remove()
+        # Add a unique axe on the last row
+        ax3 = fig.add_subplot(gs[1,:])
+        
+        ax5.axis('off') ; ax6.axis('off')
+        
+        ax1.set_title('|V|')
+        ax2.set_title('arg(V)')
+        ax3.set_title('Coherent Irradiance $\Gamma$')
+        
+        ax1.plot(spectra, np.abs(VisObj[:,0]),color='red')
+        ax3.plot(spectra, UncohIrradiance,color='red')  # Same for all baselines
+        linestyles.append(mlines.Line2D([],[],
+                                        color='red',
+                                        label=f"Uncoherent flux"))
+
         for ia in range(NA):
             for iap in range(ia+1,NA):
-                k = posk(ia,iap,NA)
-                plt.plot(spectra, np.angle(VisObj[:,k]), label='{0:}:{1:.1f}m'.format(TelNames[ia]+TelNames[iap],BaseNorms[k]))  
-        plt.xlabel('Wavelengths [µm]')
-        plt.ylabel('Coherence Degree Phase [rad]')
-        plt.ylim([-1.1*np.pi,1.1*np.pi])
-        plt.legend()
-        plt.grid()
-        plt.show()
-        config.newfig += 1
+                ib = posk(ia,iap,NA)
+                if ib<8:
+                    cl=colors[ib] ; ls='solid'
+                else:
+                    cl=colors[ib-8] ; ls='--'
+                ax1.plot(spectra, np.abs(VisObj[:,ib]),
+                         color=cl,linestyle=ls)
+                ax2.plot(spectra, np.angle(VisObj[:,ib]),
+                         color=cl,linestyle=ls)
+                ax3.plot(spectra, np.abs(CohIrradiance[:,ib]),
+                         color=cl,linestyle=ls)
+                linestyles.append(mlines.Line2D([],[],
+                                                color=cl,linestyle=ls,
+                                                label=f"{BaseNames[ib]}:{round(BaseNorms[ib])}m"))
+        
+        ax1.set_ylim(0,1.1) ; ax2.set_ylim(-np.pi,np.pi)
+        ax1.set_xlabel('Wavelengths [µm]')
+        ax2.set_xlabel('Wavelengths [µm]')
+        ax3.set_xlabel('Wavelengths [µm]')
+        
+        ax5.legend(handles=linestyles, loc='upper right')
+        
+        ax3.set_ylabel('Coherent Irradiance \n [photons/s/m²/µm]')
+        ax1.grid(True);ax2.grid(True);ax3.grid(True)
+        
+        config.newfig+=1       
+        
+        
+    if savingfilepath=='no':
+        print("Not saving the data.")
+        return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
+
+    else:
+        fileexists = os.path.exists(savingfilepath)
+        if fileexists:
+            print(f'{savingfilepath} already exists.')
+            if overwrite:
+                os.remove(savingfilepath)
+            else:
+                print("The file already exists and you didn't ask to overwrite it. I don't save the file.")          
+                return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
     
-        plt.figure(config.newfig), plt.title('Irradiance of the star')
-        plt.plot(spectra, UncohIrradiance)  
-        plt.xlabel('Wavelengths [µm]')
-        plt.ylabel('Irradiance [photons/s/m²/µm]')
-        plt.grid()
-        plt.show()
-        config.newfig += 1
+        filedir = '/'.join(savingfilepath.split('/')[:-1])+'/'
+
+    
+        if not os.path.exists(filedir):
+            os.makedirs(filedir)
         
         
-        plt.figure(config.newfig), plt.title('Coherent Irradiance of the star')
-        plt.plot(spectra, np.abs(VisObj[:,0])*UncohIrradiance, label='{0:}'.format('Uncoherent flux'))  
-        for ia in range(NA):
-            for iap in range(ia+1,NA):
-                k = posk(ia,iap,NA)
-                plt.plot(spectra, np.abs(VisObj[:,k])*UncohIrradiance, label='{0:}:{1:.1f}m'.format(TelNames[ia]+TelNames[iap],BaseNorms[k]))  
-        plt.xlabel('Wavelengths [µm]')
-        plt.ylabel('Irradiance [photons/s/m²/µm]')
-        plt.legend()
-        plt.grid()
-        plt.show()
-        config.newfig += 1
+        # hdr = ArrayParams
+        hdr = fits.Header()
+        
+        hdr['Filepath'] = savingfilepath.split('/')[-1]
+        hdr['ARRAY'] = Obs.ArrayName
+        hdr['Target'] = Target.Name
+        hdr['NA'] = NA
+        hdr['NIN'] = NIN
+        hdr['MINWAVE'] = spectra[0]
+        hdr['MAXWAVE'] = spectra[-1]
+        hdr['DWAVE'] = spectra[1] - spectra[0]
+    
+        for attr in vars(Target).keys():
+            if type(getattr(Target, attr)) is not dict:            
+                if attr not in ['Name','Filepath', 'Phases']:
+                    hdr[attr] = getattr(Target, attr)
+            else:
+                for key in getattr(Target, attr).keys():
+                    if key == 'Position':
+                        hdr[f"{attr}_alpha"] = getattr(Target, attr)[key][0]
+                        hdr[f"{attr}_beta"] = getattr(Target, attr)[key][1]
+                    else:
+                        hdr[f"{attr}_{key}"] = getattr(Target, attr)[key]
+                    
+        for attr in vars(Obs).keys():
+            if isinstance(getattr(Obs, attr),
+                          (str, int, float, complex, bool,
+                           np.floating, np.integer, np.complexfloating,
+                           np.bool_)):
+                
+                if attr != 'Filepath':
+                    if attr != ArrayName:
+                        hdr[attr] = getattr(Obs, attr)
+                else:
+                    hdr['ArrayFile'] = getattr(Obs, attr).split('/')[-1]
+            
+        
+        primary = fits.PrimaryHDU(header=hdr)
+        
+        im1 = fits.ImageHDU(np.real(VisObj), name='VReal')
+        im2 = fits.ImageHDU(np.imag(VisObj), name='VImag')
+        im3 = fits.ImageHDU(np.real(CohIrradiance), name='CfReal')
+        im4 = fits.ImageHDU(np.imag(CohIrradiance), name='CfImag')
+        im5 = fits.ImageHDU(CPObj, name='Closure Phase')
+        
+        col1 = fits.Column(name='WLsampling', format='1D', array=spectra)
+        hdu1 = fits.BinTableHDU.from_columns([col1], name='spectra' )
+        
+        hdu = fits.HDUList([primary,hdu1,im1,im2,im3,im4,im5])
+        
+        print(f'Saving file into {savingfilepath}')
+        hdu.writeto(savingfilepath)
     
     return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
 
@@ -919,20 +960,24 @@ def get_CfObj(filepath, spectra):
         ObsParams = hdu[0].header
         WLsampling = hdu['SPECTRA'].data['WLsampling']
         
-        real = hdu['VReal'].data
-        imag = hdu['VImag'].data
-
-        ComplexVisObj = real + imag*1j
+        realV = hdu['VReal'].data
+        imagV = hdu['VImag'].data
         
-        real = hdu['CfReal'].data
-        imag = hdu['CfImag'].data
+        realCf = hdu['CfReal'].data
+        imagCf = hdu['CfImag'].data
 
 
-    f = interpolate.interp1d(WLsampling, real, axis=0)
-    NewReal = f(spectra)
-    f = interpolate.interp1d(WLsampling, imag, axis=0)
-    NewImag = f(spectra)
-    CoherentIrradiance = NewReal + NewImag*1j
+    f = interpolate.interp1d(WLsampling, realCf, axis=0)
+    NewRealCf = f(spectra)
+    f = interpolate.interp1d(WLsampling, imagCf, axis=0)
+    NewImagCf = f(spectra)
+    CoherentIrradiance = NewRealCf + NewImagCf*1j
+    
+    f = interpolate.interp1d(WLsampling, realV, axis=0)
+    NewRealV = f(spectra)
+    f = interpolate.interp1d(WLsampling, imagV, axis=0)
+    NewImagV = f(spectra)
+    ComplexVisObj = NewRealV + NewImagV*1j
     
     NW, NBfile = CoherentIrradiance.shape
     NAfile = int(np.sqrt(NBfile))
@@ -941,14 +986,16 @@ def get_CfObj(filepath, spectra):
     NC = (NA-2)*(NA-1)
     ClosurePhase = np.zeros([NW,NC])
     FinalCoherentIrradiance = np.zeros([NW,NB])*1j
+    FinalComplexVisObj = np.zeros([NW,NB])*1j
     
     for ia in range(NA):
         for iap in range(NA):
             ib = ia*NA+iap
             FinalCoherentIrradiance[:,ib] = CoherentIrradiance[:,ia*NAfile+iap]
+            FinalComplexVisObj[:,ib] = ComplexVisObj[:,ia*NAfile+iap]
             
     if NA < 3:
-        return FinalCoherentIrradiance
+        return FinalCoherentIrradiance, FinalComplexVisObj
     
     else:
         for ia in range(NA):
@@ -961,7 +1008,7 @@ def get_CfObj(filepath, spectra):
                     ClosurePhase[:,ic] = np.angle(ci1*ci2*ci3)
         # ClosurePhase = hdu['Closure Phase'].data
         
-    return FinalCoherentIrradiance, ClosurePhase
+    return FinalCoherentIrradiance, FinalComplexVisObj, ClosurePhase
 
 
 def get_infos(file):
@@ -989,7 +1036,7 @@ def get_infos(file):
     return filetimestamps,filelmbdas, piston, transmission, FreqSampling, PSD, Filter,hdr
     
     
-def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
+def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=True):
     from .config import piston_average, NA
     filetimestamps, filespectra, PistonDisturbance, TransmissionDisturbance,_,_,_,_ = get_infos(DisturbanceFile)
 
@@ -1013,13 +1060,16 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps):
     NB = np.shape(PistonDisturbance)[1]**2
 
     if piston_average==1:
-        print("We subtract to the piston of each telescope its first value")
+        if verbose:
+            print("We subtract to the piston of each telescope its first value")
         PistonDisturbance = PistonDisturbance-PistonDisturbance[0]
     if piston_average==2:
-        print("We subtract the average of first piston to the piston of all telescopes.")
+        if verbose:
+            print("We subtract the average of first piston to the piston of all telescopes.")
         PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance[0])
     elif piston_average==3:
-        print("We subtract to the piston of each telescope its temporal average.")
+        if verbose:
+            print("We subtract to the piston of each telescope its temporal average.")
         PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance, axis=0)
         
     CfDisturbance = np.zeros([NT,NW,NB])*1j
@@ -1488,34 +1538,34 @@ def studyP2VM(*args,nfig=0):
     ich=config.FS['ich']
     
     if 'NMod' in config.FS.keys():
-        ABCDchip=True
+        pairwise=True
         Modulation = config.FS['Modulation']
         ABCDindex = config.FS['ABCDind']
         Nmod=config.FS['NMod']
         v2pm_sorted = sortmatrix(v2pm, ich, ABCDindex)
         p2vm_sorted = sortmatrix(p2vm, ich, ABCDindex, direction='p2vm')
     else:
-        ABCDchip=False
+        pairwise=False
         v2pm_sorted = np.copy(v2pm)
         p2vm_sorted = np.copy(p2vm)
     
     conventionalorder=[]
     for ia in range(1,NA+1):
         for iap in range(ia+1,NA+1):
-            conventionalorder.append(f"B{ia}{iap}")
+            conventionalorder.append(f"{ia}{iap}")
     
     
     """Photometries and phaseshifts"""
-    if ABCDchip:
+    if pairwise:
         photometries = np.zeros([NW,NIN,Nmod,2])
         phases = np.zeros([NW,NIN,Nmod]) ; normphasors = np.zeros([NW,NIN,Nmod])
         for ia in range(NA):
             for iap in range(ia+1,NA):
                 ib=posk(ia,iap,NA)
                 for k in range(Nmod):
-                    photometries[:,ib,k,0] = v2pm_sorted[:,4*ib+k,ia]*100
-                    photometries[:,ib,k,1] = v2pm_sorted[:,4*ib+k,iap]*100
-                    R = v2pm_sorted[:,4*ib+k,NA+ib] ; I = v2pm_sorted[:,4*ib+k,NA+NIN+ib] 
+                    photometries[:,ib,k,0] = v2pm_sorted[:,Nmod*ib+k,ia]*100
+                    photometries[:,ib,k,1] = v2pm_sorted[:,Nmod*ib+k,iap]*100
+                    R = v2pm_sorted[:,Nmod*ib+k,NA+ib] ; I = v2pm_sorted[:,Nmod*ib+k,NA+NIN+ib] 
                     phases[:,ib,k] = np.arctan2(I,R) ; normphasors[:,ib,k] = np.sqrt(R**2+I**2)
         
         ModuleCoherentFlux = normphasors/2
@@ -1547,7 +1597,7 @@ def studyP2VM(*args,nfig=0):
         CovMatrixCoherent[iw] = np.dot(p2vm_sorted[iw], np.dot(np.diag(DetectionCoherent[iw]),np.transpose(p2vm_sorted[iw])))
         CovMatrixQuadrature[iw] = np.dot(p2vm_sorted[iw], np.dot(np.diag(DetectionQuadrature[iw]),np.transpose(p2vm_sorted[iw])))
             
-    if ABCDchip:
+    if pairwise:
         dico = {'v2pm_sorted':v2pm_sorted, 
                 'p2vm_sorted':p2vm_sorted, 
                 'photometries':photometries, 
@@ -1588,9 +1638,9 @@ def studyP2VM(*args,nfig=0):
             ax1.axvline(x = x, color = 'w', linestyle = '-', linewidth=.5)
             ax1.axvline(x = x, color = 'w', linestyle = '-', linewidth=.5)
         
-        if ABCDchip:
+        if pairwise:
             for ib in range(NIN):
-                ax1.axhline(y = ib*4-0.5, color = 'w', linestyle = '-')
+                ax1.axhline(y = ib*Nmod-0.5, color = 'w', linestyle = '-')
             
             ax1.set_yticks(np.arange(NIN)*Nmod+Nmod//2-.5)
             ax1.set_yticklabels(conventionalorder)
@@ -1635,12 +1685,12 @@ def studyP2VM(*args,nfig=0):
             ax2.axhline(y = y, color = 'w', linestyle = '-', linewidth=.5)
         
         
-        if ABCDchip:
+        if pairwise:
             for ib in range(NIN):
-                ax2.axvline(x = ib*4-0.5, color = 'w', linestyle = '-', linewidth=.5)
+                ax2.axvline(x = ib*Nmod-0.5, color = 'w', linestyle = '-', linewidth=.5)
                 
             ax2.set_xticks(np.arange(NIN)*Nmod+Nmod//2-.5)
-            ax2.set_xticklabels(conventionalorder)
+            ax2.set_xticklabels(conventionalorder,rotation=45)
             ax2.set_xlabel('Pixels sorted in ABCD')
             
         else:
@@ -1663,7 +1713,7 @@ def studyP2VM(*args,nfig=0):
 #     Photometry and phaseshifts repartition in the P2VM
 # =============================================================================
     
-    # cset = tol_cset('bright')
+    # colors = tol_cset('bright')
 
     # newfig+=1
     # fig=plt.figure(newfig, clear=True)
@@ -1694,22 +1744,22 @@ def studyP2VM(*args,nfig=0):
         
     #     firstbar_pos = xtop-width/2+barwidth/2
     #     rects1 = ax2.bar(firstbar_pos + 2*k*barwidth, photometries[0,:NINtemp,k,0], 
-    #                      barwidth, hatch='///',color=cset[k],edgecolor='black').patches
+    #                      barwidth, hatch='///',color=colors[k],edgecolor='black').patches
     #     rects2 = ax2.bar(firstbar_pos + (2*k+1)*barwidth, photometries[0,:NINtemp,k,1], 
-    #                      barwidth, color=cset[k],edgecolor='black').patches
+    #                      barwidth, color=colors[k],edgecolor='black').patches
     #     rects_moy1 = ax2.bar(firstbar_pos + (2*k+1/2)*barwidth, np.mean(photometries[0,:NINtemp,k,:],axis=-1), 
-    #                      barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
+    #                      barwidth*2, color=colors[k],edgecolor='black',fill=False,linestyle='--').patches
     #     rects3 = ax1.bar(firstbar_pos + 2*k*barwidth+barwidth/2, phases[0,:NINtemp,k], 
-    #                          barwidth,color=cset[k],edgecolor='black')
+    #                          barwidth,color=colors[k],edgecolor='black')
     #     firstbar_pos = xbot-width/2+barwidth/2
     #     rects4 = ax4.bar(firstbar_pos + 2*k*barwidth, photometries[0,NINtemp:,k,0],
-    #                      barwidth, hatch='///',color=cset[k],edgecolor='black').patches
+    #                      barwidth, hatch='///',color=colors[k],edgecolor='black').patches
     #     rects5 = ax4.bar(firstbar_pos + (2*k+1)*barwidth, photometries[0,NINtemp:,k,1],
-    #                      barwidth,color=cset[k],edgecolor='black').patches
+    #                      barwidth,color=colors[k],edgecolor='black').patches
     #     rects_moy2 = ax4.bar(firstbar_pos + (2*k+1/2)*barwidth, np.mean(photometries[0,NINtemp:,k,:],axis=-1), 
-    #                      barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
+    #                      barwidth*2, color=colors[k],edgecolor='black',fill=False,linestyle='--').patches
     #     rects6 = ax3.bar(firstbar_pos + 2*k*barwidth+barwidth/2, phases[0,NINtemp:,k], 
-    #                          barwidth,color=cset[k],edgecolor='black')
+    #                          barwidth,color=colors[k],edgecolor='black')
         
     #     # rects1 = ax2.patches[:NINtemp] ; rects2 = ax2.patches[NINtemp:2*NINtemp]
     #     # rects_moy = ax2.patches[2*NINtemp:]
@@ -1726,7 +1776,7 @@ def studyP2VM(*args,nfig=0):
     #         # ax4.text(rect.get_x() + rect.get_width() / 2, height + 5, height,
     #         #         ha='center', va='bottom')
             
-    #     bar_patches2.append(mpatches.Patch(color=cset[k],label="ABCD"[k]))
+    #     bar_patches2.append(mpatches.Patch(color=colors[k],label="ABCD"[k]))
     #     # rects3 = ax1.bar(x - width/2+0.25, photometries[0,:NINtemp,0,0], barwidth, label='C',color='b')
     #     # rects4 = ax1.bar(x - width/2+0.35, photometries[0,:NINtemp,0,1], barwidth, label='D',color='g')
     
@@ -1773,8 +1823,8 @@ def studyP2VM(*args,nfig=0):
     # fig.show()
     
     if ('repartition' in args) or ('displayall' in args):
-        cset = tol_cset('bright')
-        if ABCDchip:
+        
+        if pairwise:
             newfig+=1
             fig=plt.figure(newfig, clear=True)
             fig.suptitle("Photometry repartitions and phaseshift of the beams")
@@ -1803,22 +1853,22 @@ def studyP2VM(*args,nfig=0):
             for k in range(Nmod):
                 
                 rects1 = ax1.bar(ax1_firstbar_positions + 2*k*barwidth, photometries[0,:NINtemp,k,0], 
-                                 barwidth, hatch='///',color=cset[k],edgecolor='black').patches
+                                 barwidth, hatch='///',color=colors[k],edgecolor='black').patches
                 rects2 = ax1.bar(ax1_firstbar_positions + (2*k+1)*barwidth, photometries[0,:NINtemp,k,1], 
-                                 barwidth, color=cset[k],edgecolor='black').patches
+                                 barwidth, color=colors[k],edgecolor='black').patches
                 rects_moy1 = ax1.bar(ax1_firstbar_positions + (2*k+1/2)*barwidth, np.mean(photometries[0,:NINtemp,k,:],axis=-1), 
-                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
+                                 barwidth*2, color=colors[k],edgecolor='black',fill=False,linestyle='--').patches
                 rects_coh1 = ax1.bar(ax1_firstbar_positions + (2*k+1/2)*barwidth, ModuleCoherentFlux[0,:NINtemp,k]*100, 
-                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle=':').patches
+                                 barwidth*2, color=colors[k],edgecolor='black',fill=False,linestyle=':').patches
                 
                 rects4 = ax2.bar(ax2_firstbar_positions + 2*k*barwidth, photometries[0,NINtemp:,k,0],
-                                 barwidth, hatch='///',color=cset[k],edgecolor='black').patches
+                                 barwidth, hatch='///',color=colors[k],edgecolor='black').patches
                 rects5 = ax2.bar(ax2_firstbar_positions + (2*k+1)*barwidth, photometries[0,NINtemp:,k,1],
-                                 barwidth,color=cset[k],edgecolor='black').patches
+                                 barwidth,color=colors[k],edgecolor='black').patches
                 rects_moy2 = ax2.bar(ax2_firstbar_positions + (2*k+1/2)*barwidth, np.mean(photometries[0,NINtemp:,k,:],axis=-1), 
-                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle='--').patches
+                                 barwidth*2, color=colors[k],edgecolor='black',fill=False,linestyle='--').patches
                 rects_coh2 = ax2.bar(ax2_firstbar_positions + (2*k+1/2)*barwidth, ModuleCoherentFlux[0,NINtemp:,k]*100, 
-                                 barwidth*2, color=cset[k],edgecolor='black',fill=False,linestyle=':').patches
+                                 barwidth*2, color=colors[k],edgecolor='black',fill=False,linestyle=':').patches
                 
                 for rect1,rect2,rect_moy in zip(rects1,rects2,rects_moy1):
                     height = np.max([rect1.get_height(),rect2.get_height(),rect_moy.get_height()])
@@ -1830,7 +1880,7 @@ def studyP2VM(*args,nfig=0):
                     ax2.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
                             ha='center', va='bottom')
                     
-                bar_patches2.append(mpatches.Patch(color=cset[k],label="ABCD"[k]))
+                bar_patches2.append(mpatches.Patch(color=colors[k],label="ABCD"[k]))
             
             ax1_xmin,ax1_xmax = ax1.get_xlim() ; ax2_xmin,ax2_xmax = ax2.get_xlim()
             ax1_ymin,ax1_ymax = ax1.get_ylim() ; ax2_ymin,ax2_ymax = ax2.get_ylim()
@@ -1849,7 +1899,7 @@ def studyP2VM(*args,nfig=0):
                 for k in range(Nmod):
                     phase = phases[0,ib,k] ; norm = normphasors[0,ib,k]/np.max(normphasors[0,ib,:])
                     ax.arrow(phase, 0, 0, norm, width = 0.05,
-                             edgecolor=cset[k],facecolor = cset[k], lw = 2, zorder = 5,length_includes_head=True)
+                             edgecolor=colors[k],facecolor = colors[k], lw = 2, zorder = 5,length_includes_head=True)
                     
                 # ax.set_thetagrids(phases[0,ib,:]*180/np.pi,labels=np.round(phases[0,ib,:]*180/np.pi))
             for ib in range(NIN-NINtemp):
@@ -1861,7 +1911,7 @@ def studyP2VM(*args,nfig=0):
                 for k in range(Nmod):
                     phase = phases[0,NINtemp+ib,k] ; norm = normphasors[0,NINtemp+ib,k]/np.max(normphasors[0,NINtemp+ib,:])
                     ax.arrow(phase, 0, 0, norm, width = 0.05,
-                             edgecolor=cset[k],facecolor = cset[k], lw = 2, zorder = 5,length_includes_head=True)
+                             edgecolor=colors[k],facecolor = colors[k], lw = 2, zorder = 5,length_includes_head=True)
             
             xticklabels=[]
             for ia in range(NA):

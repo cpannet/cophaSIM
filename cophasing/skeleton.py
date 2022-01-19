@@ -7,7 +7,6 @@ import time
 import numpy as np
 # import cupy as cp # NumPy-equivalent module accelerated with NVIDIA GPU  
 import pandas as pd
-
 import matplotlib.pyplot as plt
 
 from importlib import reload  # Python 3.4+ only.
@@ -136,8 +135,12 @@ SOURCE:
     
     dyn=0.                                  # to be updtated later by FS (for ex via coh_algo)
       
+    import time
+    config.SimuTimeID=""
+    
     # Observation parameters
     config.ObservationFile = ObsFile
+    config.InterfArray = InterfArray
     config.DisturbanceFile = DisturbanceFile
     config.piston_average = piston_average
     config.NA=NA
@@ -235,10 +238,18 @@ def update_config(verbose=True,**kwargs):
             oldval = getattr(config,key)
             setattr(config,key,value)
             if verbose:
+                if isinstance(value,str):
+                    if "/" in value:
+                        oldval = oldval.split("/")[-1]
+                        value = value.split("/")[-1]
                 print(f' - Parameter "{key}" changed from {oldval} to {value}')
             
     if len(config.timestamps) != config.NT:
         config.timestamps = np.arange(config.NT)*config.dt
+        from . import simu
+        simu.timestamps = np.copy(config.timestamps)
+        config.FT['state'] = np.zeros(config.NT)
+        config.FT['usaw'] = np.zeros(config.NT)
         if verbose:
             print(' - New NT \u2260 len(timestamps) so we change timestamps.')
     return
@@ -901,7 +912,7 @@ Longueur timestamps: {len(timestamps)}")
 
       
 # @timer
-def loop(*args, overwrite=False, verbose=False):
+def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     """
     Core of the simulator. This routine calls the different modules according
     to the simulation timeline. 
@@ -923,15 +934,18 @@ def loop(*args, overwrite=False, verbose=False):
 
     from .config import NT, NA, timestamps, spectra, OW, MW, checktime, checkperiod
     
+    config.SimuTimeID=time.strftime("%Y%m%d-%H%M%S")
+    
     # Reload simu module for initialising the observables with their shape
-    print('Reloading simu for reinitialising the observables.')
+    if verbose:
+        print('Reloading simu for reinitialising the observables.')
     reload(simu)
     
     # Importation of the object 
     if NA>=3:
-        CfObj, CPObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
+        CfObj, VisObj, CPObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
     else:
-        CfObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
+        CfObj, VisObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
         
     
     #scaling it to the spectral sampling  and integration time dt
@@ -943,9 +957,10 @@ def loop(*args, overwrite=False, verbose=False):
     if NA>=3:
         simu.ClosurePhaseObject = CPObj
     simu.CoherentFluxObject = CfObj
+    simu.VisibilityObject = VisObj
     
     # Importation of the disturbance
-    CfDist, PistonDist, TransmissionDist = coh_tools.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps)
+    CfDist, PistonDist, TransmissionDist = coh_tools.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps,verbose=True)
     
     simu.CfDisturbance = CfDist
     simu.PistonDisturbance = PistonDist
@@ -958,7 +973,8 @@ def loop(*args, overwrite=False, verbose=False):
 
     simu.FTmode[:config.starttracking] = np.zeros(config.starttracking)
 
-    print("Processing simulation ...")
+    if verbose2:
+        print("Processing simulation ...")
     
     simu.it = 0
     time0 = time.time()
@@ -999,12 +1015,13 @@ def loop(*args, overwrite=False, verbose=False):
         simu.EffectiveMoveODL[it+config.latency] = CmdODL
         
         checkpoint = int(checkperiod/100 * NT)
-        if (it%checkpoint == 0) and (it!=0) and checktime:
+        if (it>checkpoint) and (it%checkpoint == 0) and (it!=0) and checktime:
             processedfraction = it/NT
             # LeftProcessingTime = (time.time()-time0)*(1-processedfraction)/processedfraction
             print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
 
-    print(f"Done. (Total: {round(time.time()-time0)}s)")
+    if verbose2:
+        print(f"Done. (Total: {round(time.time()-time0)}s)")
     # Process observables for visualisation
     simu.PistonTrue = simu.PistonDisturbance - simu.EffectiveMoveODL[:-config.latency]
 
@@ -1033,8 +1050,8 @@ def loop(*args, overwrite=False, verbose=False):
     
     # print(args)
     if len(args):
-        filepath = args[0]
-        save_data(simu, config, filepath, overwrite=overwrite, verbose=verbose)
+        filepath = args[0]+f"results_{config.SimuTimeID}.fits"
+        save_data(simu, config, filepath, LightSave=LightSave, overwrite=overwrite, verbose=verbose)
     
     return
 
@@ -1060,7 +1077,7 @@ def loop(*args, overwrite=False, verbose=False):
     
         
 def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
-            OneTelescope=True, pause=False, savedir='',ext='pdf'):
+            OneTelescope=True, pause=False, display=True,savedir='',ext='pdf'):
     
     '''
     NAME:
@@ -1090,8 +1107,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     
     from .simu import timestamps
     
-    import time
-    timestr = time.strftime("%Y%m%d-%H%M%S")
+    #timestr = config.timestr
     
     if 'which' in args:
         print(f"Available observables to display:\n\
@@ -1110,14 +1126,20 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
               - State-machine: 'state'\n")
         return
     
+    if not display:
+        import matplotlib
+        currentGUI = plt.get_backend()
+        matplotlib.use('Qt5Agg')
+    
     if (len(savedir)) and (not os.path.exists(savedir)):
         os.makedirs(savedir)
     
     ind = np.argmin(np.abs(config.spectraM-wl))
     wl = config.spectraM[ind]
     
-    from .config import NA,NT,NIN,OW
-       
+    from .config import NA,NT,NIN,OW, SimuTimeID
+    timestr=SimuTimeID
+    
     ich = config.FS['ich']
     
     dt=config.dt
@@ -1126,9 +1148,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     if np.min(float(ich[0][0])) == 1:
         increment = 1
 
-    stationaryregim_start = config.starttracking+(config.starttracking-config.NT)*2//3
+    stationaryregim_start = config.starttracking+(config.NT-config.starttracking)*2//3
     if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
-    stationaryregim = range(stationaryregim_start,NT)
+    stationaryregim = np.arange(stationaryregim_start,NT)
     
     DIT = min(50, config.NT - config.starttracking -1)
     ShowPerformance(float(timestamps[stationaryregim_start]), wl, DIT, display=False)
@@ -1211,8 +1233,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 ax3.set_xlabel('Frequency [Hz]')             
                 ax3.set_xscale('log')
                 ax3.set_yscale('log')    
-                
-        plt.show()
+        
+        if display:
+            plt.show()
         config.newfig+=1    
         
         
@@ -1242,7 +1265,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         plt.grid()
         plt.xlabel('Time (ms)')
         plt.ylim(s[0],s[1])
-        plt.show()    
+        if display:
+            plt.show()    
         config.newfig+=1    
         
     
@@ -1264,7 +1288,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ax2ylim = [-ax2ymax,ax2ymax]
         fig = plt.figure("Pistons")
         plt.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
-        ax1 = fig.subplots()
+        ax1,axText = fig.subplots(ncols=2,gridspec_kw={"width_ratios":[4,1]})
+        axText.axis("off")
         ax2 = ax1.twinx()
         
         if config.TELref:
@@ -1279,7 +1304,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                       color=telcolors[ia+1],linestyle='dashed')
             ax2.plot(timestamps, simu.PistonTrue[:,ia]-PistonRef,
                      color=telcolors[ia+1],linestyle='solid')
-            plt.grid()
+            
+            axText.text(0.3,.9-ia*.05,f"$\sigma_{{{ia+1}}}={int(np.sqrt(simu.VarPiston[ia])*1e3)}$nm")
         
         ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
                    color='k', linestyle=':')
@@ -1290,9 +1316,15 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ax1.set_ylabel('Disturbance Pistons [µm]')
         ax1.set_ylim(ylim)
         plt.xlabel('Time (ms)')
-        plt.legend(handles=beam_patches+linestyles)
-        plt.show()
+        axText.legend(handles=beam_patches+linestyles,loc="lower right")
+        ax2.grid(True)
+        if display:
+            plt.show()
         config.newfig+=1
+    
+        if len(savedir):
+            fig.savefig(savedir+f"Simulation{timestr}_piston.{ext}")
+    
     
     if displayall or ('Pistondetails' in args):
         
@@ -1346,7 +1378,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
 
         plt.xlabel('Time (ms)')
         plt.legend(handles=linestyles)
-        plt.show()
+        if display:
+            plt.show()
         config.newfig+=1    
 
 
@@ -1459,10 +1492,10 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
         ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=SquaredSNR,ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=simu.OPDDisturbance)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
         ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=RMSgdmic,ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),[wl/5],np.stack(RMStrueOPD)]),ymin=0)
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
         
         ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
         ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
@@ -1477,13 +1510,13 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         
         ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-        # figname = '_'.join(title.split(' ')[:3])
-        # figname = 'GD&PD'
-        # plt.savefig(datasave+f"{figname}.pdf")
+
         ax7.legend(handles=linestyles, loc='upper right')
-        fig.show()
+        if display:
+            fig.show()
 
         if len(savedir):
+            print("Saving perftable figure.")
             plt.savefig(savedir+f"Simulation{timestr}_perftable.{ext}")
 
     if displayall or ('opd' in args):
@@ -1511,6 +1544,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     
         
         NumberOfBaselinesToShow = np.min([NIN, NA-1])
+        ShownBaselines = np.arange(NumberOfBaselinesToShow)
         for ia in range(NumberOfBaselinesToShow):
             fig = plt.figure(f"OPD {ia+1}")
 
@@ -1534,13 +1568,13 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                             color='green',linestyle='dotted')
                     ax.plot(timestamps, simu.EffectiveOPDMove[:-config.latency,ib],
                             color='green',linestyle='solid')
-                    ax.plot(timestamps, simu.OPDTrue[:,ib],color='blue')
+                    ax2.plot(timestamps, simu.OPDTrue[:,ib],color='blue')
                 else:
                     ib = coh_tools.posk(iap,ia,NA)
-                    ax2.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
-                    ax2.plot(timestamps, -simu.OPDCommand[:-1,ib],
+                    ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
+                    ax.plot(timestamps, -simu.OPDCommand[:-1,ib],
                             color='green',linestyle='dotted')   
-                    ax2.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                    ax.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
                             color='green',linestyle='-')
                     ax2.plot(timestamps, -simu.OPDTrue[:,ib],color='blue')
                 
@@ -1576,6 +1610,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             # plt.tight_layout()
             ax.set_xlabel('Time (ms)')
             axText.legend(handles=linestyles)
+            
+            if display:
+                plt.show()
             config.newfig+=1
             
             if OneTelescope:
@@ -1586,6 +1623,243 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             print("Saving opd figure.")
             plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
         
+    if displayall or ('opd3' in args):
+        SS = 12     # Small size
+        MS = 14     # Medium size
+        BS = 16     # Big size
+        figsize = (16,8)
+        rcParamsForBaselines = {"font.size":SS,
+               "axes.titlesize":SS,
+               "axes.labelsize":MS,
+               "axes.grid":True,
+               
+               "xtick.labelsize":SS,
+               "ytick.labelsize":SS,
+               "legend.fontsize":SS,
+               "figure.titlesize":BS,
+               "figure.constrained_layout.use": False,
+               "figure.figsize":figsize,
+               'figure.subplot.hspace': 0.05,
+               'figure.subplot.wspace': 0,
+               'figure.subplot.left':0.1,
+               'figure.subplot.right':0.95
+               }
+    
+    
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+                    
+
+        from mypackage.plot_tools import setaxelim
+        
+        t = simu.timestamps ; timerange = range(NT)
+        # NA=6 ; NIN = 15 ; NC = 10
+        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
+        len2 = NIN//2 ; len1 = NIN-len2
+        
+        basecolors = colors[:len1]+colors[:len2]
+        # basestyles = len1*['solid'] + len2*['dashed']
+        # closurecolors = colors[:NC]
+        
+        R=config.FS['R']
+        RMStrueOPD = np.sqrt(simu.VarOPD)
+        VisObj = coh_tools.NB2NIN(simu.VisibilityObject[ind])
+        
+        plt.rcParams.update(rcParamsForBaselines)
+        title='True OPD'
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+        fig.suptitle(title)
+        (ax1,ax6),(ax2,ax7),(ax3,ax8),(ax4,ax9),(ax5,ax10)=fig.subplots(nrows=5,ncols=2, gridspec_kw={"height_ratios":[4,.5,1,.2,1]})
+        ax1.set_title("First serie of baselines, from 12 to 25")
+        ax6.set_title("Second serie of baselines, from 26 to 56")
+        
+        for iBase in range(len1):   # First serie
+            ax1.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+
+        for iBase in range(len1,NIN):   # Second serie
+            ax6.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+        
+        ax1.vlines(config.starttracking*dt,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+                   color='k', linestyle=':')
+        ax6.vlines(config.starttracking*dt,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+                   color='k', linestyle=':')
+        # ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+        #            color='k', linestyle=':')
+        # ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+        #            color='k', linestyle=':')
+        
+        ax3.bar(baselines[:len1],RMStrueOPD[:len1], color=basecolors[:len1])
+        ax5.bar(baselines[:len1],simu.LR3[:len1], color=basecolors[:len1])
+        ax5.bar(baselines[:len1],np.abs(VisObj[:len1]), fill=False, edgecolor='black', linestyle='-',linewidth=1.5)
+        
+        ax8.bar(baselines[len1:],RMStrueOPD[len1:], color=basecolors[len1:])
+        ax10.bar(baselines[len1:],simu.LR3[len1:], color=basecolors[len1:])
+        ax10.bar(baselines[len1:],np.abs(VisObj[len1:]), fill=False, edgecolor='black', linestyle='-', linewidth=1.5)
+
+        ax1.sharex(ax6) ; ax1.sharey(ax6)
+        ax3.sharey(ax8) ; ax5.sharey(ax10)
+        ax3.sharex(ax5) ; ax8.sharex(ax10)
+        
+        ax6.tick_params(labelleft=False)
+        ax8.tick_params(labelleft=False)
+        ax10.tick_params(labelleft=False)
+        ax3.tick_params(labelbottom=False) ; ax8.tick_params(labelbottom=False)
+        
+        ax2.remove() ; ax4.remove();ax7.remove();ax9.remove()
+        
+        ax1.set_ylabel('OPD [µm]')
+        ax3.set_ylabel('$\sigma_{OPD}$\n[µm]',rotation=1,labelpad=40,loc='bottom')
+        ax5.set_ylabel('Lock\nratio',rotation=1,labelpad=40, loc='bottom')
+        
+        #ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+        
+        ax1.set_xlabel('Time [ms]') ; ax6.set_xlabel('Time [ms]')
+        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+
+        setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
+        setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
+        ax5.set_ylim(0,1.1) ; ax5.grid(True) ; ax10.grid(True)
+
+        if display:
+            fig.show()
+
+        if len(savedir):
+            print("Saving opd3 figure.")
+            plt.savefig(savedir+f"Simulation{timestr}_opd3.{ext}")
+        
+    
+    if 'opd2' in args:
+        """
+        OPD
+        """
+        
+        OPD_max = 1.1*np.max([np.max(np.abs([simu.OPDDisturbance,
+                              simu.OPDTrue,
+                              simu.OPDCommand[:-1],simu.EffectiveOPDMove[:-config.latency]])),wl/2])
+        OPD_min = -OPD_max
+        ylim = [OPD_min,OPD_max]
+    
+        linestyles=[]
+        linestyles.append(mlines.Line2D([], [], color='black',
+                                        linestyle='solid',label='Residual'))    
+        linestyles.append(mlines.Line2D([], [], color='black',
+                                        linestyle='--',label='Disturbance'))
+        linestyles.append(mlines.Line2D([], [], color='black',
+                                        linestyle=':',label='Command'))
+        linestyles.append(mlines.Line2D([], [], color='black',
+                                        linestyle='-.',label='Effective Move ODL'))
+        linestyles.append(mlines.Line2D([],[], color='red',
+                                        linestyle=':', label='Start tracking'))
+    
+        linestyles2=[]
+        
+        NumberOfBaselinesToShow = np.min([NIN, NA-1])
+        ShownBaselines = np.arange(NumberOfBaselinesToShow)
+        
+        for ia in range(NumberOfBaselinesToShow):
+            
+            BaselinesIndices=[]
+            for iap in range(NA):
+                if iap < ia:
+                    BaselinesIndices.append(coh_tools.posk(iap,ia,NA))
+                elif ia < iap:
+                    BaselinesIndices.append(coh_tools.posk(iap,ia,NA))
+            
+            fig = plt.figure(f"OPD {ia+1}")
+
+            axes = fig.subplots(nrows=NumberOfBaselinesToShow,ncols=2,sharex=True, gridspec_kw={'width_ratios': [4, 1]})
+            iap,iax=0,0
+            
+            gs = axes[0, 0].get_gridspec()
+            # remove the all axes of first column
+            for ax in axes[:, 0]:
+                ax.remove()
+                
+            # Add a unique axe on the first column
+            ax1 = fig.add_subplot(gs[:, 0])
+            ax2 = ax1.twinx()
+            ax2ymax = 1.1*np.max([np.max(np.abs(simu.OPDTrue[stationaryregim][:,BaselinesIndices])),wl/2])
+            ax2ylim = [-ax2ymax,ax2ymax]
+            
+            ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
+               color='red', linestyle=':')
+            #ax1.annotate('Big Axes \nGridSpec[1:, -1]', (0.1, 0.5),
+            #               xycoords='axes fraction', va='center')
+            
+            if np.ndim(axes)==1:
+                axes = [(axes[0], axes[1])]
+                
+            k=0
+            for iap in range(NA):
+                
+                if iap<ia:
+                    linestyles2.append(mlines.Line2D([],[],color=colors[iap],label=f'Baseline {iap+1}{ia+1}'))
+                    ib = coh_tools.posk(iap,ia,NA)
+                    ax1.plot(timestamps, -simu.OPDDisturbance[:,ib],
+                             color=colors[iap],linestyle="--")
+                    ax1.plot(timestamps, -simu.OPDCommand[:-1,ib],
+                            color=colors[iap],linestyle=':')   
+                    ax1.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                            color=colors[iap],linestyle='-.')
+                    ax1.plot(timestamps, -simu.OPDTrue[:,ib],
+                             color=colors[iap],linestyle='solid')
+                    
+                elif iap == ia:
+                    continue
+                
+                else: # ia<iap
+                    linestyles2.append(mlines.Line2D([],[],color=colors[iap],label=f'Baseline {ia+1}{iap+1}'))
+                    ib = coh_tools.posk(ia,iap,NA)
+                    ax1.plot(timestamps, simu.OPDDisturbance[:,ib],
+                             color=colors[iap],linestyle="--")
+                    ax1.plot(timestamps, simu.OPDCommand[:-1,ib],
+                             color=colors[iap],linestyle=':')
+                    ax1.plot(timestamps, simu.EffectiveOPDMove[:-config.latency,ib],
+                            color=colors[iap],linestyle='-.')
+                    ax1.plot(timestamps, simu.OPDTrue[:,ib],
+                             color=colors[iap],linestyle='solid')
+                
+                
+                
+                axes[0,1].text(0,0.9-0.2*k,f"$\sigma_{{{ia+1}{iap+1}}}={np.sqrt(simu.VarOPD[ib])*1e3:.0f}$nm RMS")
+                axes[k,1].axis("off") ; k+=1
+                
+            ax1.set_ylim(ylim)
+            ax2.set_ylim(ax2ylim)
+            if ax2ymax > wl:
+                ax2.set_yticks([-ax2ylim[0],-wl,0,wl,ax2ylim[1]])
+            else:
+                ax2.set_yticks([-wl,0,wl])
+            ax1.set_ylabel(f'OPD {ia+1}# \n [µm]')
+            ax2.set_ylabel('Residual \n [µm]')
+            
+            fig.tight_layout()
+            # wlr = round(wl,2)
+            # ax2.set_yticks([-wl,0,wl])
+            # ax2.set_yticklabels([-wlr,0,wlr])
+            ax2.tick_params(axis='y',which='major', length=7)
+            ax2.tick_params(axis='y',which='minor', length=4)
+            ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
+            ax2.grid(b=True,which='major')
+            ax2.grid(b=True, which='minor')
+                
+            # plt.tight_layout()
+            ax.set_xlabel('Time (ms)')
+            axes[-2,1].legend(handles=linestyles,loc='lower right')
+            axes[-1,1].legend(handles=linestyles2,loc='lower right')
+            config.newfig+=1
+            
+            if display:
+                plt.show()
+            if OneTelescope:
+                break
+            
+            
+        if len(savedir):
+            print("Saving opd figure.")
+            plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
+
     
     if 'OPDcmd' in args:
         OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
@@ -1679,7 +1953,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             
                 
             plt.xlabel('Time (ms)')
-            plt.show()
+            if display:
+                plt.show()
             axLegend.legend(handles=linestyles)
             config.newfig+=1
     
@@ -1773,6 +2048,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             axLegend.legend(handles=linestyles)
             config.newfig+=1
     
+            if display:
+                plt.show()
             if OneTelescope:
                 break
     
@@ -1795,7 +2072,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ax.set_ylim(s)
         ax.set_xlabel('Time [ms]')
         ax.set_ylabel('OPD [µm]')
-        plt.show()
+        if display:
+            plt.show()
         ax.legend()
         config.newfig+=1
 
@@ -1864,6 +2142,9 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         ax1.legend(handles=linestyles)
         ax3.legend(handles=linestyles1,loc='upper left') ; ax3.axis('off')
         ax4.legend(handles=linestyles2,loc='upper left') ; ax4.axis('off')
+        
+        if display:
+            plt.show()
         config.newfig+=1
         
 
@@ -1893,7 +2174,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
                        color='k', linestyle=':')
             plt.xlabel('Time (ms)')
-            plt.show()
+            if display:
+                plt.show()
             config.newfig+=1
             
             if OneTelescope:
@@ -1929,7 +2211,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
                        color='k', linestyle=':')
             plt.xlabel('Time (ms)')
-            plt.show()
+            if display:
+                plt.show()
             config.newfig+=1
     
             if OneTelescope:
@@ -1949,7 +2232,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
         if 'spica' in config.fs or 'abcd' in config.fs:
             NMod = config.FS['NM']
             
-        if 'Modulations' in config.FS.keys():
+        if 'Modulation' in config.FS.keys():
             ABCDchip = True
         else:
             ABCDchip=False
@@ -1965,7 +2248,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                 
                 ax = plt.subplot(NIN,NMod,ip+1)
                 if ip < NMod:
-                    ax.set_title(config.FS['Modulations'][ip])
+                    ax.set_title(config.FS['Modulation'][ip])
                 im = plt.imshow(np.transpose(np.dot(np.reshape(simu.MacroImages[:,ind,ip],[NT,1]), \
                                                     np.ones([1,100]))), vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))    
                     
@@ -1984,7 +2267,8 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
             fig.colorbar(im, cax=cbar_ax)
             plt.grid(False)
-            plt.show()
+            if display:
+                plt.show()
             config.newfig+=1
             
             
@@ -2010,11 +2294,41 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             plt.ylabel('Time')
             plt.xlabel(f'Image at wl={round(config.spectraM[ind],2)}µm')
             plt.grid(False)
+            if display:
+                plt.show()
             config.newfig +=1
 
         if len(savedir):
             fig.savefig(savedir+f"Simulation{timestr}_detector.{ext}")
             
+
+    if 'snr' in args:
+        InstantaneousSquaredSNR=np.nan_to_num(1/simu.varPD)
+        ylim=[1e-1,np.max(InstantaneousSquaredSNR)]
+        # State-Machine and SNR
+        fig = plt.figure("SNR²")
+        fig.suptitle("SNR² and State-Machine")
+        ax = fig.subplots()
+        for ib in range(NIN):
+            ax.plot(timestamps, simu.SquaredSNRMovingAverage[:,ib],#simu.SquaredSNRMovingAverage[:,ib],
+                    label=f"{ich[ib]}")
+            
+        ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
+                  linestyle='--',label='Threshold GD')
+        
+        ax.set_ylim(ylim)
+        ax.set_yscale('log')
+        ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+                   color='k', linestyle=':')
+        ax.set_ylabel("$<SNR>²_Ngd$")
+        ax.legend()
+        if display:
+            if pause:
+                plt.pause(0.1)
+            else:
+                plt.show()
+        config.newfig+=1
+        
 
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
@@ -2041,14 +2355,20 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
                    color='k', linestyle=':')
         ax2.vlines(config.starttracking*dt,0,NA,
                    color='k', linestyle=':')
-        ax.set_ylabel(f"<SNR>_{config.FT['Ngd']}")
+        ax.set_ylabel("$<SNR>²_{Ngd}$")
         ax2.set_ylabel("Rank of Igd")
         ax2.set_xlabel('Time (ms)')
         ax2.legend()
         ax.legend()
-        if pause:
-            plt.pause(0.1)
+        if display:
+            if pause:
+                plt.pause(0.1)
+            else:
+                plt.show()
         config.newfig+=1
+        
+    if not display:
+        matplotlib.use(currentGUI)
         
     pass
 
@@ -2117,7 +2437,7 @@ WavelengthOfInterest
     
     ich = config.FS['ich']
     
-    from .config import NIN,NC,dt,NT
+    from .config import NA,NIN,NC,dt,NT
     
     WOI = WavelengthOfInterest
     if isinstance(WOI, (float,np.float32,np.float64)):
@@ -2141,11 +2461,14 @@ WavelengthOfInterest
     simu.FringeContrast=np.zeros([NW,NIN])      # Fringe Contrast at given wavelengths [0,1]
     simu.CoherenceEnvelopModulation = np.zeros([NW,NIN]) # Contrast loss due to spectral dispersion.
     simu.VarOPD=np.zeros(NIN)
+    simu.VarPiston=np.zeros(NA)
     simu.TempVarPD=np.zeros(NIN) ; simu.TempVarGD=np.zeros(NIN)
     simu.VarCPD =np.zeros(NC); simu.VarCGD=np.zeros(NC)
-    simu.LockedRatio=np.zeros(NIN) ; simu.WLockedRatio = np.zeros(NIN)
     
-    simu.LR2 = np.zeros(NIN) ; simu.LR3= np.zeros(NIN)
+    simu.LockedRatio=np.zeros(NIN)          # sig_opd < lambda/p
+    simu.LR2 = np.zeros(NIN)                # Mode TRACK
+    simu.LR3= np.zeros(NIN)                 # In Central Fringe
+    simu.WLockedRatio = np.zeros(NIN)
     
     MaxPhaseVarForLocked = (2*np.pi/p)**2
     MaxVarOPDForLocked = (WavelengthOfInterest/p)**2
@@ -2154,18 +2477,21 @@ WavelengthOfInterest
     simu.PhaseVar_atWOI = np.zeros([Ndit,NIN])
     simu.FTLocked = np.zeros([Ndit,NIN])
     simu.PhaseStableEnough= np.zeros([Ndit,NIN])
-    simu.TrackedBaselines = (simu.SquaredSNRMovingAverage >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
-    simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
+    if 'ThresholdGD' in config.FT.keys():
+        simu.TrackedBaselines = (simu.SquaredSNRMovingAverage >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
+        simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
     simu.InCentralFringe = np.abs(simu.OPDTrue < WavelengthOfInterest/2)
     simu.LR3 = np.mean(simu.InCentralFringe[InFrame:], axis=0)    # Array [NIN]
     
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
         OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+        PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
         simu.PhaseVar_atWOI[it] = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/WavelengthOfInterest,axis=0)
         simu.PhaseStableEnough[it] = 1*(OPDVar < MaxVarOPDForLocked)
         #simu.FTLocked[it] =  # Reste à définir en utilisant la matrice de poids.
         simu.VarOPD += 1/Ndit*OPDVar
+        simu.VarPiston += 1/Ndit*PistonVar
         simu.TempVarPD += 1/Ndit*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
         simu.TempVarGD += 1/Ndit*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
         simu.VarCPD += 1/Ndit*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
@@ -2187,7 +2513,9 @@ WavelengthOfInterest
     simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
 
     simu.WLR2 = np.mean(simu.InCentralFringe * simu.SquaredSNRMovingAverage, axis=0)
-    simu.WLR3 = np.mean(simu.TrackedBaselines * simu.SquaredSNRMovingAverage, axis=0)
+    
+    if 'ThresholdGD' in config.FT.keys():
+        simu.WLR3 = np.mean(simu.TrackedBaselines * simu.SquaredSNRMovingAverage, axis=0)
 
 
     if not display:
@@ -2442,7 +2770,7 @@ def ReadCf(currCfEstimated):
     from . import simu
     
     from .config import NA,NIN,NC
-    from .config import MW
+    from .config import MW,FS
     
     it = simu.it            # Time
      
@@ -2496,7 +2824,7 @@ def ReadCf(currCfEstimated):
         # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref)
         
     # Current Phase-Delay
-    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))
+    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))*FS['active_ich']
         
     """
     Group-Delays extration
@@ -2532,7 +2860,7 @@ def ReadCf(currCfEstimated):
         cfGDmoy = np.sum(cfGDlmbdas)
 
             
-        currGD[ib] = np.angle(cfGDmoy)    # Group-delay on baseline (ib).
+        currGD[ib] = np.angle(cfGDmoy)*FS['active_ich'][ib]    # Group-delay on baseline (ib).
     
     """
     Closure phase calculation
@@ -2551,20 +2879,23 @@ def ReadCf(currCfEstimated):
     bispectrumPD = np.zeros([NC])*1j
     bispectrumGD = np.zeros([NC])*1j
     
-    timerange = range(it+1-Ncp,it+1)
+    timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
     for ia in range(NA):
         for iap in range(ia+1,NA):
-            ib = coh_tools.posk(ia,iap,NA)      # coherent flux (ia,iap)    
+            ib = coh_tools.posk(ia,iap,NA)      # coherent flux (ia,iap)  
+            valid1=config.FS['active_ich'][ib]
             cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
             cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
             cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
             for iapp in range(iap+1,NA):
                 ib = coh_tools.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                valid2=config.FS['active_ich'][ib]
                 cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
                 ib = coh_tools.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                valid3=config.FS['active_ich'][ib]
                 cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
@@ -2572,59 +2903,27 @@ def ReadCf(currCfEstimated):
                 # The bispectrum of one time and one triangle adds up to
                 # the Ncp last times
                 ic = coh_tools.poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
-                
+                validcp[ic]=valid1*valid2*valid3
                 bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
                 bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
     
+    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
+    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
     
-    
-    
-    # for iot in range(it+1-Ncp,it+1):          # integration on time Ncp
-    #     # cs = 0*1j
-    #     for ia in range(NA):
-    #         for iap in range(ia+1,NA):
-    #             ib = coh_tools.posk(ia,iap,NA)      # coherent flux (ia,iap)    
-    #             cs1 = np.sum(simu.CfPD[iot,:,ib])     # Sum of coherent flux (ia,iap)
-    #             cfGDlmbdas = simu.CfGD[iot,Ncross:,ib]*np.conjugate(simu.CfGD[iot,:-Ncross,ib])
-    #             cfGDmoy1 = np.sum(cfGDlmbdas)     # Sum of coherent flux (ia,iap)  
-    #             for iapp in range(iap+1,NA):
-    #                 ib = coh_tools.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-    #                 cs2 = np.sum(simu.CfPD[iot,:,ib]) # Sum of coherent flux (iap,iapp)    
-    #                 cfGDlmbdas = simu.CfGD[iot,Ncross:,ib]*np.conjugate(simu.CfGD[iot,:-Ncross,ib])
-    #                 cfGDmoy2 = np.sum(cfGDlmbdas)
-                    
-    #                 ib = coh_tools.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-    #                 cs3 = np.sum(np.conjugate(simu.CfPD[iot,:,ib])) # Sum of 
-    #                 cfGDlmbdas = simu.CfGD[iot,Ncross:,ib]*np.conjugate(simu.CfGD[iot,:-Ncross,ib])
-    #                 cfGDmoy3 = np.sum(cfGDlmbdas)
-                    
-    #                 # The bispectrum of one time and one triangle adds up to
-    #                 # the Ncp last times
-    #                 ic = coh_tools.poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
-                    
-    #                 bispectrumPD[ic]+=cs1*cs2*cs3
-    #                 bispectrumGD[ic]+=cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3)
-                    
-    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)
-    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)
-    
-    if it%Ncp == 0:                     # At time 0, we create the reference vectors
+    if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
         for ia in range(1,NA-1):
             for iap in range(ia+1,NA):
                 k = coh_tools.posk(ia,iap,NA)
                 ic = coh_tools.poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
-                if config.FT['usePDref']:
-                    simu.PDref[k] = simu.ClosurePhasePD[it,ic]
-                    simu.GDref[k] = simu.ClosurePhaseGD[it,ic]
-                else:
-                    simu.PDref[k] = 0
-                    simu.GDref[k] = 0
+                simu.PDref[it,k] = simu.ClosurePhasePD[it,ic]
+                simu.GDref[it,k] = simu.ClosurePhaseGD[it,ic]
+
     
     return currPD, currGD
 
 
 def SimpleIntegrator(*args, init=False, Ngd=1, Npd=1, Ncp = 1, GainPD=0, GainGD=0,
-                      Ncross = 1, CPref=True,roundGD='round',Threshold=True, usePDref=True):
+                      Ncross = 1, CPref=True,roundGD='round',Threshold=True):
     """
     Calculates, from the measured coherent flux, the new positions to send to the delay lines.
     
@@ -2697,28 +2996,7 @@ def SimpleIntegrator(*args, init=False, Ngd=1, Npd=1, Ncp = 1, GainPD=0, GainGD=
         config.FT['roundGD'] = roundGD
         config.FT['Threshold'] = Threshold
         config.FT['cmdOPD'] = True
-        config.FT['usePDref'] = usePDref
-        
-        from .config import NIN,NA
-        config.FT['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
-        config.FT['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Piston matrix
-        
-        from .coh_tools import posk
-        
-        for ia in range(NA):
-            for iap in range(ia+1,NA):
-                ib = posk(ia,iap,NA)
-                config.FT['Piston2OPD'][ib,ia] = 1
-                config.FT['Piston2OPD'][ib,iap] = -1
-                config.FT['OPD2Piston'][ia,ib] = 1
-                config.FT['OPD2Piston'][iap,ib] = -1
-
-        config.FT['OPD2Piston'] = config.FT['OPD2Piston']/NA
-        
-        if config.TELref:
-            iTELref = config.TELref - 1
-            L_ref = config.FT['OPD2Piston'][iTELref,:]
-            config.FT['OPD2Piston'] = config.FT['OPD2Piston'] - L_ref
+        config.FT['CPref'] = CPref
         
         print(f"*** \n Inititilise Integrator: \n GainPD={GainPD} ; GainGD={GainGD} \n \
 Ngd={Ngd} ; Type={config.FT['Name']} \n\ ***")
@@ -2762,7 +3040,7 @@ def SimpleCommandCalc(currPD,currGD):
     from . import simu
     
     from .config import NA,NIN
-    from .config import FT
+    from .config import FT,FS
     
     it = simu.it            # Frame number
     
@@ -2807,11 +3085,11 @@ def SimpleCommandCalc(currPD,currGD):
         # Integrator
         simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*config.PDspectra*config.FS['R']/(2*np.pi)*currGDerr
         # From OPD to Pistons
-        simu.PistonGDCommand[it+1] = np.dot(FT['OPD2Piston'], simu.GDCommand[it+1])
+        simu.PistonGDCommand[it+1] = np.dot(FS['OPD2Piston'], simu.GDCommand[it+1])
         
     else:                       # integrator on PD
         # From OPD to Piston
-        currPistonGD = np.dot(FT['OPD2Piston'], currGDerr)
+        currPistonGD = np.dot(FS['OPD2Piston'], currGDerr)
         # Integrator
         simu.PistonGDCommand[it+1] = simu.PistonGDCommand[it] + FT['GainPD']*currPistonGD
     
@@ -2854,11 +3132,11 @@ def SimpleCommandCalc(currPD,currGD):
         # Integrator
         simu.PDCommand[it+1] = simu.PDCommand[it] + FT['GainPD']*config.PDspectra/(2*np.pi)*currPDerr
         # From OPD to Pistons
-        simu.PistonPDCommand[it+1] = np.dot(FT['OPD2Piston'], simu.PDCommand[it+1])
+        simu.PistonPDCommand[it+1] = np.dot(FS['OPD2Piston'], simu.PDCommand[it+1])
         
     else:                       # integrator on PD
         # From OPD to Piston
-        currPistonPD = np.dot(FT['OPD2Piston'], currPDerr)
+        currPistonPD = np.dot(FS['OPD2Piston'], currPDerr)
         # Integrator
         simu.PistonPDCommand[it+1] = simu.PistonPDCommand[it] + FT['GainPD']*currPistonPD
     
@@ -3086,6 +3364,7 @@ def populate_hdr(objet, hdr, prefix="",verbose=False):
     supported_types = (str, float, int)
     arrnames=[] ; notsupportednames=[]
     for varname in names:
+
         if isinstance(objet, dict):
             value = objet.get(varname)
         else:
@@ -3105,7 +3384,8 @@ def populate_hdr(objet, hdr, prefix="",verbose=False):
         elif isinstance(value, str):
             if len(value.encode('utf-8')) > 80:
                 value = value.split('/')[-1]
-                hdr[f"{prefix}{varname}"] = value
+                
+            hdr[f"{prefix}{varname}"] = value
                 
         elif isinstance(value, supported_types):
             hdr[f"{prefix}{varname}"] = value
@@ -3126,10 +3406,25 @@ def populate_hdr(objet, hdr, prefix="",verbose=False):
     return hdr, DicoForImageHDU
 
 
-def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
+def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, verbose=False):
+    
+    if verbose:
+        if LightSave:
+            print(f"Saving a part of the data into {filepath}")
+        else:
+            print(f"Saving all data into {filepath}")
+        
+    
+    if os.path.exists(filepath):
+        if not overwrite:
+            if verbose:
+                print(f"{filepath} already exists, and overwrite parameter is False.")
+                print("DATA IS NOT SAVED.")
+            return
     
     hdr = fits.Header()
 
+    """ LOAD CONFIG DATA"""
     hdr, DicoForImageHDU = populate_hdr(configobj, hdr, verbose=verbose)
     
     primary = fits.PrimaryHDU(header=hdr)
@@ -3137,7 +3432,11 @@ def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
     cols=[] ; imhdu=[]
     for key, array in DicoForImageHDU.items():
         
-        if np.ndim(array) == 1:
+        if key=='FS.ichdetails':
+            cols.append(fits.Column(name=key+'.ich', format='I', array=np.array(array)[:,0]))
+            cols.append(fits.Column(name=key+'mod', format='A', array=np.array(array)[:,1]))
+            
+        elif np.ndim(array) == 1:
                 if isinstance(array[0], str):
                     form='A'
                 else:
@@ -3153,6 +3452,8 @@ def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
     for newhdu in imhdu:
         hduL.append(newhdu)
         
+        
+    """ LOAD SIMU DATA"""
     names = dir(simuobj) ; names = [name for name in names if '_' not in name]
     
     excludeddata=[]
@@ -3164,6 +3465,15 @@ def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
     #MicChromPistonData=[] # Will get all arrays of size [NAxNWxNT] 
     #MacChromPistonData=[] # Will get all arrays of size [NAxMWxNT] 
     #ChromCfData=[] # Will get all arrays of size [NBxMWxNT]
+    
+    if LightSave:
+        NamesToSave = ['OPDTrue','GDEstimated','GDResidual',
+                       'PDEstimated','PDResidual',
+                       'ClosurePhaseGD','ClosurePhasePD',
+                       'PistonGDCommand','PistonPDCommand','SearchCommand',
+                       'PistonTrue','EffectiveMoveODL',
+                       'PhotometryEstimated']
+        names = [value for value in names if value in NamesToSave]
     
     for varname in names:
         value = getattr(simuobj, varname)
@@ -3196,16 +3506,16 @@ def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
             print(f"These data couldn't be saved into fits file: {excludeddata}")
     
 
-    hdu = fits.BinTableHDU.from_columns(cols, name='simu')
-    hduL.append(hdu)
+    if len(cols):
+        hdu = fits.BinTableHDU.from_columns(cols, name='simu')
+        hduL.append(hdu)
     
-    t = PandasToTableHDU()
-    hdu = fits.BinTableHDU(t, name="Perf")
+    # t = PandasToTableHDU()
+    # hdu = fits.BinTableHDU(t, name="Perf")
     
     for newhdu in imhduL:
         hduL.append(newhdu)
         
-    print(f'Saving file into {filepath}')
     if '/' in filepath:
         filedir = '/'.join(filepath.split('/')[:-1])    # remove the filename to get the file directory only.
     
@@ -3213,19 +3523,21 @@ def save_data(simuobj, configobj, filepath, overwrite=False, verbose=False):
             os.makedirs(filedir)
             
     if os.path.exists(filepath):
-        if overwrite:
-            os.remove(filepath)
-            hduL.writeto(filepath)
-            hduL.close()
-            filedir=os.getcwd()
+        os.remove(filepath)
+        hduL.writeto(filepath)
+        hduL.close()
+        filedir=os.getcwd()
+        if verbose:
             print("Overwrite on "+os.getcwd().replace('\\','/')+"/"+filepath)
-        else:
-            print(f"{filepath} already exists, and overwrite parameter is False.")
+            
     else:
         hduL.writeto(filepath)
-        print("Write in "+os.getcwd().replace('\\','/')+"/"+filepath)
+        if verbose:
+            print("Write in "+os.getcwd().replace('\\','/')+"/"+filepath)
         
-    print('Saved.')
+    if verbose:
+        print('Saved.')
+    return
     
     
 def PandasToTableHDU(DataFrame_or_Table, direct=True):

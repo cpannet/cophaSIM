@@ -36,6 +36,10 @@ def updateFTparams(verbose=True,**kwargs):
         oldval=config.FT[key]
         config.FT[key] = value
         if verbose:
+            if isinstance(value,str):
+                if "/" in value:
+                    oldval = oldval.split("/")[-1]
+                    value = value.split("/")[-1]
             print(f' - Parameter "{key}" changed from {oldval} to {value}')
     
 
@@ -43,7 +47,7 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
             search=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, Slope=6, Vfactors = [], 
             CPref=True, Ncp = 300, Nvar = 5,cmdOPD=True, switch=1,
             ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,
-            Threshold=True, usePDref=True, useWmatrices=True,
+            Threshold=True, useWmatrices=True,
             latencytime=1,usecupy=False, **kwargs_for_update):
     """
     Uses the measured coherent flux to calculate the new positions to send 
@@ -115,8 +119,6 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         DESCRIPTION. The default is 1.5.
     Threshold : BOOLEAN, optional
         If False, the GD works also within a frange. Essentially for debugging and optimisation of the GD gain.
-    usePDref : BOOLEAN, optional
-        If False, no reference vector
     useWmatrices: BOOLEAN, optional
         Wmatrices means Weighting matrices. If True, the weighting of the commands
         using the SNR of the measurements is used.
@@ -152,7 +154,6 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         config.FT['Threshold'] = Threshold
         config.FT['switch'] = switch
         config.FT['cmdOPD'] = cmdOPD
-        config.FT['usePDref'] = usePDref
         config.FT['useWmatrices'] = useWmatrices
         config.FT['usecupy'] = usecupy
         
@@ -187,32 +188,11 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         
         config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*Slope     # The maximal OPD velocity is equal to slope/frame
         
-        config.FT['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
-        config.FT['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
-        
+
         if usecupy:
             import cupy as cp
             config.FS['sigsky'] = cp.asnumpy(config.FS['sigsky'])  # Background noise
             config.FS['imsky'] = cp.asnumpy(config.FS['imsky'])    # Sky image before observation
-        
-        # if not config.TELref:
-        active_ich = config.FS['active_ich']
-        for ia in range(NA):
-            for iap in range(ia+1,NA):
-                ib = posk(ia,iap,NA)
-                config.FT['Piston2OPD'][ib,ia] = 1*active_ich[ib]
-                config.FT['Piston2OPD'][ib,iap] = -1*active_ich[ib]
-                # config.FT['OPD2Piston'][ia,ib] = 1*active_ich[ib]
-                # config.FT['OPD2Piston'][iap,ib] = -1*active_ich[ib]
-            
-        config.FT['OPD2Piston'] = np.linalg.pinv(config.FT['Piston2OPD'])   # OPD to pistons matrix
-        config.FT['OPD2Piston'][np.abs(config.FT['OPD2Piston'])<1e-15]=0
-        # config.FT['OPistonPD2Piston'] = config.FT['OPD2Piston']/NA
-        
-        if config.TELref:
-            iTELref = config.TELref - 1
-            L_ref = config.FT['OPD2Piston'][iTELref,:]
-            config.FT['OPD2Piston'] = config.FT['OPD2Piston'] - L_ref
         
         return
 
@@ -441,7 +421,7 @@ def CommandCalc(currPD,currGD):
     """
     
     from .config import NA,NIN
-    from .config import FT
+    from .config import FT,FS
     
     it = simu.it            # Frame number
     
@@ -468,8 +448,8 @@ def CommandCalc(currPD,currGD):
         # Raw Weighting matrix in the OPD-space
         
         timerange = range(it+1-Ngd, it+1)
-        simu.SquaredSNRMovingAverage[it] = 1/np.mean(simu.varPD[timerange], axis=0)
-        simu.SquaredSNRMovingAverage2[it] = 1/np.mean(simu.varPD2[timerange], axis=0)
+        simu.SquaredSNRMovingAverage[it] = np.nan_to_num(1/np.mean(simu.varPD[timerange], axis=0))
+        simu.SquaredSNRMovingAverage2[it] = np.nan_to_num(1/np.mean(simu.varPD2[timerange], axis=0))
         
         simu.TemporalVariancePD[it] = np.var(simu.PDEstimated[timerange], axis=0)
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
@@ -480,7 +460,7 @@ def CommandCalc(currPD,currGD):
         Wdiag[reliablebaselines] = 1/varcurrPD[reliablebaselines]
         W = np.diag(Wdiag)
         # Transpose the W matrix in the Piston-space
-        MtWM = np.dot(FT['OPD2Piston'], np.dot(W,FT['Piston2OPD']))
+        MtWM = np.dot(FS['OPD2Piston'], np.dot(W,FS['Piston2OPD']))
         
         # Singular-Value-Decomposition of the W matrix
         U, S, Vt = np.linalg.svd(MtWM)
@@ -500,7 +480,7 @@ def CommandCalc(currPD,currGD):
         VSdagUt = np.dot(V, np.dot(Sdag,Ut))
         
         # Calculates the weighting matrix
-        currIgd = np.dot(FT['Piston2OPD'],np.dot(VSdagUt,np.dot(FT['OPD2Piston'], W)))
+        currIgd = np.dot(FS['Piston2OPD'],np.dot(VSdagUt,np.dot(FS['OPD2Piston'], W)))
     
     
         """
@@ -520,7 +500,7 @@ def CommandCalc(currPD,currGD):
         VSdagUt = np.dot(V, np.dot(Sdag,Ut))
         
         # Calculates the weighting matrix
-        currIpd = np.dot(FT['Piston2OPD'],np.dot(VSdagUt,np.dot(FT['OPD2Piston'], W)))
+        currIpd = np.dot(FS['Piston2OPD'],np.dot(VSdagUt,np.dot(FS['OPD2Piston'], W)))
             
     else:
         currIgd = np.identity(NIN)
@@ -545,8 +525,8 @@ def CommandCalc(currPD,currGD):
         # This situation could pose a problem but we don't manage it yet        
         if (simu.time_since_loss[it] > config.FT['SMdelay']):
             
-            Igdna = np.dot(config.FT['OPD2Piston'],
-                           np.dot(simu.Igd[it],config.FT['Piston2OPD']))
+            Igdna = np.dot(config.FS['OPD2Piston'],
+                           np.dot(simu.Igd[it],config.FS['Piston2OPD']))
             
             # Fringe loss
             simu.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
@@ -682,18 +662,18 @@ def CommandCalc(currPD,currGD):
         simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*currGDerr*config.PDspectra*config.FS['R']/2/np.pi
         
         # From OPD to Pistons
-        uGD = np.dot(FT['OPD2Piston'], simu.GDCommand[it+1])
+        uGD = np.dot(FS['OPD2Piston'], simu.GDCommand[it+1])
         
     else:                       # integrator on Pistons
         # From OPD to Piston
-        currPistonGD = np.dot(FT['OPD2Piston'], currGDerr)*config.PDspectra*config.FS['R']/2/np.pi
+        currPistonGD = np.dot(FS['OPD2Piston'], currGDerr)*config.PDspectra*config.FS['R']/2/np.pi
         # Integrator
         uGD = simu.PistonGDCommand[it+1] + FT['GainGD']*currPistonGD
         
     # simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*currGDerr
     
     # From OPD to Piston
-    # uGD = np.dot(FT['OPD2Piston'], simu.GDCommand[it+1])
+    # uGD = np.dot(FS['OPD2Piston'], simu.GDCommand[it+1])
     
     simu.PistonGDCommand_beforeround[it+1] = uGD
     
@@ -751,11 +731,11 @@ def CommandCalc(currPD,currGD):
         # Integrator
         simu.PDCommand[it+1] = simu.PDCommand[it] + FT['GainPD']*currPDerr*config.PDspectra/2/np.pi
         # From OPD to Pistons
-        uPD = np.dot(FT['OPD2Piston'], simu.PDCommand[it+1])
+        uPD = np.dot(FS['OPD2Piston'], simu.PDCommand[it+1])
         
     else:                       # integrator on Pistons
         # From OPD to Piston
-        currPistonPD = np.dot(FT['OPD2Piston'], currPDerr)*config.PDspectra/2/np.pi
+        currPistonPD = np.dot(FS['OPD2Piston'], currPDerr)*config.PDspectra/2/np.pi
         # Integrator
         uPD = simu.PistonPDCommand[it] + FT['GainPD']*currPistonPD
     
@@ -908,7 +888,7 @@ def getvar():
     return varPD
 
 
-def SetThreshold():
+def SetThreshold(manual=False, scan=False,scanned_tel=6):
     """
     This function enables to estimate the threshold GD for the state-machine.
     It scans the coherence envelop of the FS and displays the estimated SNR².
@@ -920,37 +900,135 @@ def SetThreshold():
         The user can choose the value to return regarding the SNR evolution.
 
     """
-
-
     from cophasing import skeleton as sk
-    
-    datadir2 = "C:/Users/cpannetier/Documents/These/FringeTracking/Python/Simulations/data/disturbances/"
+    from cophasing import config
 
-    R=config.FS['R']
+    if scan:
+
+        datadir2 = "C:/Users/cpannetier/Documents/These/FringeTracking/Python/Simulations/data/disturbances/"
     
-    if R < 50:
-        DisturbanceFile = datadir2 + 'EtudeThreshold/scan120micron_tel6.fits'
-        NT=500
-    else:
-        DisturbanceFile = datadir2 + 'EtudeThreshold/scan240micron_tel6.fits'
-        NT=1000
+        R=config.FS['R']
         
-    InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
+        if R < 50:
+            DisturbanceFile = datadir2 + 'EtudeThreshold/scan120micron_tel6.fits'
+            NT=500
+        else:
+            DisturbanceFile = datadir2 + 'EtudeThreshold/scan240micron_tel6.fits'
+            NT=1000
+            
+        InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
+        
+        sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT)
+        
+        # Initialize the fringe tracker with the gain
+        from cophasing.SPICA_FT import SPICAFT, updateFTparams
+        #SPICAFT(init=True, GainPD=0, GainGD=0,search=False)
+        gainPD,gainGD,search=config.FT['GainPD'],config.FT['GainGD'],config.FT['search']
+        updateFTparams(GainPD=0, GainGD=0, search=False)
+        
+        # Launch the scan
+        sk.loop()
+        
+        if manual:
+            sk.display('snr',wl=1.6, pause=True)
+            test1 = input("Set all threshold to same value? [y/n]")
+            if (test1=='y') or (test1=='yes'):    
+                newThresholdGD = float(input("Set the Threshold GD: "))
+            elif (test1=='n') or (test1=='no'):
+                newThresholdGD=np.ones(config.NIN)
+                for ib in range(config.NIN):
+                    newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
+            else:
+                raise ValueError("Please answer by 'y','yes','n' or 'no'")
+                
+        else:
+            from cophasing import simu,coh_tools
+            
+            InstantaneousSquaredSNR=1/simu.varPD
+            
+            scanned_baselines = [coh_tools.posk(ia,scanned_tel-1,config.NA) for ia in range(config.NA-1)]
+            k=0;ib=scanned_baselines[k]
+            while not config.FS['active_ich'][ib]:
+                k+=1
+                ib = scanned_baselines[k]
+                
+            Lc = R*config.PDspectra
+            
+            ind=np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
+            
+            newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
+                
+            config.FT['ThresholdGD'] = newThresholdGD
+            
+            sk.display('snr',wl=1.6, pause=True)
+            #print(f"The threshold is set to {newThresholdGD}")
+            
+        sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
+        updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, ThresholdGD=newThresholdGD)
     
-    sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT)
     
-    # Initialize the fringe tracker with the gain
-    from cophasing.SPICA_FT import SPICAFT
-    SPICAFT(init=True, GainPD=0, GainGD=0)
+    else:
+        
+        DisturbanceFile = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/disturbances/NoDisturbances/NoDisturbances.fits"
     
-    # Launch the scan
-    sk.loop()
+        #R=config.FS['R']
+        
+        #DisturbanceFile = datadir2 + 'EtudeThreshold/scan120micron_tel6.fits'
+        NT=200
+            
+        InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
+        
+        sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT)
+        
+        # Initialize the fringe tracker with the gain
+        from cophasing.SPICA_FT import SPICAFT, updateFTparams
+        #SPICAFT(init=True, GainPD=0, GainGD=0,search=False)
+        gainPD,gainGD,search=config.FT['GainPD'],config.FT['GainGD'],config.FT['search']
+        updateFTparams(GainPD=0, GainGD=0, search=False)
+        
+        # Launch the scan
+        sk.loop()
+        
+        if manual:
+            sk.display('snr',wl=1.6, pause=True)
+            test1 = input("Set all threshold to same value? [y/n]")
+            if (test1=='y') or (test1=='yes'):    
+                newThresholdGD = float(input("Set the Threshold GD: "))
+            elif (test1=='n') or (test1=='no'):
+                newThresholdGD=np.ones(config.NIN)
+                for ib in range(config.NIN):
+                    newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
+            else:
+                raise ValueError("Please answer by 'y','yes','n' or 'no'")
+                
+        else:
+            from cophasing import simu,coh_tools
+            
+            # InstantaneousSquaredSNR=1/simu.varPD
+            
+            # scanned_baselines = [coh_tools.posk(ia,scanned_tel-1,config.NA) for ia in range(config.NA-1)]
+            # k=0;ib=scanned_baselines[k]
+            # while not config.FS['active_ich'][ib]:
+            #     k+=1
+            #     ib = scanned_baselines[k]
+                
+            # Lc = R*config.PDspectra
+            
+            ind=100#np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
+            
+            newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
+            newThresholdPD = np.min(newThresholdGD)
+            
+            config.FT['ThresholdGD'] = newThresholdGD
+            sk.display('snr',wl=1.6, pause=True)
+            #print(f"The threshold is set to {newThresholdGD}")
+            
+        sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
+        updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
+                       ThresholdGD=newThresholdGD, ThresholdPD=newThresholdPD)
     
-    sk.display('state',wl=1.6, pause=True)
+    return newThresholdGD
 
-    sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
-    
-    return float(input("Set the Threshold GD: "))
     
 
 def getvarcupy():

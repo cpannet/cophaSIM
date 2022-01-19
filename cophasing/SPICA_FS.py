@@ -77,12 +77,13 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
                   [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
         
-        ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14]
+        ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14] ; NIN=15
             
         config.FS['func'] = SPICAFS_PERFECT
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
         config.FS['active_ich'] = np.ones_like(ichorder)
+        config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         NG = np.shape(ich)[0]       # should always be equal to NIN
         
@@ -90,7 +91,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         
         M_ABCD = ABCDmod()          # A2P ABCD modulation
         NMod = len(M_ABCD)          # Number of modulations for each baseline
-        config.FS['Modulations'] = ['A','B','C','D']
+        config.FS['Modulation'] = 'ABCD'
         ABCDind = [0,1,2,3]
         config.FS['ABCDind'] = ABCDind
         NP = NMod*NG
@@ -253,7 +254,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         
         M_ABCD = realisticABCDmod(phaseshifts, transmissions)          # A2P ABCD modulation
         NMod = len(M_ABCD)          # Number of modulations for each baseline
-        config.FS['Modulations'] = ['A','B','C','D']
+        config.FS['Modulation'] = ['A','B','C','D']
         ABCDind = [0,1,2,3]
         config.FS['ABCDind'] = ABCDind
         config.FS['Phaseshifts'] = [k*np.pi/2 for k in phaseshifts]
@@ -312,6 +313,8 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        config.FS['active_ich'] = np.ones(NIN)
+        config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         return
     
@@ -359,7 +362,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
 def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
     """
     Init: Reads the fitsfile and load the different parameters NP, ich, T, 
-    Modulations, spectra into the config module.
+    Modulation, spectra into the config module.
     Run: Takes true current Coherent Flux, calculates the image, add noise 
     and estimates noisy Coherent Flux.
 
@@ -433,13 +436,13 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         config.FS['func'] = SPICAFS_TRUE
         # We read the interferometric channels indices and modulation patterns
         ichraw = detectordico['BEAM_INDEX']
-        # Modulations = list(detectordico['ABCD_INDEX'][:4])
-        Modulations = ['B','D','A','C']
+        # Modulation = list(detectordico['ABCD_INDEX'][:4])
+        Modulation = 'BDAC'
         ABCDind = [2,0,3,1]
-        NMod = len(Modulations)
+        NMod = len(Modulation)
         NP = len(ichraw)
         
-        config.FS['Modulations'] = Modulations
+        config.FS['Modulation'] = Modulation
         config.FS['ABCDind'] = ABCDind
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
@@ -453,6 +456,8 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             ichorder[ibconventional] = ib
             
         config.FS['ichorder'] = ichorder
+        config.FS['active_ich'] = np.ones(NIN)
+        config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         OrderingIndex = np.zeros(NP,dtype=np.int8)
         for ib in range(NIN):
@@ -713,11 +718,11 @@ def SPICAFS_TRUE2(*args, init=False, OW=10, wlinfo=False, **kwargs):
         
         # We read the interferometric channels indices and modulation patterns
         ichraw = detectordico['BEAM_INDEX']
-        Modulations = list(detectordico['ABCD_INDEX'][:4])
-        NMod = len(Modulations)
+        Modulation = ''.join(list(detectordico['ABCD_INDEX'][:4]))
+        NMod = len(Modulation)
         NP = len(ichraw)
         
-        config.FS['Modulations'] = Modulations
+        config.FS['Modulation'] = Modulation
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
         config.FS['ich'] = np.array([(ichraw[i]) for i in range(0,NP,NMod)])

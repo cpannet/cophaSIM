@@ -24,6 +24,7 @@ timestamps = np.arange(NT)*dt
 
 # Coherent flux [NB] - Most general formalism: contains photometries information
 CoherentFluxObject = np.zeros([NW, NB])*1j      # Object coherent flux
+VisibilityObject = np.zeros([NW, NB])*1j      # Object Visibility
 CfDisturbance = np.zeros([NT, NW, NB])*1j       # Disturbance coherent flux
 CfTrue = np.zeros([NT, NW, NB])*1j              # True coherent flux
 CfEstimated = np.zeros([NT, MW, NB])*1j         # Estimated coherent flux
@@ -124,6 +125,7 @@ TempVarGD = np.zeros([NIN])
 VarCPD = np.zeros([NC])
 VarCGD =np.zeros([NC])
 SNRSI=np.zeros([NIN])
+VarPiston = np.zeros([NA])
 
 # Investigation Variables
 

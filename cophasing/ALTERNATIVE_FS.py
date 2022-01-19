@@ -25,9 +25,51 @@ from . import tol_colors as tc
 colors=tc.tol_cset('muted')
 
 
-def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=np.ones([3,3])/np.sqrt(2), modulation='ABCD', clean_up=False, display=False, savedir='',ArrayDetails=0):
+
+NA=6
+d0=(np.ones([NA,NA])-np.identity(NA))/5
+
+d1 = np.array([[0,1/2,0,1/2,0,0],
+                  [1/6,0,0,1/3,1/6,1/3],
+                  [0,0,0,1/2,0,1/2],
+                  [1/6,1/3,1/6,0,0,1/3],
+                  [0,1/2,0,0,0,1/2],
+                  [0,1/3,1/6,1/3,1/6,0]])
+
+d2 = np.array([[0,1/2,0,1/2,0,0],
+                  [1/4,0,0,1/4,1/4,1/4],
+                  [0,0,0,1/2,0,1/2],
+                  [1/4,1/4,1/4,0,0,1/4],
+                  [0,1/2,0,0,0,1/2],
+                  [0,1/4,1/4,1/4,1/4,0]])
+
+d3 = np.array([[0,1/3,1/3,0,1/3,0],
+                  [1/3,0,0,1/3,0,1/3],
+                  [1/3,0,0,1/3,1/3,0],
+                  [0,1/3,1/3,0,0,1/3],
+                  [1/3,0,1/3,0,0,1/3],
+                  [0,1/3,0,1/3,1/3,0]])
+
+d4 = np.array([[0,1/3,0,1/3,0,1/3],
+               [1/3,0,1/3,0,1/3,0],
+               [0,1/3,0,1/3,0,1/3],
+               [1/3,0,1/3,0,1/3,0],
+               [0,1/3,0,1/3,0,1/3],
+               [1/3,0,1/3,0,1/3,0]])
+
+descriptions = {"PW6-15-10":d0, "PW6-9-4a":d1,"PW6-9-4b":d2,"PW6-9-2":d3,"PW6-9-0":d4}
+
+
+
+
+def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', description='PW6-15-10', modulation='ABCD', clean_up=False, display=False, savedir='',ext='pdf',ArrayDetails=0):
     
     if init:
+        if isinstance(description,str):
+            if not len(name):
+                name=description
+            description = descriptions[description]
+        
         NA=np.shape(description)[0] ; NIN=NA*(NA-1)//2
         
         d=np.zeros([NIN,2])     # Transmissions basewise in amplitude
@@ -59,9 +101,30 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=np.one
       
         NP, NA = np.shape(A2P)
         
+        config.FS['name'] = name
         config.FS['func'] = PAIRWISE
         config.FS['ich'] = ich
         config.FS['active_ich'] = active_ich
+        config.FS['description'] = description
+        
+        if not ArrayDetails:
+            raise Exception("No interferometric array has been given so we can't display the combination architecture.")
+        
+        InterfArray=ct.get_array(name=ArrayDetails)
+        PhotometricSNR = np.ones(NIN)
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib=ct.posk(ia,iap,NA)
+                x2,y2 = InterfArray.TelCoordinates[iap,:2]
+                T1=d[ib][0] ; T2=d[ib][1]
+                if T1 or T2:
+                    PhotometricCoherence = 2*np.sqrt(T1*T2)/(T1+T2)
+                else:
+                    PhotometricCoherence=0
+                UncoherentPhotometry = (T1+T2)*(NA-1) # Normalised by the maximal photometry
+                PhotometricSNR[ib] = UncoherentPhotometry * PhotometricCoherence**2  # SNR on the squared visibility measurement
+        
+        config.FS['PhotometricSNR'] = PhotometricSNR  # TV² of the baselines normalised by its value for equal repartition on all baselines.
         config.FS['Modulation'] = modulation
         config.FS['ABCDind'] = ModulationIndices
         config.FS['NMod'] = NMod
@@ -73,6 +136,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=np.one
         V2PM = ct.MakeV2PfromA2P(A2P)
         
         P2VM = np.linalg.pinv(V2PM)
+        P2VM[np.abs(P2VM)<1e-10]=0
         
         NW, MW = len(spectra), len(spectraM)
         
@@ -95,13 +159,26 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=np.one
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
         
+        config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
+        config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = ct.posk(ia,iap,NA)
+                if active_ich[ib]:
+                    config.FS['Piston2OPD'][ib,ia] = 1
+                    config.FS['Piston2OPD'][ib,iap] = -1
+            
+        config.FS['OPD2Piston'] = np.linalg.pinv(config.FS['Piston2OPD'])   # OPD to pistons matrix
+        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-15]=0
+        # config.FT['OPistonPD2Piston'] = config.FT['OPD2Piston']/NA
+        
+        if config.TELref:
+            iTELref = config.TELref - 1
+            L_ref = config.FS['OPD2Piston'][iTELref,:]
+            config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+        
         if display:
-            
-            if not ArrayDetails:
-                print("No interferometric array has been given so we can't display the combination architecture.")
-                return
-            
-            InterfArray=ct.get_array(name=ArrayDetails)
             
             plt.rcParams['figure.figsize']=(16,12)
             font = {'family' : 'DejaVu Sans',
@@ -119,7 +196,10 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=np.one
                     ib=ct.posk(ia,iap,NA)
                     x2,y2 = InterfArray.TelCoordinates[iap,:2]
                     T1=d[ib][0] ; T2=d[ib][1]
-                    PhotometricCoherence = 2*np.sqrt(T1*T2)/(T1+T2)
+                    if T1 or T2:
+                        PhotometricCoherence = 2*np.sqrt(T1*T2)/(T1+T2)
+                    else:
+                        PhotometricCoherence=0
                     UncoherentPhotometry = T1*T2*(NA-1) # Normalised by the maximal photometry
                     PhotometricSNR = UncoherentPhotometry * PhotometricCoherence
                     if T1*T2:
@@ -134,7 +214,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, description=np.one
                 if not os.path.exists(savedir):
                     os.makedirs(savedir, exist_ok=True)
                 
-                fig.savefig(savedir+'CombinationArchitecture.pdf')
+                fig.savefig(savedir+f'CombinationArchitecture.{ext}')
         
         return
 
@@ -335,6 +415,9 @@ given in config ({NA}).")
         config.FS['Dc'] = Dc
         config.FS['PSDwindow'] = PSDwindow
         config.FS['Tphot'] = Tphot ; config.FS['Tint'] = Tint
+        config.FS['description'] = (np.ones([NA,NA]) - np.identity(NA))/(NA-1)
+        config.FS['active_ich'] = np.ones(NIN)
+        config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)

@@ -259,7 +259,7 @@ latency = 1                 # Latency in number of frames
 
 # Piston Calculator dictionnary
 FT = {'Name':'integrator',
-      'GainPD':0.5}              # Distance between spectral channels for GD calc
+      'GainPD':0,'GainGD':0,'search':False}              # Distance between spectral channels for GD calc
     
 
 # Simulation parameters
@@ -267,7 +267,7 @@ FT = {'Name':'integrator',
 # ich=np.array([NP,2])        # For display only: bases correspondances on pixels
 TELref=0            # For display only: reference delay line
 newfig=0
-timestamp = np.arange(NT)*dt       # Timestamps in [ms]
+timestamps = np.arange(NT)*dt       # Timestamps in [ms]
 
 # a_dict={}
 
