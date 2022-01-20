@@ -111,7 +111,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
             raise Exception("No interferometric array has been given so we can't display the combination architecture.")
         
         InterfArray=ct.get_array(name=ArrayDetails)
-        PhotometricSNR = np.ones(NIN)
+        PhotometricBalance = np.ones(NIN)
         for ia in range(NA):
             for iap in range(ia+1,NA):
                 ib=ct.posk(ia,iap,NA)
@@ -122,9 +122,12 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                 else:
                     PhotometricCoherence=0
                 UncoherentPhotometry = (T1+T2)*(NA-1) # Normalised by the maximal photometry
-                PhotometricSNR[ib] = UncoherentPhotometry * PhotometricCoherence**2  # SNR on the squared visibility measurement
+                # PhotometricBalance = N.rho où N=I1*I2 et rho = 2sqrt(I1I2)/(I1+I2)
+                # Et on écrit I1 = T1*(N-1) pour que si T1=1/(N-1) (cas équilibré) I1=1
+                # et donc SNR=1
+                PhotometricBalance[ib] = (T1*T2)
         
-        config.FS['PhotometricSNR'] = PhotometricSNR  # TV² of the baselines normalised by its value for equal repartition on all baselines.
+        config.FS['PhotometricBalance'] = PhotometricBalance  # TV of the baselines normalised by its value in case of equal repartition on all baselines.
         config.FS['Modulation'] = modulation
         config.FS['ABCDind'] = ModulationIndices
         config.FS['NMod'] = NMod
@@ -201,14 +204,13 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                     else:
                         PhotometricCoherence=0
                     UncoherentPhotometry = T1*T2*(NA-1) # Normalised by the maximal photometry
-                    PhotometricSNR = UncoherentPhotometry * PhotometricCoherence
+                    PhotometricBalance = UncoherentPhotometry * PhotometricCoherence
                     if T1*T2:
                         ax.plot([x1,x2],[y1,y2],color=colors[0],linestyle='-',linewidth=5*PhotometricCoherence)
                         ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
             ax.set_xlim([-210,160]) ; ax.set_ylim([-50,350])
-            fig.suptitle("All baselines")
             
             if len(savedir):
                 if not os.path.exists(savedir):
@@ -417,7 +419,7 @@ given in config ({NA}).")
         config.FS['Tphot'] = Tphot ; config.FS['Tint'] = Tint
         config.FS['description'] = (np.ones([NA,NA]) - np.identity(NA))/(NA-1)
         config.FS['active_ich'] = np.ones(NIN)
-        config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
+        config.FS['PhotometricBalance'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)

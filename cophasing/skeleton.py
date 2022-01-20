@@ -93,6 +93,8 @@ SOURCE:
 
     InterfArray = coh_tools.get_array(name=Interferometer)
 
+    Obs, Target = coh_tools.get_ObsInformation(ObsFile)
+
     NA=InterfArray.NA
     # Redundant number of baselines
     NB = NA**2
@@ -140,6 +142,8 @@ SOURCE:
     
     # Observation parameters
     config.ObservationFile = ObsFile
+    config.Obs = Obs
+    config.Target = Target
     config.InterfArray = InterfArray
     config.DisturbanceFile = DisturbanceFile
     config.piston_average = piston_average
@@ -1076,8 +1080,10 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     
     
         
-def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
-            OneTelescope=True, pause=False, display=True,savedir='',ext='pdf'):
+def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
+            Pistondetails=False,OPDdetails=False,
+            OneTelescope=True, pause=False, display=True,
+            savedir='',ext='pdf'):
     
     '''
     NAME:
@@ -1134,7 +1140,7 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     if (len(savedir)) and (not os.path.exists(savedir)):
         os.makedirs(savedir)
     
-    ind = np.argmin(np.abs(config.spectraM-wl))
+    ind = np.argmin(np.abs(config.spectraM-WLOfTrack))
     wl = config.spectraM[ind]
     
     from .config import NA,NT,NIN,OW, SimuTimeID
@@ -1152,8 +1158,31 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
     if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
     stationaryregim = np.arange(stationaryregim_start,NT)
     
-    DIT = min(50, config.NT - config.starttracking -1)
-    ShowPerformance(float(timestamps[stationaryregim_start]), wl, DIT, display=False)
+    effDIT = min(DIT, config.NT - config.starttracking -1)
+    ShowPerformance(float(timestamps[stationaryregim_start]), WLOfScience, effDIT, display=False)
+    
+    
+    SS = 12     # Small size
+    MS = 14     # Medium size
+    BS = 16     # Big size
+    figsize = (16,8)
+    rcParamsForBaselines = {"font.size":SS,
+           "axes.titlesize":SS,
+           "axes.labelsize":MS,
+           "axes.grid":True,
+           
+           "xtick.labelsize":SS,
+           "ytick.labelsize":SS,
+           "legend.fontsize":SS,
+           "figure.titlesize":BS,
+           "figure.constrained_layout.use": False,
+           "figure.figsize":figsize,
+           'figure.subplot.hspace': 0.05,
+           'figure.subplot.wspace': 0,
+           'figure.subplot.left':0.1,
+           'figure.subplot.right':0.95
+           }
+    
     
     print('Displaying observables...')
     print(f'First fig is Figure {config.newfig}')
@@ -1384,28 +1413,6 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
 
 
     if displayall or ('perftable' in args):
-        
-        SS = 12     # Small size
-        MS = 14     # Medium size
-        BS = 16     # Big size
-        figsize = (16,8)
-        rcParamsForBaselines = {"font.size":SS,
-               "axes.titlesize":SS,
-               "axes.labelsize":MS,
-               "axes.grid":True,
-               
-               "xtick.labelsize":SS,
-               "ytick.labelsize":SS,
-               "legend.fontsize":SS,
-               "figure.titlesize":BS,
-               "figure.constrained_layout.use": False,
-               "figure.figsize":figsize,
-               'figure.subplot.hspace': 0.05,
-               'figure.subplot.wspace': 0,
-               'figure.subplot.left':0.1,
-               'figure.subplot.right':0.95
-               }
-    
     
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
@@ -1519,6 +1526,88 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             print("Saving perftable figure.")
             plt.savefig(savedir+f"Simulation{timestr}_perftable.{ext}")
 
+
+    if displayall or ('perfarray' in args):
+        
+        from .config import InterfArray
+        from .tol_colors import tol_cmap as tc
+        import matplotlib as mpl
+        
+        plt.rcParams.update(rcParamsForBaselines)
+        
+        #visibilities, _,_,_=coh_tools.VanCittert(WLOfScience,config.Obs,config.Target)
+        #simu.VisibilityAtPerfWL = visibilities
+        visibilities = coh_tools.NB2NIN(simu.VisibilityObject[ind])
+        vismod = np.abs(visibilities) ; visangle = np.angle(visibilities)
+        PhotometricBalance = config.FS['PhotometricBalance']
+        
+        cm = tc('rainbow_PuRd').reversed() ; Nnuances = 256
+        
+        # plt.rcParams['figure.figsize']=(16,12)
+        # font = {'family' : 'DejaVu Sans',
+        #         'weight' : 'normal',
+        #         'size'   : 22}
+        
+        # plt.rc('font', **font)
+        fig,(ax1,ax2)=plt.subplots(ncols=2, sharex=True, sharey=True)
+        ax1.set_title(f"Target visibility and photometric balance ({wl:.3}µm)")
+        ax2.set_title(f"Fringe contrast and Time on central fringe ({WLOfScience:.3}µm)")
+        
+        for ia in range(NA):
+            name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+            ax1.scatter(x1,y1,color='k',linewidth=10)
+            ax1.annotate(name1, (x1+6,y1+1),color="k")
+            ax1.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+            for iap in range(ia+1,NA):
+                ib=coh_tools.posk(ia,iap,NA)
+                x2,y2 = InterfArray.TelCoordinates[iap,:2]
+                if PhotometricBalance[ib]>0:
+                    ls = (0,(10*PhotometricBalance[ib]/np.max(PhotometricBalance),10*(1-PhotometricBalance[ib]/np.max(PhotometricBalance))))
+                    im=ax1.plot([x1,x2],[y1,y2],linestyle=ls,
+                            linewidth=3,
+                            color=cm(int(vismod[ib]*Nnuances)))
+                else:
+                    im=ax1.plot([x1,x2],[y1,y2],linestyle=ls,
+                            linewidth=1,
+                            color=cm(int(vismod[ib]*Nnuances)))
+        ax1.set_xlabel("X [m]")
+        ax1.tick_params(labelleft=False)
+        
+        for ia in range(NA):
+            name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+            ax2.scatter(x1,y1,color='k',linewidth=10)
+            ax2.annotate(name1, (x1+6,y1+1),color="k")
+            ax2.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+            for iap in range(ia+1,NA):
+                ib=coh_tools.posk(ia,iap,NA)
+                x2,y2 = InterfArray.TelCoordinates[iap,:2]
+                ls = (0,(10*simu.LR3[ib],10*(1-simu.LR3[ib])))
+                if PhotometricBalance[ib]>0:
+                    im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+                            linewidth=3,
+                            color=cm(int(simu.FringeContrast[ib]*Nnuances)))
+                else:
+                    im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+                            linewidth=1,
+                            color=cm(int(simu.FringeContrast[ib]*Nnuances)))
+        ax2.set_xlabel("X [m]")
+        ax2.set_ylabel("Y [m]")
+        ax2.set_xlim([-210,160]) ; ax2.set_ylim([-50,350])
+        # fig.subplots_adjust(right=0.8)
+        # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        # mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+        #                           orientation='vertical',
+        #                           label=f"Fringe Contrast at {WLOfScience:.3}µm")
+
+
+        
+        fig.subplots_adjust(bottom=0.2)
+        cbar_ax = fig.add_axes([0.1, 0.05, 0.85, 0.05])
+        mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+                                  orientation='horizontal')
+
+
+
     if displayall or ('opd' in args):
         """
         OPD 
@@ -1624,27 +1713,6 @@ def display(*args, wl=1.6,Pistondetails=False,OPDdetails=False,
             plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
         
     if displayall or ('opd3' in args):
-        SS = 12     # Small size
-        MS = 14     # Medium size
-        BS = 16     # Big size
-        figsize = (16,8)
-        rcParamsForBaselines = {"font.size":SS,
-               "axes.titlesize":SS,
-               "axes.labelsize":MS,
-               "axes.grid":True,
-               
-               "xtick.labelsize":SS,
-               "ytick.labelsize":SS,
-               "legend.fontsize":SS,
-               "figure.titlesize":BS,
-               "figure.constrained_layout.use": False,
-               "figure.figsize":figsize,
-               'figure.subplot.hspace': 0.05,
-               'figure.subplot.wspace': 0,
-               'figure.subplot.left':0.1,
-               'figure.subplot.right':0.95
-               }
-    
     
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
@@ -2440,11 +2508,18 @@ WavelengthOfInterest
     from .config import NA,NIN,NC,dt,NT
     
     WOI = WavelengthOfInterest
-    if isinstance(WOI, (float,np.float32,np.float64)):
-        WOI = [WOI]    
-    NW = len(WOI) 
-    
-    Lc = R*WOI      # Vector
+    MultiWavelength = False
+    if hasattr(WOI, 'len'): # test if it is a list or array.
+        NW = len(WOI)
+        if NW >1:
+            MultiWavelength = True
+        else:
+            WOI = WOI[0]
+            MultiWavelength = False
+    else:
+        NW=1
+        
+    Lc = R*WOI      # Vector or float
     
     DIT_NumberOfFrames = int(DIT/dt)
     
@@ -2458,8 +2533,11 @@ WavelengthOfInterest
         raise '"TimeBonds" must be instance of (float,int,np.ndarray,list)'
         
    
-    simu.FringeContrast=np.zeros([NW,NIN])      # Fringe Contrast at given wavelengths [0,1]
-    simu.CoherenceEnvelopModulation = np.zeros([NW,NIN]) # Contrast loss due to spectral dispersion.
+    if MultiWavelength:
+        simu.FringeContrast=np.zeros([NW,NIN])  # Fringe Contrast at given wavelengths [0,1]
+    else:
+        simu.FringeContrast=np.zeros(NIN)       # Fringe Contrast at given wavelengths [0,1]
+
     simu.VarOPD=np.zeros(NIN)
     simu.VarPiston=np.zeros(NA)
     simu.TempVarPD=np.zeros(NIN) ; simu.TempVarGD=np.zeros(NIN)
@@ -2498,13 +2576,19 @@ WavelengthOfInterest
         simu.VarCGD += 1/Ndit*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
         
         # Fringe contrast
-        for iw in range(NW):
-            wl = WOI[iw]
+        if MultiWavelength:
+            for iw in range(NW):
+                wl = WOI[iw]
+                for ib in range(NIN):
+                    CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
+                    Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
+                    simu.FringeContrast[iw,ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
+        else:
             for ib in range(NIN):
-                CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
-                Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
-                simu.FringeContrast[iw,ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
-        
+                CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc)
+                Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/WOI)
+                simu.FringeContrast[ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
+
         InFrame += DIT_NumberOfFrames
         
     simu.LockedRatio = np.mean(simu.PhaseStableEnough,axis=0)

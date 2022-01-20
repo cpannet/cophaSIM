@@ -542,14 +542,17 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     
     # baselines = np.transpose(basedist)*np.sin(altitude-basealtaz[:,0])
     
+    if not hasattr(spectra,'len'):
+        spectra = [spectra]
+    
     NW = len(spectra)
+    
     # Projection baselines on the u,v coordinates (oriented with the star north-east)
     chara_uv = np.zeros([NW,NIN,2])
     for iw in range(NW):
         lmbda=spectra[iw]
-        chara_uv[iw,:,0] = B_Ep/lmbda#np.dot(basecoords[0], np.transpose(u_Sp))/lmbda #baselines*np.dot(basecoords, np.transpose(u_Np))/lmbda
-        chara_uv[iw,:,1] = B_Np/lmbda#baselines*np.dot(basecoords, np.transpose(u_Ep))/lmbda
-        #chara_uv[iw,:,1] = baselines*np.sin(azimuth-basealtaz[:,1])/lmbda
+        chara_uv[iw,:,0] = B_Ep/lmbda
+        chara_uv[iw,:,1] = B_Np/lmbda
     
     # Conversion functions
     mas2rad = lambda mas : 1/3600*1e-3*np.pi/180*mas
@@ -625,6 +628,9 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
             import time
             timestr = time.strftime("%Y%m%d-%H%M%S")
             plt.savefig(savedir+f"UVplane{timestr}.{ext}")
+    
+    if NW==1:
+        visibilities = visibilities[0]
     
     return visibilities, chara_uv, uv_plane, UVcoords
 
@@ -879,6 +885,7 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
         
         hdr['Filepath'] = savingfilepath.split('/')[-1]
         hdr['ARRAY'] = Obs.ArrayName
+        hdr['AltAz'] = Obs.AltAz
         hdr['Target'] = Target.Name
         hdr['NA'] = NA
         hdr['NIN'] = NIN
@@ -887,7 +894,7 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
         hdr['DWAVE'] = spectra[1] - spectra[0]
     
         for attr in vars(Target).keys():
-            if type(getattr(Target, attr)) is not dict:            
+            if type(getattr(Target, attr)) is not dict:    
                 if attr not in ['Name','Filepath', 'Phases']:
                     hdr[attr] = getattr(Target, attr)
             else:
@@ -928,6 +935,48 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
         hdu.writeto(savingfilepath)
     
     return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
+
+
+def get_ObsInformation(ObservationFile):
+    
+    from .config import ScienceObject, Observation
+    from astropy.io import fits
+    
+        
+    hdul = fits.open(ObservationFile)
+    hdr=hdul['PRIMARY'].header
+    
+    Target = ScienceObject()
+    Obs = Observation()
+    
+    Objects = list(dict.fromkeys([x[4] for x in hdr.keys() if 'Star' in x]))
+    for No in Objects:
+        currentobject = f"Star{No}"
+        attributes = [x.split('_')[1] for x in hdr.keys() if currentobject in x]
+        StarCharacteristics={}
+        for attr in attributes:
+            if attr=='alpha':
+                if 'Position' not in StarCharacteristics.keys():
+                    StarCharacteristics['Position']=[0,0]
+                StarCharacteristics['Position'][0]=hdr[currentobject+f"_{attr}"]
+            elif attr=='beta':
+                if 'Position' not in StarCharacteristics.keys():
+                    StarCharacteristics['Position']=(0,0)
+                StarCharacteristics['Position'][1]=hdr[currentobject+f"_{attr}"]
+            else:
+                StarCharacteristics[attr]=hdr[currentobject+f"_{attr}"]
+                #setattr(dico,attr,hdr[currentobject+f"_{attr}"])
+        setattr(Target, f"Star{No}",StarCharacteristics)
+    
+    Target.Name = hdr['TARGET']
+    Obs.ArrayName = hdr['ARRAY']
+    Obs.Filepath = hdr['Filepath']
+    if 'AltAz' in hdr.keys():
+        Obs.AltAz = hdr['AltAz']
+    else:
+        Obs.AltAz = (90,0)
+        
+    return Obs, Target
 
 
 def get_CfObj(filepath, spectra):
