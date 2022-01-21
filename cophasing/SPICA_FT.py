@@ -355,19 +355,19 @@ def ReadCf(currCfEstimated):
     for ia in range(NA):
         for iap in range(ia+1,NA):
             ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
-            valid1=config.FS['active_ich'][ib]
+            valid1=(config.FS['active_ich'][ib] and simu.TrackedBaselines[ib])
             cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
             cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
             cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
             for iapp in range(iap+1,NA):
                 ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-                valid2=config.FS['active_ich'][ib]
+                valid2=(config.FS['active_ich'][ib] and simu.TrackedBaselines[ib])
                 cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
                 ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-                valid3=config.FS['active_ich'][ib]
+                valid3=(config.FS['active_ich'][ib] and simu.TrackedBaselines[ib])
                 cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
@@ -455,6 +455,7 @@ def CommandCalc(currPD,currGD):
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
         
         reliablebaselines = (simu.SquaredSNRMovingAverage[it,:] >= FT['ThresholdGD']**2)
+        simu.TrackedBaselines[it] = reliablebaselines
         
         Wdiag=np.zeros(NIN)
         Wdiag[reliablebaselines] = 1/varcurrPD[reliablebaselines]
@@ -930,7 +931,7 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
         sk.loop()
         
         if manual:
-            sk.display('snr',wl=1.6, pause=True)
+            sk.display('snr',WLOfTrack=1.6, pause=True)
             test1 = input("Set all threshold to same value? [y/n]")
             if (test1=='y') or (test1=='yes'):    
                 newThresholdGD = float(input("Set the Threshold GD: "))
@@ -960,7 +961,7 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
                 
             config.FT['ThresholdGD'] = newThresholdGD
             
-            sk.display('snr',wl=1.6, pause=True)
+            sk.display('snr',WLOfTrack=1.6, pause=True)
             #print(f"The threshold is set to {newThresholdGD}")
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
@@ -990,7 +991,7 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
         sk.loop()
         
         if manual:
-            sk.display('snr',wl=1.6, pause=True)
+            sk.display('snr',WLOfTrack=1.6, pause=True)
             test1 = input("Set all threshold to same value? [y/n]")
             if (test1=='y') or (test1=='yes'):    
                 newThresholdGD = float(input("Set the Threshold GD: "))
@@ -1020,7 +1021,7 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
             newThresholdPD = np.min(newThresholdGD)
             
             config.FT['ThresholdGD'] = newThresholdGD
-            sk.display('snr',wl=1.6, pause=True)
+            sk.display('snr',WLOfTrack=1.6, pause=True)
             #print(f"The threshold is set to {newThresholdGD}")
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
