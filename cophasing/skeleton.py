@@ -2373,25 +2373,87 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             
 
     if 'snr' in args:
-        InstantaneousSquaredSNR=np.nan_to_num(1/simu.varPD)
-        ylim=[1e-1,np.max(InstantaneousSquaredSNR)]
-        # State-Machine and SNR
-        fig = plt.figure("SNR²")
-        fig.suptitle("SNR² and State-Machine")
-        ax = fig.subplots()
-        for ib in range(NIN):
-            ax.plot(timestamps, simu.SquaredSNRMovingAverage[:,ib],#simu.SquaredSNRMovingAverage[:,ib],
-                    label=f"{ich[ib]}")
-            
-        ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
-                  linestyle='--',label='Threshold GD')
         
-        ax.set_ylim(ylim)
-        ax.set_yscale('log')
-        ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+        # InstantaneousSquaredSNR=np.nan_to_num(1/simu.varPD)
+        # ylim=[1e-1,np.max(InstantaneousSquaredSNR)]
+        # # State-Machine and SNR
+        # fig = plt.figure("SNR²")
+        # fig.suptitle("SNR² and State-Machine")
+        # ax = fig.subplots()
+        # for ib in range(NIN):
+        #     ax.plot(timestamps, simu.SquaredSNRMovingAverage[:,ib],#simu.SquaredSNRMovingAverage[:,ib],
+        #             label=f"{ich[ib]}")
+            
+        #     ax.hlines(config.FT['ThresholdGD'][ib]**2,0,timestamps[-1],
+        #               linestyle='--',label='Threshold GD')
+        
+        # ax.set_ylim(ylim)
+        # ax.set_yscale('log')
+        # ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+        #            color='k', linestyle=':')
+        # ax.set_ylabel("$<SNR>²_Ngd$")
+        # ax.legend()        
+        
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle='solid', label='Maximal SNR²'),
+                    mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+        if 'ThresholdGD' in config.FT.keys():
+            linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle='--', label='Squared Threshold GD'))
+                    
+        
+        from mypackage.plot_tools import setaxelim
+        
+        t = simu.timestamps ; timerange = range(NT)
+        len2 = NIN//2 ; len1 = NIN-len2
+        basecolors = list(colors[:len1]+colors[:len2])
+        
+        title = "SNR²"
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+        fig.suptitle(title)
+        (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
+        ax1.set_title(f"Baselines from {config.FS['ich'][0]} to {config.FS['ich'][len1-1]}")
+        ax2.set_title(f"Baselines from {config.FS['ich'][len1]} to {config.FS['ich'][-1]}")
+        
+        for iBase in range(len1):   # First serie
+            ax1.plot(t[timerange],simu.SquaredSNRMovingAverage[timerange,iBase],color=basecolors[iBase])
+            if 'ThresholdGD' in config.FT.keys():
+                ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+
+        for iBase in range(len1,NIN):   # Second serie
+            ax2.plot(t[timerange],simu.SquaredSNRMovingAverage[timerange,iBase],color=basecolors[iBase])
+            if 'ThresholdGD' in config.FT.keys():
+                ax2.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+
+        ax1.vlines(config.starttracking*dt,0.5,2*np.max(simu.SquaredSNRMovingAverage),
                    color='k', linestyle=':')
-        ax.set_ylabel("$<SNR>²_Ngd$")
-        ax.legend()
+        ax2.vlines(config.starttracking*dt,0.5,2*np.max(simu.SquaredSNRMovingAverage),
+                   color='k', linestyle=':')
+        
+        maxSquaredSNR = np.max(simu.SquaredSNRMovingAverage,axis=0)
+        ax3.bar(baselines[:len1],maxSquaredSNR[:len1], color=basecolors[:len1])
+        ax3.bar(baselines[:len1],config.FT['ThresholdGD'][:len1], fill=False,edgecolor='k')
+
+        ax4.bar(baselines[len1:]+['']*(len1-len2),list(maxSquaredSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
+        ax4.bar(baselines[len1:]+['']*(len1-len2),list(config.FT['ThresholdGD'][len1:])+[0]*(len1-len2), fill=False,edgecolor='k')
+        ax3.hlines(2,-0.5,len1-0.5,color='r',linestyle='-.')
+        ax4.hlines(2,-0.5,len1-0.5,color='r',linestyle='-.')
+        
+        ax1.sharex(ax2)
+        ax1.sharey(ax2) ; ax2.tick_params(labelleft=False) 
+        ax3.sharey(ax4) ; ax4.tick_params(labelleft=False)
+        
+        ax1.set_yscale('log')
+        ax1.grid(True) ; ax2.grid(True)
+        ax3.grid(True) ; ax4.grid(True)
+        ax1.set_ylabel('SNR²')
+        ax3.set_yscale('log') ; ax3.set_ylabel('SNR² &\n Threshold')
+        ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
+        ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
+        setaxelim(ax3,ydata=maxSquaredSNR,ymin=0.5)
+        
         if display:
             if pause:
                 plt.pause(0.1)
@@ -2399,6 +2461,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 plt.show()
         config.newfig+=1
         
+
+
+
+
+
 
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
