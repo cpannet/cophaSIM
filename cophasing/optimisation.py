@@ -442,11 +442,11 @@ Remains {strtime(RemainingTime)}")
     
     if criteriaName != "VarCP":
         bestCombi = Base_av.loc[(slice(None),slice(None),slice(None),
-                                 slice(None),slice(None), 
+                                 slice(None),slice(None),slice(None), 
                                  criteriaName)].idxmax(skipna=True)[0]
     else:
         bestCombi = Closure_av.loc[(slice(None),slice(None),slice(None)
-                                    ,slice(None),slice(None), 
+                                    ,slice(None),slice(None),slice(None),
                                     criteriaName)].idxmax(skipna=True)[0]
         
     bestDIT, bestGainGD, bestGainPD = bestCombi[:3]
@@ -467,7 +467,7 @@ Remains {strtime(RemainingTime)}")
         
         # Launch the simulator
         sk.loop()
-        sk.display('perftable',WLOfScience=WLOfScience,display=display,savedir=savepath,ext='pdf')
+        sk.display('perfarray',WLOfScience=WLOfScience,display=display,savedir=savepath,ext='pdf')
     
     return bestCombi, resultsBasedf,  resultsClosuredf
 

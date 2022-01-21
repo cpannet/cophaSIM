@@ -50,6 +50,7 @@ OPDDisturbance = np.zeros([NT,NIN])             # OPD-space disturbance
 PDEstimated = np.zeros([NT,NIN])                # Estimated baselines PD [rad]
 varPD = np.zeros([NT,NIN])                      # Estimated "PD variance" = 1/SNR²
 SquaredSNRMovingAverage = np.zeros([NT,NIN])    # Estimated SNR² averaged over N dit
+TrackedBaselines = np.zeros([NT,NIN])
 TemporalVariancePD = np.zeros([NT,NIN])         # Temporal Variance PD estimator
 TemporalVarianceGD = np.zeros([NT,NIN])         # Temporal Variance GD estimator
 GDEstimated = np.zeros([NT,NIN])                # Estimated baselines GD [rad]

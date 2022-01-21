@@ -1567,7 +1567,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                             linewidth=3,
                             color=cm(int(vismod[ib]*Nnuances)))
                 else:
-                    im=ax1.plot([x1,x2],[y1,y2],linestyle=ls,
+                    im=ax1.plot([x1,x2],[y1,y2],linestyle='solid',
                             linewidth=1,
                             color=cm(int(vismod[ib]*Nnuances)))
         ax1.set_xlabel("X [m]")
@@ -1606,7 +1606,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
                                   orientation='horizontal')
 
-
+        if len(savedir):
+            print("Saving perfarray figure.")
+            plt.savefig(savedir+f"Simulation{timestr}_perfarray.{ext}")
 
     if displayall or ('opd' in args):
         """
@@ -2481,7 +2483,7 @@ WavelengthOfInterest
     ----------
     TimeBonds : INT or ARRAY [ms]
         If int:
-            The performance are processed from StartingTime until the end
+            The performance are processed from TimeBonds until the end
         If array [StartingTime,EndingTime]: 
             The performance are processed between StartingTime and EndingTime
     WavelengthOfInterest : ARRAY
