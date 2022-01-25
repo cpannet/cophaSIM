@@ -1463,7 +1463,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         for iBase in range(len1):   # First serie
             ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
-                ax1.hlines(config.FT['ThresholdGD']**2, t[timerange[0]],t[timerange[-1]], color='black', linestyle='dashed')
+                ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
             ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
@@ -1471,7 +1471,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         for iBase in range(len1,NIN):   # Second serie
             ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
-                ax6.hlines(config.FT['ThresholdGD']**2,t[timerange[0]],t[timerange[-1]],color='black', linestyle='dashed')
+                ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
             ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
             ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
@@ -1527,6 +1527,125 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             plt.savefig(savedir+f"Simulation{timestr}_perftable.{ext}")
 
 
+    if displayall or ('perftableres2' in args):
+    
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+        if 'ThresholdGD' in config.FT.keys():
+            linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle='--', label='Squared Threshold GD'))
+                    
+
+        from mypackage.plot_tools import setaxelim
+        
+        t = simu.timestamps ; timerange = range(NT)
+        # NA=6 ; NIN = 15 ; NC = 10
+        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
+        len2 = NIN//2 ; len1 = NIN-len2
+        
+        basecolors = colors[:len1]+colors[:len2]
+        # basestyles = len1*['solid'] + len2*['dashed']
+        # closurecolors = colors[:NC]
+        
+        R=config.FS['R']
+        
+        GD = simu.GDResidual2 ; PD=simu.PDResidual2
+        GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
+        GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
+        SquaredSNR = simu.SquaredSNRMovingAverage
+        # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
+        
+        
+        start_pd_tracking = 100
+        
+        RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
+        RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+        RMStrueOPD = np.sqrt(simu.VarOPD)
+        # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
+        # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
+        
+        
+        
+        plt.rcParams.update(rcParamsForBaselines)
+        title='GD and PD'
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+        fig.suptitle(title)
+        (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+        ax1.set_title("First serie of baselines, from 12 to 25")
+        ax6.set_title("Second serie of baselines, from 26 to 56")
+        
+        for iBase in range(len1):   # First serie
+            ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            if 'ThresholdGD' in config.FT.keys():
+                ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+            ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+            ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+            ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+        for iBase in range(len1,NIN):   # Second serie
+            ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            if 'ThresholdGD' in config.FT.keys():
+                ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+            ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+            ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+            ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+        
+        
+        ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                   color='k', linestyle=':')
+        ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+                   color='k', linestyle=':')
+        ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                   color='k', linestyle=':')
+        ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+                   color='k', linestyle=':')
+        
+        ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
+        ax4.bar(baselines[:len1],simu.LR3[:len1],fill=False,edgecolor='black',linestyle='-')
+        ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
+        ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
+        
+        ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
+        ax9.bar(baselines[len1:],simu.LR3[len1:],fill=False,edgecolor='black',linestyle='-')
+        ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
+        ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
+        
+        ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+        
+        ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
+        ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
+        
+        ax1.set_ylabel('SNR²')
+        ax2.set_ylabel('Group-Delays [µm]')
+        ax3.set_ylabel('Phase-Delays [µm]')
+        ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+        ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+        
+        ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+        
+        ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
+        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+
+        ax7.legend(handles=linestyles, loc='upper right')
+        if display:
+            fig.show()
+
+        if len(savedir):
+            print("Saving perftable figure.")
+            plt.savefig(savedir+f"Simulation{timestr}_perftableres2.{ext}")
+
+
+
+
+
+
     if displayall or ('perfarray' in args):
         
         from .config import InterfArray
@@ -1549,7 +1668,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         #         'size'   : 22}
         
         # plt.rc('font', **font)
-        fig,(ax1,ax2)=plt.subplots(ncols=2, sharex=True, sharey=True)
+        title="perfarray"
+        fig=plt.figure(title, clear=True)
+        (ax1,ax2)=fig.subplots(ncols=2, sharex=True, sharey=True)
         ax1.set_title(f"Target visibility and photometric balance ({wl:.3}µm)")
         ax2.set_title(f"Fringe contrast and Time on central fringe ({WLOfScience:.3}µm)")
         
@@ -1798,6 +1919,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             print("Saving opd3 figure.")
             plt.savefig(savedir+f"Simulation{timestr}_opd3.{ext}")
         
+    
+    
     
     if 'opd2' in args:
         """
@@ -2292,23 +2415,16 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         """
         DETECTOR VIEW
         """
-        fig = plt.figure("Detector intensities")
+        title="Detector&SNR"
+        fig = plt.figure(title,clear=True)
         axes = fig.subplots()
-        plt.suptitle('Intensities recorded by the detector at {:.2f}µm'.\
-                     format(wl))
-        
-        if config.fs == 'default':
-            NMod = 1
-        if 'spica' in config.fs or 'abcd' in config.fs:
-            NMod = config.FS['NM']
-            
-        if 'Modulation' in config.FS.keys():
-            ABCDchip = True
+        plt.suptitle(f'Sequence of intensities on pixels corresponding to {wl:.2f}µm')
+
+        if config.FS['name'] == 'MIRCxFS':
+            ABCDchip = False
         else:
-            ABCDchip=False
-            
-            
-            
+            ABCDchip=True
+
         if ABCDchip:
             NIN = config.NIN
             NP = config.FS['NP']
@@ -2324,7 +2440,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                     
                 plt.tick_params(axis='y',left='off')
                 if ip//NMod == ip/NMod:
-                    plt.ylabel(str(int(ich[ip//NMod,0]))+str(int(ich[ip//NMod,1])))
+                    plt.ylabel(ich[ip//NMod])
                     
                 if ip>=NP-NMod:
                     plt.xticks([0,NT],[0,NT*dt])
@@ -2334,12 +2450,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 plt.yticks([],[])
                     
             fig.subplots_adjust(right=0.8)
-            cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+            cbar_ax = fig.add_axes([0.85, 0.3, 0.05, 0.6])
             fig.colorbar(im, cax=cbar_ax)
             plt.grid(False)
-            if display:
-                plt.show()
-            config.newfig+=1
             
             
         else:
@@ -2358,16 +2471,52 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             im = plt.imshow(simu.MacroImages[:,ind,:], vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))
             
             fig.subplots_adjust(right=0.8)
-            cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+            cbar_ax = fig.add_axes([0.85, 0.3, 0.05, 0.6])
             fig.colorbar(im, cax=cbar_ax)
             
-            plt.ylabel('Time')
-            plt.xlabel(f'Image at wl={round(config.spectraM[ind],2)}µm')
-            plt.grid(False)
-            if display:
-                plt.show()
-            config.newfig +=1
+            ax.set_ylabel('Time')
+            ax.set_xlabel("Pixels")
+            cbar_ax.set_ylabel("Pixel intensity")
+            cbar_ax.yaxis.set_label_position("left")
+            
+            ax.grid(False)
 
+        # linestyles=[mlines.Line2D([],[], color='black',
+        #                                 linestyle='solid', label='Maximal SNR²'),
+        #             mlines.Line2D([],[], color='black',
+        #                                 linestyle=':', label='Start tracking')]
+        # if 'ThresholdGD' in config.FT.keys():
+        #     linestyles.append(mlines.Line2D([],[], color='black',
+        #                                 linestyle='--', label='Squared Threshold GD'))
+                    
+        fig.subplots_adjust(bottom=0.3)
+        snr_ax = fig.add_axes([0.18, 0.05, 0.72, 0.1])
+        snr_ax.set_title("SNR & Thresholds")
+        from mypackage.plot_tools import setaxelim
+        
+        t = simu.timestamps ; timerange = range(NT)
+        #len2 = NIN//2 ; len1 = NIN-len2
+        #basecolors = list(colors[:len1]+colors[:len2])
+        
+        SNR = np.sqrt(simu.SquaredSNRMovingAverage)
+
+        maxSNR = np.nan_to_num(np.mean(SNR,axis=0))
+        snr_ax.bar(baselines,maxSNR, color=colors[6])
+        snr_ax.bar(baselines,config.FT['ThresholdGD'], fill=False,edgecolor='k')
+
+        snr_ax.hlines(config.FT['ThresholdPD'],-0.5,NIN-0.5,color='r',linestyle='-.')
+        
+        snr_ax.set_yscale('log') ; snr_ax.grid(True)
+        #snr_ax.set_ylabel('SNR &\n Thresholds')
+
+        snr_ax.set_xlabel('Baseline')
+        setaxelim(snr_ax,ydata=maxSNR,ymin=0.5)
+
+        if display:
+            if pause:
+                plt.pause(0.1)
+            else:
+                plt.show()  
         if len(savedir):
             fig.savefig(savedir+f"Simulation{timestr}_detector.{ext}")
             
@@ -2409,7 +2558,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         len2 = NIN//2 ; len1 = NIN-len2
         basecolors = list(colors[:len1]+colors[:len2])
         
-        title = "SNR²"
+        SNR = np.sqrt(simu.SquaredSNRMovingAverage)
+        title = "SNR"
         plt.close(title)
         fig=plt.figure(title, clear=True)
         fig.suptitle(title)
@@ -2418,28 +2568,28 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax2.set_title(f"Baselines from {config.FS['ich'][len1]} to {config.FS['ich'][-1]}")
         
         for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],simu.SquaredSNRMovingAverage[timerange,iBase],color=basecolors[iBase])
+            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
-                ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+                ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
 
         for iBase in range(len1,NIN):   # Second serie
-            ax2.plot(t[timerange],simu.SquaredSNRMovingAverage[timerange,iBase],color=basecolors[iBase])
+            ax2.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
-                ax2.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+                ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
 
-        ax1.vlines(config.starttracking*dt,0.5,2*np.max(simu.SquaredSNRMovingAverage),
+        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
                    color='k', linestyle=':')
-        ax2.vlines(config.starttracking*dt,0.5,2*np.max(simu.SquaredSNRMovingAverage),
+        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
                    color='k', linestyle=':')
         
-        maxSquaredSNR = np.max(simu.SquaredSNRMovingAverage,axis=0)
-        ax3.bar(baselines[:len1],maxSquaredSNR[:len1], color=basecolors[:len1])
+        maxSNR = np.nan_to_num(np.max(SNR,axis=0))
+        ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
         ax3.bar(baselines[:len1],config.FT['ThresholdGD'][:len1], fill=False,edgecolor='k')
 
-        ax4.bar(baselines[len1:]+['']*(len1-len2),list(maxSquaredSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
-        ax4.bar(baselines[len1:]+['']*(len1-len2),list(config.FT['ThresholdGD'][len1:])+[0]*(len1-len2), fill=False,edgecolor='k')
-        ax3.hlines(2,-0.5,len1-0.5,color='r',linestyle='-.')
-        ax4.hlines(2,-0.5,len1-0.5,color='r',linestyle='-.')
+        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(maxSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
+        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(config.FT['ThresholdGD'][len1:])+[0]*(len1-len2), fill=False,edgecolor='k')
+        ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+        ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
         
         ax1.sharex(ax2)
         ax1.sharey(ax2) ; ax2.tick_params(labelleft=False) 
@@ -2448,22 +2598,17 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax1.set_yscale('log')
         ax1.grid(True) ; ax2.grid(True)
         ax3.grid(True) ; ax4.grid(True)
-        ax1.set_ylabel('SNR²')
-        ax3.set_yscale('log') ; ax3.set_ylabel('SNR² &\n Threshold')
+        ax1.set_ylabel('SNR')
+        ax3.set_yscale('log') ; ax3.set_ylabel('SNR &\n Thresholds')
         ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
         ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
-        setaxelim(ax3,ydata=maxSquaredSNR,ymin=0.5)
+        setaxelim(ax3,ydata=maxSNR,ymin=0.5)
         
         if display:
             if pause:
                 plt.pause(0.1)
             else:
                 plt.show()
-        config.newfig+=1
-        
-
-
-
 
 
 
@@ -2471,7 +2616,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
         ylim=[1e-1,np.max(simu.SquaredSNRMovingAverage)]
         # State-Machine and SNR
-        fig = plt.figure("SNR²")
+        title="State"
+        fig = plt.figure(title,clear=True)
         fig.suptitle("SNR² and State-Machine")
         ax,ax2 = fig.subplots(nrows=2,ncols=1, sharex=True)
         for ib in range(NIN):
@@ -2608,7 +2754,12 @@ WavelengthOfInterest
         simu.FringeContrast=np.zeros(NIN)       # Fringe Contrast at given wavelengths [0,1]
 
     simu.VarOPD=np.zeros(NIN)
+    simu.VarGDRes=np.zeros(NIN)
+    simu.VarPDRes=np.zeros(NIN)
     simu.VarPiston=np.zeros(NA)
+    simu.VarPistonGD=np.zeros(NA)
+    simu.VarPistonPD=np.zeros(NA)
+
     simu.TempVarPD=np.zeros(NIN) ; simu.TempVarGD=np.zeros(NIN)
     simu.VarCPD =np.zeros(NC); simu.VarCGD=np.zeros(NC)
     
@@ -2633,12 +2784,20 @@ WavelengthOfInterest
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
         OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+        GDResVar = np.var(simu.GDResidual2[InFrame:OutFrame,:],axis=0)
+        PDResVar = np.var(simu.PDResidual2[InFrame:OutFrame,:],axis=0)
         PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
+        PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
+        PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
         simu.PhaseVar_atWOI[it] = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/WavelengthOfInterest,axis=0)
         simu.PhaseStableEnough[it] = 1*(OPDVar < MaxVarOPDForLocked)
         #simu.FTLocked[it] =  # Reste à définir en utilisant la matrice de poids.
         simu.VarOPD += 1/Ndit*OPDVar
+        simu.VarPDRes += 1/Ndit*PDResVar
+        simu.VarGDRes += 1/Ndit*GDResVar
         simu.VarPiston += 1/Ndit*PistonVar
+        simu.VarPistonGD += 1/Ndit*PistonVarGD
+        simu.VarPistonPD += 1/Ndit*PistonVarPD
         simu.TempVarPD += 1/Ndit*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
         simu.TempVarGD += 1/Ndit*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
         simu.VarCPD += 1/Ndit*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)

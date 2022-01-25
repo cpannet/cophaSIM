@@ -34,7 +34,10 @@ def updateFTparams(verbose=True,**kwargs):
     print("Update fringe-tracker parameters:")
     for key, value in zip(list(kwargs.keys()),list(kwargs.values())):
         oldval=config.FT[key]
-        config.FT[key] = value
+        if (key=='ThresholdGD') and (isinstance(value,(float,int))):
+            config.FT['ThresholdGD'] = np.ones(config.NIN)*value
+        else:
+            config.FT[key] = value
         if verbose:
             if isinstance(value,str):
                 if "/" in value:
@@ -147,7 +150,10 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         config.FT['Ncross'] = Ncross
         config.FT['Ncp'] = Ncp
         config.FT['Nvar'] = Nvar
-        config.FT['ThresholdGD'] = ThresholdGD
+        if isinstance(ThresholdGD,(float,int)):
+            config.FT['ThresholdGD'] = np.ones(NIN)*ThresholdGD
+        else:
+            config.FT['ThresholdGD'] = ThresholdGD
         config.FT['ThresholdPD'] = ThresholdPD
         config.FT['CPref'] = CPref
         config.FT['roundGD'] = roundGD
@@ -378,6 +384,12 @@ def ReadCf(currCfEstimated):
                 validcp[ic]=valid1*valid2*valid3
                 bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
                 bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+    
+    simu.BispectrumGD[it] = bispectrumGD
+    simu.BispectrumPD[it] = bispectrumPD
+    
+    bispectrumPD[bispectrumPD<0.05] = 0
+    bispectrumGD[bispectrumGD<0.05] = 0
     
     simu.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
     simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
@@ -634,13 +646,15 @@ def CommandCalc(currPD,currGD):
 
     
     R = config.FS['R']
+    
     # Store residual GD for display only [radians]
-    simu.GDResidual[it] = currGDerr*R
+    simu.GDResidual[it] = currGDerr*R*config.PDspectra/(2*np.pi)
     
     # Weights the GD (Eq.35)
     currGDerr = np.dot(currIgd,currGDerr)
      
-    simu.GDResidual2[it] = currGDerr
+    simu.GDResidual2[it] = currGDerr*R*config.PDspectra/(2*np.pi)
+    simu.GDPistonResidual[it] = np.dot(FS['OPD2Piston'], currGDerr*R*config.PDspectra/(2*np.pi))
     
     # Threshold function (eq.36)
     if FT['Threshold']:
@@ -710,21 +724,17 @@ def CommandCalc(currPD,currGD):
     higher_than_pi = (currPDerr > np.pi)
     lower_than_mpi = (currPDerr < -np.pi)
     
-    currGDerr[higher_than_pi] -= 2*np.pi
-    currGDerr[lower_than_mpi] += 2*np.pi
+    currPDerr[higher_than_pi] -= 2*np.pi
+    currPDerr[lower_than_mpi] += 2*np.pi
     
-    # for ib in range(NIN):
-    #     if currPDerr[ib] > np.pi:
-    #         currPDerr[ib] -= 2*np.pi
-    #     elif currPDerr[ib] < -np.pi:
-    #         currPDerr[ib] += 2*np.pi
-    
-    # Store residual PD and piston for display only
-    simu.PDResidual[it] = currPDerr
-    # simu.PistonResidual[it] = np.dot(OPD2Piston_, simu.PDResidual[it])/2/np.pi*config.PDspectra
+    simu.PDResidual[it] = currPDerr*config.PDspectra/(2*np.pi)
     
     # Weights the PD (Eq.35)
     currPDerr = np.dot(currIpd,currPDerr)
+    
+    # Store residual PD and piston for display only
+    simu.PDResidual2[it] = currPDerr*config.PDspectra/(2*np.pi)
+    simu.PDPistonResidual[it] = np.dot(FS['OPD2Piston'], currPDerr*config.PDspectra/(2*np.pi))
     
     # Integrator (Eq.37)
             
@@ -991,7 +1001,7 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
         sk.loop()
         
         if manual:
-            sk.display('snr',WLOfTrack=1.6, pause=True)
+            sk.display('detector',WLOfTrack=1.6, pause=True)
             test1 = input("Set all threshold to same value? [y/n]")
             if (test1=='y') or (test1=='yes'):    
                 newThresholdGD = float(input("Set the Threshold GD: "))
@@ -1018,15 +1028,14 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
             ind=100#np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
             
             newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
-            newThresholdPD = np.min(newThresholdGD)
             
             config.FT['ThresholdGD'] = newThresholdGD
-            sk.display('snr',WLOfTrack=1.6, pause=True)
+            sk.display('detector',WLOfTrack=1.6, pause=True)
             #print(f"The threshold is set to {newThresholdGD}")
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
-                       ThresholdGD=newThresholdGD, ThresholdPD=newThresholdPD)
+                       ThresholdGD=newThresholdGD)
     
     return newThresholdGD
 

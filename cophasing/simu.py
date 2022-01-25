@@ -40,6 +40,8 @@ VisibilityTrue = np.zeros([NT, MW, NIN])*1j         # True expected fringe visib
 
 # Closure Phases [NC]
 ClosurePhaseObject = np.zeros([NW,NC])          # Closure Phase Object
+BispectrumGD = np.zeros([NT,NC])*1j             # GD bispectrum
+BispectrumPD = np.zeros([NT,NC])*1j             # PD bispectrum
 ClosurePhasePD = np.zeros([NT,NC])              # PD closure phase        
 ClosurePhaseGD = np.zeros([NT,NC])              # GD closure phase
 
@@ -60,8 +62,9 @@ GDCommand = np.zeros([NT+1,NIN])                # OPD-space GD command
 EffectiveOPDMove = np.zeros([NT+latency,NIN])   # Effective move of the delay lines in OPD-space
 
 PDResidual = np.zeros([NT,NIN])                 # Estimated residual PD = PD-PDref
+PDResidual2 = np.zeros([NT,NIN])                 # Estimated residual PD = PD-PDref after Ipd
 GDResidual = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref
-GDResidual2 = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref
+GDResidual2 = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref after Igd
 GDErr = np.zeros([NT,NIN])                      # Error that integrates GD integrator
 OPDSearchCommand = np.zeros([NT+latency,NIN])           # Search command projected in the OPD-space
 
@@ -71,7 +74,8 @@ PistonDisturbance = np.zeros([NT,NA])           # Piston disturbances
 PistonPDCommand = np.zeros([NT+1,NA])           # Piston-space PD command
 PistonGDCommand = np.zeros([NT+1,NA])           # Piston-space GD command
 PistonGDCommand_beforeround = np.zeros([NT+1,NA])
-
+GDPistonResidual = np.zeros([NT,NA])            # GD residuals on telescopes
+PDPistonResidual = np.zeros([NT,NA])            # PD residuals on telescopes
 SearchCommand = np.zeros([NT+1,NA])             # Piston-space Search command
 CommandODL = np.zeros([NT+1,NA])                # Delay lines positionnal command calculated at time it
 EffectiveMoveODL = np.zeros([NT+latency,NA])    # Effective move of the delay lines
@@ -121,6 +125,8 @@ Performance Observables will be introduced and processed when the function
 """
 
 VarOPD = np.zeros([NIN])
+VarGDRes = np.zeros([NIN])
+VarPDRes = np.zeros([NIN])
 TempVarPD = np.zeros([NIN])
 TempVarGD = np.zeros([NIN])
 VarCPD = np.zeros([NC])

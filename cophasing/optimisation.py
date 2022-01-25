@@ -192,7 +192,7 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
     from . import config
     import pandas as pd
     
-    from .config import NIN, NC
+    from .config import NA, NIN, NC
         
     if not (len(GainsPD) and len(GainsPD)):
         raise Exception('Need GainsPD and GainsGD.')
@@ -207,6 +207,11 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
     sk.update_config(checkperiod=110) # For not seeing the decount.
     
     VarOPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])         # Phase variances
+    VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances
+    VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances
+    VarPiston = np.zeros([NDIT,NgainsGD,NgainsPD,NA])       # Piston variance
+    VarPistonGD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston GD variance
+    VarPistonPD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston PD variance
     VarCP = np.zeros([NDIT,NgainsGD,NgainsPD,NC])           # Closure Phase variances
     SNR = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])            # Signal-to-noise ratio in the scientific instrument
     FCArray = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])        # Contains the fringe contrasts
@@ -214,6 +219,9 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
     WLockedRatio = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])   # Weigthed locked ratio
     LR2 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])            # Locked ratio
     LR3 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])            # Central fringe ratio
+    
+    Vmod = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])
+    Vangle = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])
     
     minValue = 10000
     
@@ -235,7 +243,7 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
     time0 = time.time() ; LoopNumber = 0
     iOptimGD=0; iOptimPD=0 ; IDs=[] ; ThresholdGDmins=[] ; ThresholdGDmaxs=[]
 
-
+    indWLOfTrack = np.argmin(np.abs(config.spectra-WLOfTrack))
     
     for ig in range(NgainsGD):
         Ggd = GainsGD[ig]    
@@ -293,6 +301,11 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                     # Initialise the comparison tables
                     VarOPD[idit,ig,ip,:] += simu.VarOPD/Nfiles
                     VarCP[idit,ig,ip,:] += simu.VarCPD/Nfiles
+                    VarGDRes[idit,ig,ip,:] += simu.VarGDRes/Nfiles
+                    VarPDRes[idit,ig,ip,:] += simu.VarPDRes/Nfiles
+                    VarPiston[idit,ig,ip,:] += simu.VarPiston/Nfiles
+                    VarPistonGD[idit,ig,ip,:] += simu.VarPistonGD/Nfiles
+                    VarPistonPD[idit,ig,ip,:] += simu.VarPistonPD/Nfiles
                     # SNR[idit,ig,ip,:] += simu.SNRSI/Nfiles
                     FCArray[idit,ig,ip,:] += simu.FringeContrast[0]/Nfiles
                     LockedRatio[idit,ig,ip,:] += simu.LockedRatio/Nfiles
@@ -300,6 +313,9 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                 
                     LR2[idit,ig,ip,:] += simu.LR2/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
                     LR3[idit,ig,ip,:] += simu.LR3/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
+            
+                    Vmod[idit,ig,ip,:] = ct.NB2NIN(np.abs(simu.VisibilityObject[indWLOfTrack]))
+                    Vangle[idit,ig,ip,:] = ct.NB2NIN(np.angle(simu.VisibilityObject[indWLOfTrack]))
             
             IDs.append(config.SimuTimeID)
             ThresholdGDmins.append(np.min(config.FT['ThresholdGD']))
@@ -359,8 +375,10 @@ Remains {strtime(RemainingTime)}")
     from tabulate import tabulate
     # ich = [12,13,14,15,16,23,24,25,26,34,35,36,45,46,56]
     ichint = [int(''.join([str(int(ic[0]+1)),str(int(ic[1]+1))])) for ic in config.ich] # Convert list of tuples into list of int
-    
-    criteriasBase = ["LR", "LR2", "LR3", "WLR", "FC", "VarOPD [µm]"]
+    telint = np.arange(1,NA+1)
+    criteriasBase = ["LR", "LR2", "LR3", "WLR", "FC", "VarOPD [µm]",
+                     "VarGDRes","VarPDRes",
+                     'Vmod','Vangle']
     
     Ncb = len(criteriasBase)
     # A=list(np.repeat(GainsGD, Ncb)) ; B = criteriasBase*Ngains
@@ -375,7 +393,9 @@ Remains {strtime(RemainingTime)}")
     C4 = list(np.repeat(ThresholdGDmaxs,Ncb)) * NDIT   # ThresholdGD
     D = criteriasBase * NDIT * NgainsGD * NgainsPD 
     
-    base_5d = np.array([LockedRatio,LR2,LR3,WLockedRatio,FCArray,VarOPD])
+    base_5d = np.array([LockedRatio,LR2,LR3,WLockedRatio,FCArray,VarOPD,
+                        VarGDRes,VarPDRes,
+                        Vmod,Vangle])
     base_5d = np.transpose(base_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order
     
     base_2d = base_5d.reshape([NDIT*Ncb*NgainsGD*NgainsPD,NIN], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
@@ -420,14 +440,45 @@ Remains {strtime(RemainingTime)}")
 
     resultsClosuredf = pd.DataFrame(data=closure_2d, columns=[A,B,C,C2,C3,C4,D],index=CPindexint)
     
+    """
+    Residues on Telescopes
+    """
+    criteriasTel = ["VarPiston","VarPistonGD","VarPistonPD"]
+    
+    Nct = len(criteriasTel)
+    # A=list(np.repeat(GainsGD, Ncb)) ; B = criteriasBase*Ngains
+    
+    A = list(np.repeat(DITs, NgainsGD*NgainsPD*Nct))
+    Btemp = list(np.repeat(GainsGD,Nct*NgainsPD))
+    B = Btemp * NDIT
+    Ctemp = list(np.repeat(GainsPD,Nct))
+    C = Ctemp * NDIT * NgainsGD
+    C2 = list(np.repeat(IDs,Nct)) * NDIT            # ID of the last simu
+    C3 = list(np.repeat(ThresholdGDmins,Nct)) * NDIT   # ThresholdGD
+    C4 = list(np.repeat(ThresholdGDmaxs,Nct)) * NDIT   # ThresholdGD
+    D = criteriasTel * NDIT * NgainsGD * NgainsPD 
+    
+    tel_5d = np.array([VarPiston,VarPistonGD,VarPistonPD])
+    tel_5d = np.transpose(tel_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order
+    
+    tel_2d = tel_5d.reshape([NDIT*Nct*NgainsGD*NgainsPD,NA], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
+    
+    # Need another dataframe only for Closure Phase (dimension 10)
+    
+    resultsTeldf = pd.DataFrame(data=tel_2d, columns=[A,B,C,C2,C3,C4,D], index=telint)
+    
+    
     if not telescopes:
         Base_av = resultsBasedf.mean(axis=0).to_frame(name='Average')
         Closure_av = resultsClosuredf.mean(axis=0).to_frame(name='Average')
+        Tel_av = resultsBasedf.mean(axis=0).to_frame(name='Average')
     else:
         itel1,itel2 = telescopes[0]-1, telescopes[1]-1
         ib = ct.posk(itel1, itel2, config.NA)
+        ia = telescopes[0]-1  # histoire de mettre un truc, mais à modifier si besoin
         Base_av = resultsBasedf.iloc[ib].to_frame(name=f"{telescopes[0]}{telescopes[1]}")
         Closure_av = resultsClosuredf.iloc[ib].to_frame(name=f"{telescopes[0]}{telescopes[1]}")
+        Tel_av = resultsTeldf.iloc[ia].to_frame(name=f"{telescopes[0]}")
         
     if optimCriteria=="VarOPD":
         criteriaName = "VarOPD [µm]" 
@@ -439,9 +490,15 @@ Remains {strtime(RemainingTime)}")
         criteriaName = "WLR"
     elif optimCriteria == "VarCP":
         criteriaName = "VarCP [µm]"
+    elif optimCriteria == "VarPiston":
+        criteriaName = "VarPiston"
     
-    if criteriaName != "VarCP":
+    if criteriaName not in ("VarCP","VarPiston"):
         bestCombi = Base_av.loc[(slice(None),slice(None),slice(None),
+                                 slice(None),slice(None),slice(None), 
+                                 criteriaName)].idxmax(skipna=True)[0]
+    elif criteriaName == 'VarPiston':
+        bestCombi = Tel_av.loc[(slice(None),slice(None),slice(None),
                                  slice(None),slice(None),slice(None), 
                                  criteriaName)].idxmax(skipna=True)[0]
     else:
@@ -451,11 +508,14 @@ Remains {strtime(RemainingTime)}")
         
     bestDIT, bestGainGD, bestGainPD = bestCombi[:3]
 
-    print(f"Best performances reached with gains (GD,PD)={(bestGainGD, bestGainPD)} and DIT={bestDIT}ms")
+    print(f"Best performances OPD reached with gains (GD,PD)={(bestGainGD, bestGainPD)} and DIT={bestDIT}ms")
     print(tabulate(resultsBasedf[bestCombi], headers="keys"))
     
     print(f"Same for closure phases with gain={bestGains}")
     print(tabulate(resultsClosuredf[bestCombi], headers="keys"))
+    
+    print(f"Same for telescopes with gain={bestGains}")
+    print(tabulate(resultsTeldf[bestCombi], headers="keys"))
    
     if display or len(figsave):
         print("We launch again the simulation with these gains on the last\
@@ -469,7 +529,7 @@ Remains {strtime(RemainingTime)}")
         sk.loop()
         sk.display('perfarray',WLOfScience=WLOfScience,display=display,savedir=savepath,ext='pdf')
     
-    return bestCombi, resultsBasedf,  resultsClosuredf
+    return bestCombi, resultsBasedf,  resultsClosuredf, resultsTeldf
 
 
 

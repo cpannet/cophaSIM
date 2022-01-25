@@ -542,7 +542,7 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     
     # baselines = np.transpose(basedist)*np.sin(altitude-basealtaz[:,0])
     
-    if not hasattr(spectra,'len'):
+    if isinstance(spectra,(float,int)):
         spectra = [spectra]
     
     NW = len(spectra)
@@ -777,8 +777,9 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
                     ci2 = VisObj[:,iap*NA+iapp]
                     ci3 = VisObj[:,iapp*NA+ia]
                     ic = poskfai(ia,iap,iapp,NA)
-                    bispectrum[:,ic] = ci1*ci2*ci3
-        CPObj = np.angle(bispectrum)
+                    bispec = ci1*ci2*ci3
+                    bispec[np.abs(bispec)<0.05] = 0
+                    bispectrum[:,ic] = bispec
         
     else:           # Van-Cittert theorem visibility
         visibilities,_,_,_ = VanCittert(spectra, Obs, Target,display=display)
@@ -983,7 +984,9 @@ def get_CfObj(filepath, spectra):
     """
     Reads data of an observation contained in a FITSfile.
     Adapt the spectral sampling to the FS spectral sampling.
-    Return it
+    The coherent and uncoherent flux are given in Photons/µm/second at 
+    the entrance of the fringe-sensor
+    Return the interpolated coherent flux.
 
     Parameters
     ----------
@@ -1028,34 +1031,59 @@ def get_CfObj(filepath, spectra):
     NewImagV = f(spectra)
     ComplexVisObj = NewRealV + NewImagV*1j
     
-    NW, NBfile = CoherentIrradiance.shape
+    if isinstance(spectra,float):
+        NW=1
+        NBfile=len(CoherentIrradiance)
+    else:
+        NW, NBfile = CoherentIrradiance.shape
     NAfile = int(np.sqrt(NBfile))
     
     from .config import NA, NB
     NC = (NA-2)*(NA-1)
-    ClosurePhase = np.zeros([NW,NC])
-    FinalCoherentIrradiance = np.zeros([NW,NB])*1j
-    FinalComplexVisObj = np.zeros([NW,NB])*1j
+    if NW!=1:
+        ClosurePhase = np.zeros([NW,NC])
+        FinalCoherentIrradiance = np.zeros([NW,NB])*1j
+        FinalComplexVisObj = np.zeros([NW,NB])*1j
+
+        for ia in range(NA):
+            for iap in range(NA):
+                ib = ia*NA+iap
+                FinalCoherentIrradiance[:,ib] = CoherentIrradiance[:,ia*NAfile+iap]
+                FinalComplexVisObj[:,ib] = ComplexVisObj[:,ia*NAfile+iap]
+                
     
-    for ia in range(NA):
-        for iap in range(NA):
-            ib = ia*NA+iap
-            FinalCoherentIrradiance[:,ib] = CoherentIrradiance[:,ia*NAfile+iap]
-            FinalComplexVisObj[:,ib] = ComplexVisObj[:,ia*NAfile+iap]
+    else:
+        ClosurePhase = np.zeros([NC])
+        FinalCoherentIrradiance = np.zeros([NB])*1j
+        FinalComplexVisObj = np.zeros([NB])*1j
+        for ia in range(NA):
+            for iap in range(NA):
+                ib = ia*NA+iap        
+                FinalCoherentIrradiance[ib] = CoherentIrradiance[ia*NAfile+iap]
+                FinalComplexVisObj[ib] = ComplexVisObj[ia*NAfile+iap]
             
     if NA < 3:
         return FinalCoherentIrradiance, FinalComplexVisObj
     
     else:
-        for ia in range(NA):
-            for iap in range(ia+1,NA):
-                for iapp in range(iap+1,NA):
-                    ic = poskfai(ia,iap,iapp,NAfile)
-                    ci1 = CoherentIrradiance[:,ia*NAfile+iap]
-                    ci2 = CoherentIrradiance[:,iap*NAfile+iapp]
-                    ci3 = CoherentIrradiance[:,iapp*NAfile+ia]
-                    ClosurePhase[:,ic] = np.angle(ci1*ci2*ci3)
-        # ClosurePhase = hdu['Closure Phase'].data
+        if NW!=1:
+            for ia in range(NA):
+                for iap in range(ia+1,NA):
+                    for iapp in range(iap+1,NA):
+                        ic = poskfai(ia,iap,iapp,NAfile)
+                        ci1 = CoherentIrradiance[:,ia*NAfile+iap]
+                        ci2 = CoherentIrradiance[:,iap*NAfile+iapp]
+                        ci3 = CoherentIrradiance[:,iapp*NAfile+ia]
+                        ClosurePhase[:,ic] = np.angle(ci1*ci2*ci3)
+        else:
+            for ia in range(NA):
+                for iap in range(ia+1,NA):
+                    for iapp in range(iap+1,NA):
+                        ic = poskfai(ia,iap,iapp,NAfile)
+                        ci1 = CoherentIrradiance[ia*NAfile+iap]
+                        ci2 = CoherentIrradiance[iap*NAfile+iapp]
+                        ci3 = CoherentIrradiance[iapp*NAfile+ia]
+                        ClosurePhase[ic] = np.angle(ci1*ci2*ci3)
         
     return FinalCoherentIrradiance, FinalComplexVisObj, ClosurePhase
 

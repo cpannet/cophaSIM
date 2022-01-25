@@ -129,10 +129,12 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         
         ichorder = np.arange(NIN)
         
+        config.FS['name'] = 'MIRCxFS'
         config.FS['func'] = MIRCxFS
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
         config.FS['active_ich'] = np.ones(NIN)
+        config.FS['PhotometricBalance'] = np.ones(NIN)
         config.FS['NP'] = NP
         config.FS['MW'] = MW
         config.FS['posi'] = posi

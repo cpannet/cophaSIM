@@ -96,6 +96,8 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
         
         ct.check_nrj(A2P)               # Check if A2P is the matrix of a physical system.
       
+        config.FS['A2P'] = A2P
+          
         ich = [str(ichdetails[NMod*k][0]) for k in range(len(ichdetails)//NMod)]
         NINmes = len(ich)  
       
@@ -164,16 +166,19 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
         
         config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
         config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        Piston2OPD_forInv = np.zeros([NIN,NA])
         
         for ia in range(NA):
             for iap in range(ia+1,NA):
                 ib = ct.posk(ia,iap,NA)
+                config.FS['Piston2OPD'][ib,ia] = 1
+                config.FS['Piston2OPD'][ib,iap] = -1
                 if active_ich[ib]:
-                    config.FS['Piston2OPD'][ib,ia] = 1
-                    config.FS['Piston2OPD'][ib,iap] = -1
+                    Piston2OPD_forInv[ib,ia] = 1
+                    Piston2OPD_forInv[ib,iap] = -1
             
-        config.FS['OPD2Piston'] = np.linalg.pinv(config.FS['Piston2OPD'])   # OPD to pistons matrix
-        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-15]=0
+        config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
+        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
         # config.FT['OPistonPD2Piston'] = config.FT['OPD2Piston']/NA
         
         if config.TELref:
@@ -189,7 +194,9 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                     'size'   : 22}
             
             plt.rc('font', **font)
-            fig,ax=plt.subplots()
+            title="ConbinationScheme"
+            fig=plt.figure(title, clear=True)
+            ax=fig.subplots()
             for ia in range(NA):
                 name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
                 ax.scatter(x1,y1,color='k',linewidth=10)
