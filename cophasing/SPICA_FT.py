@@ -899,7 +899,7 @@ def getvar():
     return varPD
 
 
-def SetThreshold(manual=False, scan=False,scanned_tel=6):
+def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
     """
     This function enables to estimate the threshold GD for the state-machine.
     It scans the coherence envelop of the FS and displays the estimated SNR².
@@ -971,8 +971,7 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
                 
             config.FT['ThresholdGD'] = newThresholdGD
             
-            sk.display('snr',WLOfTrack=1.6, pause=True)
-            #print(f"The threshold is set to {newThresholdGD}")
+            sk.display('snr',WLOfTrack=1.6, pause=True,display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, ThresholdGD=newThresholdGD)
@@ -981,10 +980,7 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
     else:
         
         DisturbanceFile = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/disturbances/NoDisturbances/NoDisturbances.fits"
-    
-        #R=config.FS['R']
         
-        #DisturbanceFile = datadir2 + 'EtudeThreshold/scan120micron_tel6.fits'
         NT=200
             
         InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
@@ -1015,22 +1011,12 @@ def SetThreshold(manual=False, scan=False,scanned_tel=6):
         else:
             from cophasing import simu,coh_tools
             
-            # InstantaneousSquaredSNR=1/simu.varPD
-            
-            # scanned_baselines = [coh_tools.posk(ia,scanned_tel-1,config.NA) for ia in range(config.NA-1)]
-            # k=0;ib=scanned_baselines[k]
-            # while not config.FS['active_ich'][ib]:
-            #     k+=1
-            #     ib = scanned_baselines[k]
-                
-            # Lc = R*config.PDspectra
-            
-            ind=100#np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
+            ind=100
             
             newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
             
             config.FT['ThresholdGD'] = newThresholdGD
-            sk.display('detector',WLOfTrack=1.6, pause=True)
+            sk.display('detector',WLOfTrack=1.6, pause=True,display=display)
             #print(f"The threshold is set to {newThresholdGD}")
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)

@@ -2240,7 +2240,7 @@ def MakeV2PfromA2P(Amat):
         for ia in range(NA):
             for iap in range(NA):
                 k = ia*NA+iap
-                Bmat[ip, k] = Amat[ip,ia]*np.transpose(np.conjugate(Amat[ip,iap]))/(NA-1)
+                Bmat[ip, k] = Amat[ip,ia]*np.transpose(np.conjugate(Amat[ip,iap]))
 
     return Bmat
 
