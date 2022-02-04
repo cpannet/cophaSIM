@@ -397,7 +397,7 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     coords = (np.arange(Npix)- Npix/2)*dtheta
     (alpha,beta) = np.meshgrid(coords,-coords)
     dist1 = np.sqrt((alpha-pos_star1[0])**2 + (beta-pos_star1[1])**2)
-    obj_plane[dist1<angular_diameter1] = 1
+    obj_plane[dist1<angular_diameter1/2] = 1
     NpixStar1 = np.sum(obj_plane)
     
     if BinaryObject:
@@ -990,18 +990,23 @@ def get_CfObj(filepath, spectra):
 
     Parameters
     ----------
-    filepath : TYPE
-        DESCRIPTION.
-    spectra : TYPE
-        DESCRIPTION.
+    filepath : STRING
+        Filepath of the file that contains target information.
+    spectra : LIST or ARRAY
+        Spectral sampling of the output data (for interpolation).
 
     Returns
     -------
-    CohIrradiance : ARRAY[NW,NB]
+    FinalCoherentIrradiance, FinalComplexVisObj, ClosurePhase
+    
+    FinalCoherentIrradiance : ARRAY[NW,NB]
         Coherence Flux of the object in photons/s.
+        
+    FinalComplexVisObj:
+        Complex degree of mutual coherence. (between 0 and 1)
+        
     ClosurePhase : ARRAY[NW,NC]
-        Closure Phases of the object in radian.
-
+        Closure phases of the object in radian.
     """
 
     fileexists = os.path.exists(filepath)
@@ -2149,31 +2154,41 @@ def posk(ia,iap,N):
 
 def NB2NIN(vector):
     """
-    Returns the entry vector of length NA**2 (which might the expected quantities) 
-    on a non-redundant form of length NIN=NA(NA-1)/2 sorted as follow:
+    Get a vector (resp.array) of shape NB=NA² (resp. [NW,NB]).
+    Returns it on a non-redundant form of length NIN=NA(NA-1)/2 sorted as follow:
         12,..,1NA,23,..,2NA,34,..,3NA,..,(NA-1)(NA)
 
     Parameters
     ----------
-    vector : FLOAT COMPLEX ARRAY [NB]
+    vector : FLOAT COMPLEX ARRAY [NB] or [NW,NB]
         Vector of general complex coherences.
 
     Returns
     -------
-    ninvec : FLOAT COMPLEX ARRAY [NIN]
+    ninvec : FLOAT COMPLEX ARRAY [NIN] or [NW,NIN]
         Complex Vector of non-redundant mutual coherences.
     """
 
-    
-    NB = len(vector)
+    if vector.ndim==2:
+        NW,NB = vector.shape
+    else:
+        NB = len(vector)
+        
     NA = int(np.sqrt(NB))
     NIN = int(NA*(NA-1)/2)
     
-    ninvec = np.zeros([NIN])*1j
-    for ia in range(NA):
-        for iap in range(ia+1,NA):
-            k = posk(ia,iap,NA)
-            ninvec[k] = vector[ia*NA+iap]
+    if vector.ndim==2:
+        ninvec = np.zeros([NW,NIN])*1j
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                k = posk(ia,iap,NA)
+                ninvec[:,k] = vector[:,ia*NA+iap]
+    else:
+        ninvec = np.zeros([NIN])*1j
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                k = posk(ia,iap,NA)
+                ninvec[k] = vector[ia*NA+iap]
     
     return ninvec
 

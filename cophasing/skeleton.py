@@ -1082,7 +1082,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         
 def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             Pistondetails=False,OPDdetails=False,
-            OneTelescope=True, pause=False, display=True,
+            OneTelescope=True, pause=False, display=True,verbose=True,
             savedir='',ext='pdf'):
     
     '''
@@ -1183,13 +1183,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
            'figure.subplot.right':0.95
            }
     
-    
-    print('Displaying observables...')
-    print(f'First fig is Figure {config.newfig}')
+    if verbose:
+        print('Displaying observables...')
+        print(f'First fig is Figure {config.newfig}')
     
     displayall = False
     if len(args)==0:
-        print(args)
         displayall = True
         
     from matplotlib.ticker import AutoMinorLocator
@@ -1523,7 +1522,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             fig.show()
 
         if len(savedir):
-            print("Saving perftable figure.")
+            if verbose:
+                print("Saving perftable figure.")
             plt.savefig(savedir+f"Simulation{timestr}_perftable.{ext}")
 
 
@@ -1638,7 +1638,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             fig.show()
 
         if len(savedir):
-            print("Saving perftable figure.")
+            if verbose:
+                print("Saving perftable figure.")
             plt.savefig(savedir+f"Simulation{timestr}_perftableres2.{ext}")
 
 
@@ -1728,7 +1729,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                                   orientation='horizontal')
 
         if len(savedir):
-            print("Saving perfarray figure.")
+            if verbose:
+                print("Saving perfarray figure.")
             plt.savefig(savedir+f"Simulation{timestr}_perfarray.{ext}")
 
     if displayall or ('opd' in args):
@@ -1832,7 +1834,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             
             
         if len(savedir):
-            print("Saving opd figure.")
+            if verbose:
+                print("Saving opd figure.")
             plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
         
     if displayall or ('opd3' in args):
@@ -1916,7 +1919,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             fig.show()
 
         if len(savedir):
-            print("Saving opd3 figure.")
+            if verbose:
+                print("Saving opd3 figure.")
             plt.savefig(savedir+f"Simulation{timestr}_opd3.{ext}")
         
     
@@ -2050,7 +2054,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             
             
         if len(savedir):
-            print("Saving opd figure.")
+            if verbose:
+                print("Saving opd figure.")
             plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
 
     
