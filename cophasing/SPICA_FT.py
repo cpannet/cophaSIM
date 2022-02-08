@@ -263,7 +263,7 @@ def ReadCf(currCfEstimated):
     """
     PhotEst = np.zeros([MW,NA])
     for ia in range(NA):
-        PhotEst[:,ia] = np.real(currCfEstimated[:,ia*(NA+1)])
+        PhotEst[:,ia] = np.abs(currCfEstimated[:,ia*(NA+1)])
     
     # Save coherent flux and photometries in stack
     simu.PhotometryEstimated[it] = PhotEst
@@ -869,12 +869,6 @@ def getvar():
         varPhot[:,ia] = simu.Covariance[it,:,ibp,ibp]       # Variance of photometry at each frame
         for iap in range(ia+1,NA):
             ib = posk(ia,iap,NA)
-            # kp = ia*NA+iap
-            # posX = NA + ib ; posY = NA + NIN + ib
-            # Ex = np.mean(np.real(simu.CfPD[timerange,:,ib]), axis=0)
-            # Ey = np.mean(np.imag(simu.CfPD[timerange,:,ib]), axis=0)
-            # varX = simu.CovarianceReal[timerange,:,kp]
-            # varY = simu.CovarianceImag[timerange,:,kp]
             ibr=NA+ib; varX = simu.Covariance[timerange,:,ibr,ibr]
             ibi=NA+NIN+ib; varY = simu.Covariance[timerange,:,ibi,ibi]
             covarXY = simu.Covariance[timerange,:,ibr,ibi]
