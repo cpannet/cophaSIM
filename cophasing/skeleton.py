@@ -1324,11 +1324,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             iTELref = config.TELref - 1
             PistonRef=simu.PistonTrue[:,iTELref]
         else:
-            PistonRef=np.mean(simu.PistonTrue, axis=1)
+            PistonRef=0#np.mean(simu.PistonTrue, axis=1)
         
         for ia in range(NA):
             
-            ax1.plot(timestamps, simu.PistonDisturbance[:,ia]-PistonRef,
+            ax1.plot(timestamps, simu.PistonDisturbance[:,ia]-simu.PistonDisturbance[:,iTELref],
                       color=telcolors[ia+1],linestyle='dashed')
             ax2.plot(timestamps, simu.PistonTrue[:,ia]-PistonRef,
                      color=telcolors[ia+1],linestyle='solid')
@@ -2434,7 +2434,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             NIN = config.NIN
             NP = config.FS['NP']
             NMod = config.FS['NMod']
-            
+                        
             for ip in range(NP):
                 
                 ax = plt.subplot(NIN,NMod,ip+1)

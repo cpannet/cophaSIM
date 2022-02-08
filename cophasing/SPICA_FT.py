@@ -47,9 +47,9 @@ def updateFTparams(verbose=True,**kwargs):
     
 
 def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
-            search=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, Slope=6, Vfactors = [], 
+            search=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, maxVelocity=0.300, Vfactors = [], 
             CPref=True, Ncp = 300, Nvar = 5,cmdOPD=True, switch=1,
-            ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,
+            ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,
             Threshold=True, useWmatrices=True,
             latencytime=1,usecupy=False, **kwargs_for_update):
     """
@@ -101,7 +101,7 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         DESCRIPTION. The default is 20.
     Sweep30s : TYPE, optional
         DESCRIPTION. The default is 10.
-    Slope : TYPE, optional
+    maxVelocity : TYPE, optional
         DESCRIPTION. The default is 6.
     Vfactors : TYPE, optional
         DESCRIPTION. The default is [].
@@ -154,6 +154,12 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
             config.FT['ThresholdGD'] = np.ones(NIN)*ThresholdGD
         else:
             config.FT['ThresholdGD'] = ThresholdGD
+            
+        if isinstance(ThresholdGD,(float,int)):
+            config.FT['ThresholdRELOCK'] = np.ones(NIN)*ThresholRELOCK
+        else:
+            config.FT['ThresholdRELOCK'] = ThresholdRELOCK
+            
         config.FT['ThresholdPD'] = ThresholdPD
         config.FT['CPref'] = CPref
         config.FT['roundGD'] = roundGD
@@ -165,10 +171,10 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         
         # Search command parameters
         config.FT['search'] = search
-        config.FT['SMdelay'] = SMdelay      # Waiting time before launching search
-        config.FT['Sweep0'] = Sweep0        # Starting sweep in [s]
-        config.FT['Sweep30s'] = Sweep30s    # Sweep at 30s
-        config.FT['Slope'] = Slope          # Maximal slope given in µm/frame
+        config.FT['SMdelay'] = SMdelay          # Waiting time before launching search
+        config.FT['Sweep0'] = Sweep0            # Starting sweep in seconds
+        config.FT['Sweep30s'] = Sweep30s        # Sweep at 30s in seconds
+        config.FT['maxVelocity'] = maxVelocity  # Maximal slope given in µm/frame
         
         # Version usaw vector
         # config.FT['usaw'] = np.zeros([NT,NA])
@@ -178,8 +184,8 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         # config.FT['eps'] = np.ones(NA)
         
         # Version usaw float
-        config.FT['usaw'] = np.zeros(NT)
-        config.FT['last_usaw'] = 0
+        config.FT['usaw'] = np.zeros([NT])
+        config.FT['LastPosition'] = np.zeros([NT+1,NA])
         config.FT['it_last'] = 0
         config.FT['it0'] = 0
         config.FT['eps'] = 1
@@ -192,7 +198,7 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         else:
             config.FT['Vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])/8.75
         
-        config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*Slope     # The maximal OPD velocity is equal to slope/frame
+        config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
         
 
         if usecupy:
@@ -455,7 +461,7 @@ def CommandCalc(currPD,currGD):
 
     if config.FT['useWmatrices']:
         
-        varcurrPD = getvar()
+        varcurrPD, varcurrPD2 = getvar()
         
         # Raw Weighting matrix in the OPD-space
         
@@ -466,7 +472,13 @@ def CommandCalc(currPD,currGD):
         simu.TemporalVariancePD[it] = np.var(simu.PDEstimated[timerange], axis=0)
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
         
-        reliablebaselines = (simu.SquaredSNRMovingAverage[it,:] >= FT['ThresholdGD']**2)
+        if config.FT['state'][it-1]:
+            SquaredSNRMovingAverage = simu.SquaredSNRMovingAverage2[it]
+            reliablebaselines = (SquaredSNRMovingAverage >= FT['ThresholdRELOCK']**2)
+        else:
+            SquaredSNRMovingAverage = simu.SquaredSNRMovingAverage[it]
+            reliablebaselines = (SquaredSNRMovingAverage >= FT['ThresholdGD']**2)
+            
         simu.TrackedBaselines[it] = reliablebaselines
         
         Wdiag=np.zeros(NIN)
@@ -527,6 +539,111 @@ def CommandCalc(currPD,currGD):
     FRINGE SEARCHING command
     """
     
+    # IgdRank = np.linalg.matrix_rank(simu.Igd[it])
+    # NotCophased = (IgdRank < NA-1)
+    # simu.IgdRank[it] = IgdRank
+    
+    # if NotCophased:
+    #     simu.time_since_loss[it]=simu.time_since_loss[it-1]+config.dt
+        
+    #     # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_rank(simu.Igd[it-1]))
+    #     # This situation could pose a problem but we don't manage it yet        
+    #     if (simu.time_since_loss[it] > config.FT['SMdelay']):
+            
+    #         Igdna = np.dot(config.FS['OPD2Piston'],
+    #                        np.dot(simu.Igd[it],config.FS['Piston2OPD']))
+            
+    #         # Fringe loss
+    #         simu.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
+    #         # WeLostANewTelescope = (sum(newLostTelescopes) > 0)
+            
+    #         # Photometry loss
+    #         simu.noSignal_on_T[it] = 1*(simu.SNRPhotometry[it] < config.FT['ThresholdPhot'])
+                
+    #         comparison = (simu.noSignal_on_T[it] == simu.LostTelescopes[it])
+    #         simu.LossDueToInjection[it] = comparison.all()       # Evaluates if the two arrays are the same
+            
+    #         if not simu.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
+    #             config.FT['state'][it] = 1
+                
+    #             newLostTelescopes = (simu.LostTelescopes[it] - simu.LostTelescopes[it-1] == 1)
+    #             TelescopesThatGotBackPhotometry = (simu.noSignal_on_T[it-1] - simu.noSignal_on_T[it] == 1)
+    #             # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
+                
+    #             TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
+                
+    #             # if (config.FT['state'][it-1] == 0):         # Last frame, all telescopes were tracked
+    #             #     config.FT['it0'] = np.ones(NA)*it ; config.FT['it_last'] = np.ones(NA)*it
+    #             #     config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
+                    
+    #             # elif sum(TelescopesThatNeedARestart) > 0:
+                    
+    #             #     # Version "Restart only concerned telescopes" (06-10-2021)
+    #             #     # --> doesn't work because it avoids some OPDs.
+    #             #     # for ia in TelescopesThatNeedARestart:
+    #             #     #     config.FT['it0'][ia] = it ; config.FT['it_last'][ia] = it
+    #             #     #     config.FT['last_usaw'][ia] = 0
+                
+    #             #     # Version "Restart all" (06-10-2021)
+    #             #     # Restart all telescope from their current position.
+    #             #     config.FT['it0'] = np.ones(NA)*it
+    #             #     config.FT['it_last'] = np.ones(NA)*it
+    #             #     config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
+                    
+    #             # config.FT['usaw'][it] = searchfunction(config.FT['usaw'][it-1])         # Fonction search de vitesse 1µm/frame par piston
+                    
+    #             # Kernel = np.identity(NA) - Igdna
+    #             # simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
+    #             # Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)                 
+                
+    #             # # After multiplication by Kernel, the OPD velocities can only be lower or equal than before
+                
+    #             # usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
+            
+    #             if (config.FT['state'][it-1] == 0):# or (sum(TelescopesThatNeedARestart) >0) :
+    #                 config.FT['it0'] = it ; config.FT['it_last'] = it
+    #                 config.FT['last_usaw'] = config.FT['usaw'][it-1]
+            
+    #             usaw = np.copy(config.FT['usaw'][it-1])
+    #             config.FT['usaw'][it] = searchfunction2(usaw,it)      # In this version, usaw is a float
+            
+    #             Kernel = np.identity(NA) - Igdna
+    #             simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
+    #             Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)
+            
+    #             usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
+                
+    #         else:
+    #             config.FT['state'][it] = 0
+    #             usearch = simu.SearchCommand[it]
+    #     else:
+    #         config.FT['state'][it] = 0
+    #         usearch = simu.SearchCommand[it]
+            
+    # else:
+    #     simu.time_since_loss[it] = 0
+    #     config.FT['state'][it] = 0
+    #     # Version usaw vector
+    #     # config.FT['eps'] = np.ones(NA)
+        
+    #     # Version usaw float
+    #     config.FT['eps'] = 1
+        
+    #     usearch = simu.SearchCommand[it]
+        
+        
+    # # if config.TELref:
+    # #     iTel = config.TELref-1
+    # #     usearch = usearch - usearch[iTel]
+    
+    # usearch = config.FT['search']*usearch
+    # # The command is sent at the next time, that's why we note it+1
+    # simu.SearchCommand[it+1] = usearch
+    
+    
+    
+    """ New implementation RELOCK command 08/02/2022 """
+    
     IgdRank = np.linalg.matrix_rank(simu.Igd[it])
     NotCophased = (IgdRank < NA-1)
     simu.IgdRank[it] = IgdRank
@@ -541,6 +658,14 @@ def CommandCalc(currPD,currGD):
             Igdna = np.dot(config.FS['OPD2Piston'],
                            np.dot(simu.Igd[it],config.FS['Piston2OPD']))
             
+            CophasedBaselines=np.where(np.diag(simu.Igd[it])>0.5)[0]
+            CophasedPairs=[]
+            for ib in CophasedBaselines:
+                ia,iap = config.FS['ich'][ib][0], config.FS['ich'][ib][1]
+                CophasedPairs.append([ia,iap])
+                
+            CophasedGroups = JoinOnCommonElements(CophasedPairs)
+            
             # Fringe loss
             simu.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
             # WeLostANewTelescope = (sum(newLostTelescopes) > 0)
@@ -549,74 +674,59 @@ def CommandCalc(currPD,currGD):
             simu.noSignal_on_T[it] = 1*(simu.SNRPhotometry[it] < config.FT['ThresholdPhot'])
                 
             comparison = (simu.noSignal_on_T[it] == simu.LostTelescopes[it])
-            simu.LossDueToInjection[it] = comparison.all()       # Evaluates if the two arrays are the same
+            simu.LossDueToInjection[it] = (comparison.all() and sum(simu.noSignal_on_T[it])>1)       # Evaluates if the two arrays are the same
             
             if not simu.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
                 config.FT['state'][it] = 1
+
+                # If it=0, initialize LastPosition to 0. 
+                # Else, it will remain the last value of SearchCommand, which has
+                # not change since last RELOCK state.
+                
+                LastPosition = config.FT['LastPosition'][it]
                 
                 newLostTelescopes = (simu.LostTelescopes[it] - simu.LostTelescopes[it-1] == 1)
                 TelescopesThatGotBackPhotometry = (simu.noSignal_on_T[it-1] - simu.noSignal_on_T[it] == 1)
                 # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
                 
                 TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
-                
-                # if (config.FT['state'][it-1] == 0):         # Last frame, all telescopes were tracked
-                #     config.FT['it0'] = np.ones(NA)*it ; config.FT['it_last'] = np.ones(NA)*it
-                #     config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
-                    
-                # elif sum(TelescopesThatNeedARestart) > 0:
-                    
-                #     # Version "Restart only concerned telescopes" (06-10-2021)
-                #     # --> doesn't work because it avoids some OPDs.
-                #     # for ia in TelescopesThatNeedARestart:
-                #     #     config.FT['it0'][ia] = it ; config.FT['it_last'][ia] = it
-                #     #     config.FT['last_usaw'][ia] = 0
-                
-                #     # Version "Restart all" (06-10-2021)
-                #     # Restart all telescope from their current position.
-                #     config.FT['it0'] = np.ones(NA)*it
-                #     config.FT['it_last'] = np.ones(NA)*it
-                #     config.FT['last_usaw'] = np.copy(config.FT['usaw'][it-1])
-                    
-                # config.FT['usaw'][it] = searchfunction(config.FT['usaw'][it-1])         # Fonction search de vitesse 1µm/frame par piston
-                    
-                # Kernel = np.identity(NA) - Igdna
-                # simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
-                # Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)                 
-                
-                # # After multiplication by Kernel, the OPD velocities can only be lower or equal than before
-                
-                # usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
-            
-                if (config.FT['state'][it-1] == 0):# or (sum(TelescopesThatNeedARestart) >0) :
-                    config.FT['it0'] = it ; config.FT['it_last'] = it
-                    config.FT['last_usaw'] = config.FT['usaw'][it-1]
-            
-                usaw = np.copy(config.FT['usaw'][it-1])
-                config.FT['usaw'][it] = searchfunction2(usaw,it)      # In this version, usaw is a float
-            
+
+                if sum(TelescopesThatNeedARestart)>0:
+                    config.FT['it_last']=it ; #Ldico[ia]['eps']=1 #; Ldico[ia]['it0']=it ;   
+
+                usaw, change = searchfunction_inc(it)
+                config.FT['usaw'][it]= usaw
+
                 Kernel = np.identity(NA) - Igdna
-                simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
-                Kernel = np.dot(simu.NoPhotometryFiltration[it],Kernel)
-            
-                usearch = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
+                Increment = np.dot(Kernel,config.FT['usaw'][it]*config.FT['Velocities'])
+                Increment = Increment/np.ptp(Increment) * config.FT['maxVelocity']
                 
+                if change:
+                    for group in CophasedGroups:
+                        for ig in range(1,len(group)):
+                            ia = int(float(group[ig])-1) ; i0 = int(float(group[0])-1)
+                            LastPosition[ia] = LastPosition[i0] + simu.SearchCommand[it,ia]-simu.SearchCommand[it,i0]
+                    usearch = LastPosition + Increment
+                    LastPosition = simu.SearchCommand[it]
+                    
+                else:
+                    usearch = simu.SearchCommand[it]+Increment
+                    
+                config.FT['LastPosition'][it+1] = LastPosition
+                
+                # You should send command only on telescope with flux
+                simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
+                usearch = np.dot(simu.NoPhotometryFiltration[it],usearch)
+            
+            
             else:
-                config.FT['state'][it] = 0
                 usearch = simu.SearchCommand[it]
+        
         else:
-            config.FT['state'][it] = 0
             usearch = simu.SearchCommand[it]
             
     else:
         simu.time_since_loss[it] = 0
-        config.FT['state'][it] = 0
-        # Version usaw vector
-        # config.FT['eps'] = np.ones(NA)
-        
-        # Version usaw float
-        config.FT['eps'] = 1
-        
         usearch = simu.SearchCommand[it]
         
         
@@ -628,6 +738,7 @@ def CommandCalc(currPD,currGD):
     # The command is sent at the next time, that's why we note it+1
     simu.SearchCommand[it+1] = usearch
     
+   
     
     """
     Group-Delay tracking
@@ -876,21 +987,20 @@ def getvar():
             varNum[:,ib] = np.mean(varX+varY,axis=0)
             varNum2[:,ib] = np.mean(varX+varY + 2*covarXY, axis=0)
             
-            CohFlux[:,ib] = np.mean(simu.CfPD[timerange,:,ib], axis=0)
-    
-    simu.varNum2[it] = varNum2
-    simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
-    simu.varPDnum2[it] = np.sum(varNum2, axis=0)/2  # Sum over lmbdas of Variance of |CohFlux| taking into account the covariance
+    CohFlux = np.mean(simu.CfPD[timerange], axis=0)
     simu.varPDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|²
-    
+    simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
+    simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
+       
     simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
-    simu.varPD2[it] = simu.varPDnum2[it]/simu.varPDdenom[it]    # Var(|CohFlux|)/|CohFlux|²
+    simu.varPD2[it] = simu.varPDnum[it]/simu.varPDdenom2[it]      # Var(|CohFlux|)/|CohFlux|²
     
     simu.SNRPhotometry[it,:] = np.sum(simu.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
     
     varPD = simu.varPD[it]
+    varPD2 = simu.varPD2[it]
     
-    return varPD
+    return varPD, varPD2
 
 
 def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
@@ -939,6 +1049,7 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             test1 = input("Set all threshold to same value? [y/n]")
             if (test1=='y') or (test1=='yes'):    
                 newThresholdGD = float(input("Set the Threshold GD: "))
+                
             elif (test1=='n') or (test1=='no'):
                 newThresholdGD=np.ones(config.NIN)
                 for ib in range(config.NIN):
@@ -946,10 +1057,31 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             else:
                 raise ValueError("Please answer by 'y','yes','n' or 'no'")
                 
+            test2 = input("Set also a threshold for RELOCK? [y/n]")
+            if (test2 == 'y') or (test2=='yes'):
+                
+                test3 = input("Set all threshold to same value? [y/n]")
+                if (test3 == 'y') or (test3=='yes'):
+                    newThresholdRELOCK = float(input("Set the Threshold RELOCK: "))
+                
+                elif (test3=='n') or (test3=='no'):
+                    newThresholdGD=np.ones(config.NIN)
+                    newThresholdRELOCK=np.ones(config.NIN)
+                    for ib in range(config.NIN):
+                        newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
+                        newThresholdRELOCK[ib] = float(input(f"Threshold RELOCK base {config.FS['ich'][ib]}:"))
+                
+                else:
+                    raise ValueError("Please answer by 'y','yes','n' or 'no'")
+            
+            elif (test2=='n') or (test2=='no'):
+                newThresholdRELOCK=newThresholdGD
+                pass
+            else:
+                raise ValueError("Please answer by 'y','yes','n' or 'no'")
+            
         else:
             from cophasing import simu,coh_tools
-            
-            InstantaneousSquaredSNR=1/simu.varPD
             
             scanned_baselines = [coh_tools.posk(ia,scanned_tel-1,config.NA) for ia in range(config.NA-1)]
             k=0;ib=scanned_baselines[k]
@@ -962,13 +1094,16 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             ind=np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
             
             newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
-                
+            newThresholdRELOCK = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAverage2[ind,:])])
+                    
             config.FT['ThresholdGD'] = newThresholdGD
+            config.FT['ThresholdRELOCK'] = newThresholdRELOCK
             
             sk.display('snr',WLOfTrack=1.6, pause=True,display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
-        updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, ThresholdGD=newThresholdGD)
+        updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
+                       ThresholdGD=newThresholdGD, ThresholdRELOCK=newThresholdRELOCK)
     
     
     else:
@@ -1001,6 +1136,30 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
                     newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
             else:
                 raise ValueError("Please answer by 'y','yes','n' or 'no'")
+            
+            test2 = input("Set also a threshold for RELOCK? [y/n]")
+            if (test2 == 'y') or (test2=='yes'):
+                
+                test3 = input("Set all threshold to same value? [y/n]")
+                if (test3 == 'y') or (test3=='yes'):
+                    newThresholdRELOCK = float(input("Set the Threshold RELOCK: "))
+                
+                elif (test3=='n') or (test3=='no'):
+                    newThresholdGD=np.ones(config.NIN)
+                    newThresholdRELOCK=np.ones(config.NIN)
+                    for ib in range(config.NIN):
+                        newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
+                        newThresholdRELOCK[ib] = float(input(f"Threshold RELOCK base {config.FS['ich'][ib]}:"))
+                
+                else:
+                    raise ValueError("Please answer by 'y','yes','n' or 'no'")
+            
+            elif (test2=='n') or (test2=='no'):
+                newThresholdRELOCK=newThresholdGD
+                pass
+            else:
+                raise ValueError("Please answer by 'y','yes','n' or 'no'")
+                
                 
         else:
             from cophasing import simu,coh_tools
@@ -1008,14 +1167,16 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             ind=100
             
             newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
+            newThresholdRELOCK = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage2[ind,:])])
             
             config.FT['ThresholdGD'] = newThresholdGD
+            config.FT['ThresholdRELOCK'] = newThresholdRELOCK
             sk.display('detector',WLOfTrack=1.6, pause=True,display=display)
             #print(f"The threshold is set to {newThresholdGD}")
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
-                       ThresholdGD=newThresholdGD)
+                       ThresholdGD=newThresholdGD,ThresholdRELOCK=newThresholdRELOCK)
     
     return newThresholdGD
 
@@ -1146,7 +1307,7 @@ def searchfunction(usaw):
 
 def searchfunction2(usaw,it):
     
-    a = config.FT['Sweep30s']/30
+    a = config.FT['Sweep30s']/30000
     sweep = config.FT['Sweep0'] + a*(it-config.FT['it0'])*config.dt
     
     time_since_last_change = (it-config.FT['it_last'])*config.dt
@@ -1167,7 +1328,7 @@ def searchfunction2(usaw,it):
 
 def searchfunction3(usaw,it):
     
-    a = config.FT['Sweep30s']/30
+    a = config.FT['Sweep30s']/30000
     sweep = config.FT['Sweep0'] + a*(it-config.FT['it0'])*config.dt
     
     time_since_last_change = (it-config.FT['it_last'])*config.dt
@@ -1186,3 +1347,82 @@ def searchfunction3(usaw,it):
     config.FT['usaw'][it] = usaw
         
     return usaw
+
+def searchfunction_inc(it):
+    """
+    Incremental sawtooth function working.
+    It returns +1 or -1 depending on the tooth on which it is, and add a delta only at the change of tooth.
+    INPUT:
+        - dico : DICTIONARY
+            Contains relevant informations for the decision of change of tooth.
+        - it : FLOAT
+            Current time.
+            
+    OUTPUT:
+        - usaw : FLOAT ARRAY
+            Incrementation to add to the current ODL position, telescope per telescope.
+        - dico : DICTIONNARY
+            Updated dico.
+    """
+    
+    it_last=config.FT['it_last']; it0=config.FT['it0'] ; eps=config.FT['eps']
+    
+    a = config.FT['Sweep30s']/30000  # Coefficient directeur de la fonction d'augmentation du temps avant saut.
+    sweep = config.FT['Sweep0'] + a*(it-it0)*config.dt
+    
+    time_since_last_change = (it-it_last)*config.dt
+    
+    if time_since_last_change < sweep:
+        change=False
+        usaw = eps
+        
+    else:
+        change=True
+        eps = -eps
+        it_last = it
+        usaw = eps
+        config.FT['it_last'] = it_last
+        
+    config.FT['eps'] = eps
+    
+    return usaw, change
+
+def JoinOnCommonElements(groups):
+    """
+    Get a list of groups and join all the groups with common elements.
+    INPUT:
+        - groups : ARRAY OF LIST or LIST OF LIST
+            List of the cophased pairs
+    
+    OUTPUT:
+        - L : LIST OR LIST
+            List of the cophased groups
+    """
+
+    l = groups
+
+    out = []
+    while len(l)>0:
+        first, *rest = l
+        first = set(first)
+
+        lf = -1
+        while len(first)>lf:
+            lf = len(first)
+
+            rest2 = []
+            for r in rest:
+                if len(first.intersection(set(r)))>0:
+                    first |= set(r)
+                else:
+                    rest2.append(r)     
+            rest = rest2
+
+        out.append(first)
+        l = rest
+
+    L=[]
+    for x in out:
+        L.append(list(x))
+            
+    return(L)

@@ -179,7 +179,6 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
             
         config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
         config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
-        # config.FT['OPistonPD2Piston'] = config.FT['OPD2Piston']/NA
         
         if config.TELref:
             iTELref = config.TELref - 1

@@ -140,6 +140,7 @@ SquaredSNRMovingAverage2 = np.zeros([NT,NIN])           # Estimated SNR
 varPDnum = np.zeros([NT,NIN])
 varPDnum2 = np.zeros([NT,NIN])
 varPDdenom = np.zeros([NT,NIN])
+varPDdenom2 = np.zeros([NT,NIN])
 varPD2 = np.zeros([NT,NIN])
 varNum2 = np.zeros([NT,MW,NIN])
 LossDueToInjection = np.zeros(NT)
