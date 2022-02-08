@@ -78,11 +78,13 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
                   [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
         
         ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14] ; NIN=15
-            
+        active_ich = np.ones(NIN)
+        
+        config.FS['name'] = 'PW6-15-10_perfect'
         config.FS['func'] = SPICAFS_PERFECT
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
-        config.FS['active_ich'] = np.ones_like(ichorder)
+        config.FS['active_ich'] = active_ich
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         NG = np.shape(ich)[0]       # should always be equal to NIN
@@ -145,6 +147,27 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        
+        config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
+        config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        Piston2OPD_forInv = np.zeros([NIN,NA])
+        
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = ct.posk(ia,iap,NA)
+                config.FS['Piston2OPD'][ib,ia] = 1
+                config.FS['Piston2OPD'][ib,iap] = -1
+                if active_ich[ib]:
+                    Piston2OPD_forInv[ib,ia] = 1
+                    Piston2OPD_forInv[ib,iap] = -1
+            
+        config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
+        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
+        
+        if config.TELref:
+            iTELref = config.TELref - 1
+            L_ref = config.FS['OPD2Piston'][iTELref,:]
+            config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
         
         return
     
@@ -242,11 +265,14 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         # Created by the user here
         ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
                   [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
-        ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14]
-
+        ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14] ; NIN=15
+        active_ich = np.ones(NIN)
+        
+        config.FS['name'] = 'PW6-15-10_realistic'
         config.FS['func'] = SPICAFS_REALISTIC
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
+        config.FS['active_ich'] = active_ich
         
         NG = np.shape(ich)[0]       # should always be equal to NIN
         
@@ -316,6 +342,27 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         config.FS['active_ich'] = np.ones(NIN)
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
+        config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
+        config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        Piston2OPD_forInv = np.zeros([NIN,NA])
+        
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = ct.posk(ia,iap,NA)
+                config.FS['Piston2OPD'][ib,ia] = 1
+                config.FS['Piston2OPD'][ib,iap] = -1
+                if active_ich[ib]:
+                    Piston2OPD_forInv[ib,ia] = 1
+                    Piston2OPD_forInv[ib,iap] = -1
+            
+        config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
+        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
+        
+        if config.TELref:
+            iTELref = config.TELref - 1
+            L_ref = config.FS['OPD2Piston'][iTELref,:]
+            config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+            
         return
     
     from .config import NA, NB, NW, MW, OW
@@ -432,7 +479,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         wldico = hdul[2].data           # Wavelength information
         v2pmdico = hdul[3].data         # contains the V2PM
             
-        # hdul.close()
+        config.FS['name'] = 'SPICAFS_PW_real'
         config.FS['func'] = SPICAFS_TRUE
         # We read the interferometric channels indices and modulation patterns
         ichraw = detectordico['BEAM_INDEX']
@@ -456,7 +503,8 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             ichorder[ibconventional] = ib
             
         config.FS['ichorder'] = ichorder
-        config.FS['active_ich'] = np.ones(NIN)
+        active_ich = np.ones(NIN)
+        config.FS['active_ich'] = active_ich
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         OrderingIndex = np.zeros(NP,dtype=np.int8)
@@ -613,7 +661,29 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             config.FS['V2PMgrav'] = MicroV2PMgrav
             config.FS['P2VMgrav'] = MicroP2VMgrav
             config.FS['MacroP2VMgrav'] = MacroP2VMgrav
+        
+            config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
+            config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+            Piston2OPD_forInv = np.zeros([NIN,NA])
             
+            for ia in range(NA):
+                for iap in range(ia+1,NA):
+                    ib = ct.posk(ia,iap,NA)
+                    config.FS['Piston2OPD'][ib,ia] = 1
+                    config.FS['Piston2OPD'][ib,iap] = -1
+                    if active_ich[ib]:
+                        Piston2OPD_forInv[ib,ia] = 1
+                        Piston2OPD_forInv[ib,iap] = -1
+                
+            config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
+            config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
+            
+            if config.TELref:
+                iTELref = config.TELref - 1
+                L_ref = config.FS['OPD2Piston'][iTELref,:]
+                config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+        
+        
             # Changes the oversampled spectra and initializes the macro spectra
             config.spectra = newspectra
             config.NW = NW
