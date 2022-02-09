@@ -429,7 +429,6 @@ def CommandCalc(currPD,currGD):
     -------
     cmd_odl : TYPE
         DESCRIPTION.
-
     """
     
     from . import simu
