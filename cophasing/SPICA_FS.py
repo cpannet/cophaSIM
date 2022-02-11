@@ -153,7 +153,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
         for imw in range(MW):
             ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
-            config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+            config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(ElementsNorm.T).T)
         
         config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
         config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
@@ -204,12 +204,13 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
     
     if config.noise:
         from .skeleton import addnoise
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
-    
         if np.min(simu.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
             simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
     
+        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
+    
+
     # estimates coherences
     currCfEstimated = np.zeros([MW,NB])*1j
     for imw in range(MW):
@@ -355,7 +356,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
         for imw in range(MW):
             ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
-            config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+            config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(ElementsNorm.T).T)
             
         config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
         config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
@@ -406,11 +407,11 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
     
     if config.noise:
         from .skeleton import addnoise
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
-    
         if np.min(simu.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
             simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+    
+        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
     
     # estimates coherences
     currCfEstimated = np.zeros([MW,NB])*1j
@@ -615,7 +616,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
             for imw in range(MW):
                 ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
-                config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+                config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(ElementsNorm.T).T)
             
             # Changes the oversampled spectra and initializes the macro spectra
             config.spectra = spectra
@@ -687,7 +688,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
             for imw in range(MW):
                 ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
-                config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+                config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(ElementsNorm.T).T)
             
             config.FS['V2PMgrav'] = MicroV2PMgrav
             config.FS['P2VMgrav'] = MicroP2VMgrav
@@ -748,11 +749,11 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             
     if config.noise:
         from .skeleton import addnoise
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
-    
         if np.min(simu.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
             simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+    
+        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
             
     # estimates coherences
     currCfEstimated = np.zeros([MW,NB])*1j

@@ -164,7 +164,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
         config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
         for imw in range(MW):
             ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
-            config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+            config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(ElementsNorm.T).T)
     
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
@@ -259,7 +259,6 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
     
     if config.noise:
         from .skeleton import addnoise
-        
         if np.min(simu.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
             simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
@@ -489,7 +488,7 @@ given in config ({NA}).")
         # /!\ To save time, it's in [NIN,NP]
         config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
         for imw in range(MW):
-            config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw]))
+            config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])))
 
 
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
