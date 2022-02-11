@@ -204,12 +204,18 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
     if verbose2:
         print(f"Start optimisation with sample gains GD={GainsGD} and PD={GainsPD}")
     
-    sk.update_config(checkperiod=110) # For not seeing the decount.
+    sk.update_config(checkperiod=110,verbose=verbose) # For not seeing the decount.
     
     VarOPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])         # Phase variances
     VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances
     VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances
     InstVarPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
+    InstVarPD2 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
+    InstVarPDdebiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
+    VarPDnum = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # Estimated PD variances
+    VarPDdenom = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
+    VarPDdenom2 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
+    VarPDdenomDebiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
     VarPiston = np.zeros([NDIT,NgainsGD,NgainsPD,NA])       # Piston variance
     VarPistonGD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston GD variance
     VarPistonPD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston PD variance
@@ -274,7 +280,7 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                 if verbose2:
                     print(f'File {ifile+1}/{Nfiles}')
                 
-                sk.update_config(DisturbanceFile=DisturbanceFile)
+                sk.update_config(DisturbanceFile=DisturbanceFile, verbose=verbose)
             
                 # Launch the simulator
                 if save_all=='light':
@@ -321,6 +327,12 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                     # Average of the estimated instantaneous variance. (has a 
                     # signification only in open loop)
                     InstVarPD[idit,ig,ip,:] += np.mean(simu.varPD,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    InstVarPD2[idit,ig,ip,:] += np.mean(simu.varPD2,axis=0)
+                    InstVarPDdebiased[idit,ig,ip,:] += np.mean(simu.varPDdebiased,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarPDnum[idit,ig,ip,:] += np.mean(simu.varPDnum,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarPDdenom[idit,ig,ip,:] += np.mean(simu.varPDdenom,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarPDdenom2[idit,ig,ip,:] += np.mean(simu.varPDdenom2,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarPDdenomDebiased[idit,ig,ip,:] += np.mean(simu.varPDdenomDebiased,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
                     Vmod[idit,ig,ip,:] = ct.NB2NIN(np.abs(simu.VisibilityObject[indWLOfTrack]))
                     Vangle[idit,ig,ip,:] = ct.NB2NIN(np.angle(simu.VisibilityObject[indWLOfTrack]))
@@ -387,7 +399,8 @@ Remains {strtime(RemainingTime)}")
     ichint = [int(''.join([str(int(ic[0]+1)),str(int(ic[1]+1))])) for ic in config.ich] # Convert list of tuples into list of int
     telint = np.arange(1,NA+1)
     criteriasBase = ["LR", "LR2", "LR3", "WLR", "FC", "VarOPD [µm]",
-                     "VarGDRes","VarPDRes","InstVarPD","InstSNR","ThresholdGDs",
+                     "VarGDRes","VarPDRes","InstVarPD","InstVarPD2","InstVarPDdebiased",
+                     "VarPDnum", "VarPDdenom","VarPDdenom2","VarPDdenomDebiased", "InstSNR","ThresholdGDs",
                      'Vmod','Vangle']
     
     Ncb = len(criteriasBase)
@@ -404,8 +417,10 @@ Remains {strtime(RemainingTime)}")
     D = criteriasBase * NDIT * NgainsGD * NgainsPD 
     
     base_5d = np.array([LockedRatio,LR2,LR3,WLockedRatio,FCArray,VarOPD,
-                        VarGDRes,VarPDRes,InstVarPD,np.sqrt(1/InstVarPD),
-                        Vmod,Vangle,ThresholdGDs])
+                        VarGDRes,VarPDRes,InstVarPD,InstVarPD2,InstVarPDdebiased,
+                        VarPDnum, VarPDdenom,VarPDdenom2,VarPDdenomDebiased,
+                        np.sqrt(1/InstVarPD),
+                        ThresholdGDs, Vmod,Vangle])
     base_5d = np.transpose(base_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order
     
     base_2d = base_5d.reshape([NDIT*Ncb*NgainsGD*NgainsPD,NIN], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
@@ -527,7 +542,7 @@ disturbance file to show the results.")
         
         config.FT['GainGD'] = bestGainGD
         config.FT['GainPD'] = bestGainPD
-        sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=40)
+        sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=40, verbose=verbose)
         
         # Launch the simulator
         sk.loop()

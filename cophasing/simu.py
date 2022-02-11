@@ -94,6 +94,7 @@ MacroImages = np.zeros([NT,MW,FS['NP']])        # Contains microtime images sume
 CovarianceReal = np.zeros([NT,MW,NB])           # Covariances of the real part of the coherent flux
 CovarianceImag = np.zeros([NT,MW,NB])           # Covariances of the imaginary part of the coherent flux
 Covariance = np.zeros([NT,MW,NB,NB])            # Covariances of the real and imaginary parts of the coherent flux
+BiasModCf = np.zeros([NT,MW,NIN])               # Bias on the estimator of the module of the coherent flux.
 varFlux = np.zeros([NT,MW,FS['NP']])            # Variance Flux
 SNRPhotometry = np.zeros([NT,NA])               # SNR of the photometry estimation
 
@@ -137,11 +138,14 @@ VarPiston = np.zeros([NA])
 # Investigation Variables
 
 SquaredSNRMovingAverage2 = np.zeros([NT,NIN])           # Estimated SNR
+SquaredSNRMovingAverageDebiased = np.zeros([NT,NIN])
 varPDnum = np.zeros([NT,NIN])
 varPDnum2 = np.zeros([NT,NIN])
 varPDdenom = np.zeros([NT,NIN])
 varPDdenom2 = np.zeros([NT,NIN])
+varPDdenomDebiased = np.zeros([NT,NIN])
 varPD2 = np.zeros([NT,NIN])
+varPDdebiased = np.zeros([NT,NIN])
 varNum2 = np.zeros([NT,MW,NIN])
 LossDueToInjection = np.zeros(NT)
 eps = np.zeros([NT,NA])

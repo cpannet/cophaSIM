@@ -148,6 +148,13 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
         
+        # The matrix of the elements norm only for the calculation of the bias of |Cf|².
+        # /!\ To save time, it's in [NIN,NP]
+        config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
+        for imw in range(MW):
+            ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
+            config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+        
         config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
         config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
         Piston2OPD_forInv = np.zeros([NIN,NA])
@@ -185,7 +192,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
     for iw in range(config.NW):
         
         Modulation = config.FS['V2PM'][iw,:,:]
-        image_iw = np.abs(np.dot(Modulation,currCfTrue[iw,:]))
+        image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
         simu.MacroImages[it,imw,:] += image_iw
         
@@ -379,7 +386,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
     for iw in range(config.NW):
         
         Modulation = config.FS['V2PM'][iw,:,:]
-        image_iw = np.abs(np.dot(Modulation,currCfTrue[iw,:]))
+        image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
         simu.MacroImages[it,imw,:] += image_iw
         
@@ -706,7 +713,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
     for iw in range(config.NW):
         
         Modulation = config.FS['V2PM'][iw,:,:]
-        image_iw = np.abs(np.dot(Modulation,currCfTrue[iw,:]))
+        image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
         simu.MacroImages[it,imw,:] += image_iw      # Integrate flux into spectral channel
         

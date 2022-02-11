@@ -156,7 +156,7 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
             config.FT['ThresholdGD'] = ThresholdGD
             
         if isinstance(ThresholdGD,(float,int)):
-            config.FT['ThresholdRELOCK'] = np.ones(NIN)*ThresholRELOCK
+            config.FT['ThresholdRELOCK'] = np.ones(NIN)*ThresholdRELOCK
         else:
             config.FT['ThresholdRELOCK'] = ThresholdRELOCK
             
@@ -467,6 +467,7 @@ def CommandCalc(currPD,currGD):
         timerange = range(it+1-Ngd, it+1)
         simu.SquaredSNRMovingAverage[it] = np.nan_to_num(1/np.mean(simu.varPD[timerange], axis=0))
         simu.SquaredSNRMovingAverage2[it] = np.nan_to_num(1/np.mean(simu.varPD2[timerange], axis=0))
+        simu.SquaredSNRMovingAverageDebiased[it] = np.nan_to_num(1/np.mean(simu.varPDdebiased[timerange], axis=0))
         
         simu.TemporalVariancePD[it] = np.var(simu.PDEstimated[timerange], axis=0)
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
@@ -928,7 +929,7 @@ def getvar():
     from .config import NA, NIN, MW
     
     from .simu import it
-    from .coh_tools import simu2GRAV
+    from .coh_tools import simu2GRAV, NB2NIN
     
     image = simu.MacroImages[it]
     
@@ -937,6 +938,7 @@ def getvar():
     sigsky = config.FS['sigsky']  # Background noise
     imsky = config.FS['imsky']    # Sky image before observation
     Demod = config.FS['MacroP2VM']    # Macro P2VM matrix used for demodulation
+    ElementsNormDemod = config.FS['ElementsNormDemod']
     
     DemodGRAV = simu2GRAV(Demod, direction='p2vm')
     
@@ -949,11 +951,12 @@ def getvar():
     Covariance calculation (eq. 13)
     """
     
-    for iw in range(MW):
-        simu.CovarianceReal[it,iw] = np.sum(np.real(Demod[iw])**2*varFlux[iw], axis=1)
-        simu.CovarianceImag[it,iw] = np.sum(np.imag(Demod[iw])**2*varFlux[iw], axis=1)
+    for imw in range(MW):
+        simu.CovarianceReal[it,imw] = np.sum(np.real(Demod[imw])**2*varFlux[imw], axis=1)
+        simu.CovarianceImag[it,imw] = np.sum(np.imag(Demod[imw])**2*varFlux[imw], axis=1)
 
-        simu.Covariance[it,iw] = np.dot(DemodGRAV[iw], np.dot(np.diag(varFlux[iw]),np.transpose(DemodGRAV[iw])))
+        simu.Covariance[it,imw] = np.dot(DemodGRAV[imw], np.dot(np.diag(varFlux[imw]),np.transpose(DemodGRAV[imw])))
+        simu.BiasModCf[it,imw] = np.dot(ElementsNormDemod[imw],varFlux[imw])
         
     simu.DemodGRAV = DemodGRAV
     
@@ -972,27 +975,36 @@ def getvar():
 #       Ex = Esperance of X ; Ey = Esperance of Y
 #       VarX = Variance of X ; VarY = Variance of Y
 # =============================================================================
-    
+    diagCovar = np.diagonal(simu.Covariance, axis1=2, axis2=3)
+    varPhot = diagCovar[it,:,:NA]
     timerange = range(it+1-Nvar,it+1)
-    for ia in range(NA):
-        ibp = ia*(NA+1)
-        varPhot[:,ia] = simu.Covariance[it,:,ibp,ibp]       # Variance of photometry at each frame
-        for iap in range(ia+1,NA):
-            ib = posk(ia,iap,NA)
-            ibr=NA+ib; varX = simu.Covariance[timerange,:,ibr,ibr]
-            ibi=NA+NIN+ib; varY = simu.Covariance[timerange,:,ibi,ibi]
-            covarXY = simu.Covariance[timerange,:,ibr,ibi]
+    varX = np.abs(diagCovar[timerange,:,NA:NA+NIN])
+    varY = np.abs(diagCovar[timerange,:,NA+NIN:])
+    varNum = np.mean(varX+varY,axis=0)
+    # for ia in range(NA):
+    #     ibp = ia*(NA+1)
+    #     varPhot[:,ia] = simu.Covariance[it,:,ibp,ibp]       # Variance of photometry at each frame
+    #     for iap in range(ia+1,NA):
+    #         ib = posk(ia,iap,NA)
+    #         ibr=NA+ib; varX = simu.Covariance[timerange,:,ibr,ibr]
+    #         ibi=NA+NIN+ib; varY = simu.Covariance[timerange,:,ibi,ibi]
+    #         covarXY = simu.Covariance[timerange,:,ibr,ibi]
             
-            varNum[:,ib] = np.mean(varX+varY,axis=0)
-            varNum2[:,ib] = np.mean(varX+varY + 2*covarXY, axis=0)
+    #         varNum[:,ib] = np.mean(varX+varY,axis=0)
+    #         varNum2[:,ib] = np.mean(varX+varY + 2*covarXY, axis=0)
             
     CohFlux = np.mean(simu.CfPD[timerange], axis=0)
-    simu.varPDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|²
-    simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
-    simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
-       
+    CfSumOverLmbda = np.mean(CohFlux,axis=0)
+    
+    simu.varPDdenom[it] = np.mean(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
+    simu.varPDdenomDebiased[it] = np.mean(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
+    simu.varPDdenom2[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda)-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14
+    #simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
+    simu.varPDnum[it] = np.mean(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
+    
     simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
     simu.varPD2[it] = simu.varPDnum[it]/simu.varPDdenom2[it]      # Var(|CohFlux|)/|CohFlux|²
+    simu.varPDdebiased[it] = simu.varPDnum[it]/simu.varPDdenomDebiased[it]
     
     simu.SNRPhotometry[it,:] = np.sum(simu.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
     
@@ -1002,7 +1014,7 @@ def getvar():
     return varPD, varPD2
 
 
-def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
+def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel=6):
     """
     This function enables to estimate the threshold GD for the state-machine.
     It scans the coherence envelop of the FS and displays the estimated SNR².
@@ -1032,13 +1044,13 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             
         InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
         
-        sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT)
+        sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT,verbose=verbose)
         
         # Initialize the fringe tracker with the gain
         from cophasing.SPICA_FT import SPICAFT, updateFTparams
         #SPICAFT(init=True, GainPD=0, GainGD=0,search=False)
         gainPD,gainGD,search=config.FT['GainPD'],config.FT['GainGD'],config.FT['search']
-        updateFTparams(GainPD=0, GainGD=0, search=False)
+        updateFTparams(GainPD=0, GainGD=0, search=False, verbose=verbose)
         
         # Launch the scan
         sk.loop()
@@ -1100,9 +1112,11 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             
             sk.display('snr',WLOfTrack=1.6, pause=True,display=display)
             
-        sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
+        sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
+                         verbose=verbose)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
-                       ThresholdGD=newThresholdGD, ThresholdRELOCK=newThresholdRELOCK)
+                       ThresholdGD=newThresholdGD, ThresholdRELOCK=newThresholdRELOCK,
+                       verbose=verbose)
     
     
     else:
@@ -1113,13 +1127,13 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             
         InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
         
-        sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT)
+        sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT, verbose=verbose)
         
         # Initialize the fringe tracker with the gain
         from cophasing.SPICA_FT import SPICAFT, updateFTparams
         #SPICAFT(init=True, GainPD=0, GainGD=0,search=False)
         gainPD,gainGD,search=config.FT['GainPD'],config.FT['GainGD'],config.FT['search']
-        updateFTparams(GainPD=0, GainGD=0, search=False)
+        updateFTparams(GainPD=0, GainGD=0, search=False, verbose=verbose)
         
         # Launch the scan
         sk.loop()
@@ -1171,11 +1185,12 @@ def SetThreshold(manual=False, scan=False,display=False,scanned_tel=6):
             config.FT['ThresholdGD'] = newThresholdGD
             config.FT['ThresholdRELOCK'] = newThresholdRELOCK
             sk.display('detector',WLOfTrack=1.6, pause=True,display=display)
-            #print(f"The threshold is set to {newThresholdGD}")
             
-        sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT)
+        sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
+                         verbose=verbose)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
-                       ThresholdGD=newThresholdGD,ThresholdRELOCK=newThresholdRELOCK)
+                       ThresholdGD=newThresholdGD,ThresholdRELOCK=newThresholdRELOCK,
+                       verbose=verbose)
     
     return newThresholdGD
 

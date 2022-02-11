@@ -28,7 +28,7 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, N
              spectrum = [], mode = 'search',
              fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigsky=[],imsky=[],
              ft = 'integrator', state = 0,
-             noise=False,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
+             noise=True,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
              seedph=100, seedron=100, seeddist=100,
              starttracking=50, latencytime=0,
              piston_average=0,display=False,
@@ -177,7 +177,7 @@ SOURCE:
     
     if noise:
         np.random.seed(seedron+60)
-        config.FS['sigsky'] = np.random.randn([MW,config.FS['NP']])*ron
+        config.FS['sigsky'] = np.random.randn(MW,config.FS['NP'])*ron
     
     config.phnoise=phnoise
     config.G = G

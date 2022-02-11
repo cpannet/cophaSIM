@@ -197,7 +197,14 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         config.FS['V2PM'] = V2PM
         config.FS['P2VM'] = P2VM
         config.FS['MacroP2VM'] = MacroP2VM
-
+        
+        # The matrix of the elements norm only for the calculation of the bias of |Cf|².
+        # /!\ To save time, it's in [NIN,NP]
+        config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
+        for imw in range(MW):
+            ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
+            config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+            
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
@@ -218,7 +225,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
     for iw in range(config.NW):
         
         Modulation = config.FS['V2PM'][iw,:,:]
-        image_iw = np.abs(np.dot(Modulation,currCfTrue[iw,:]))
+        image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
         simu.MacroImages[it,imw,:] += image_iw
         
