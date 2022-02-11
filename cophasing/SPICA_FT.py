@@ -367,19 +367,19 @@ def ReadCf(currCfEstimated):
     for ia in range(NA):
         for iap in range(ia+1,NA):
             ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
-            valid1=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+            valid1=config.FS['active_ich'][ib]
             cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
             cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
             cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
             for iapp in range(iap+1,NA):
                 ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-                valid2=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+                valid2=config.FS['active_ich'][ib]
                 cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
                 ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-                valid3=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+                valid3=config.FS['active_ich'][ib]
                 cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
