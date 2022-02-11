@@ -264,21 +264,21 @@ def ReadCf(currCfEstimated):
     it = simu.it            # Time
      
     """
-    Photometries extraction
+    Photometries and CfNIN extraction
     [NT,MW,NA]
     """
+    
     PhotEst = np.zeros([MW,NA])
+    currCfEstimatedNIN = np.zeros([MW, NIN])*1j
     for ia in range(NA):
         PhotEst[:,ia] = np.abs(currCfEstimated[:,ia*(NA+1)])
-    
+        for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)
+            currCfEstimatedNIN[:,ib] = currCfEstimated[:,ia*NA+iap]
+            
     # Save coherent flux and photometries in stack
     simu.PhotometryEstimated[it] = PhotEst
-    
-    # Extract NIN-sized coherence vector from NB-sized one. 
-    # (eliminates photometric and conjugate terms)
-    currCfEstimatedNIN = np.zeros([MW, NIN])*1j
-    for imw in range(MW):    
-        currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
+
         
     """
     Visibilities extraction
@@ -994,13 +994,13 @@ def getvar():
     #         varNum2[:,ib] = np.mean(varX+varY + 2*covarXY, axis=0)
             
     CohFlux = np.mean(simu.CfPD[timerange], axis=0)
-    CfSumOverLmbda = np.mean(CohFlux,axis=0)
+    CfSumOverLmbda = np.sum(CohFlux,axis=0)
     
-    simu.varPDdenom[it] = np.mean(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
-    simu.varPDdenomDebiased[it] = np.mean(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
+    simu.varPDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
+    simu.varPDdenomDebiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
     simu.varPDdenom2[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda)-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14
     #simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
-    simu.varPDnum[it] = np.mean(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
+    simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
     
     simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
     simu.varPD2[it] = simu.varPDnum[it]/simu.varPDdenom2[it]      # Var(|CohFlux|)/|CohFlux|²

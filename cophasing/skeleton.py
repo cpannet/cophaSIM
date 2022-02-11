@@ -256,6 +256,14 @@ def update_config(verbose=True,**kwargs):
         config.FT['usaw'] = np.zeros(config.NT)
         if verbose:
             print(' - New NT \u2260 len(timestamps) so we change timestamps.')
+            
+    if 'ron' in kwargs.keys():
+        ron = kwargs['ron']
+        config.noise=True
+        config.FS['sigsky'] = np.random.randn(config.MW,config.FS['NP'])*ron
+        if verbose:
+            print(f' - Updated sigsky for ron={ron}.')
+        
     return
 
 def save_config():

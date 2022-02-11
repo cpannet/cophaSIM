@@ -239,8 +239,9 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         from .skeleton import addnoise
         simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
     
-    # if np.min(simu.MacroImages[it]) < 0:
-    #     print(f'Negative image value at t={it}')
+        if np.min(simu.MacroImages[it,:,:])<0:
+            print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
+            simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
     
     # estimates coherences
     currCfEstimated = np.zeros([config.FS['MW'],NB])*1j

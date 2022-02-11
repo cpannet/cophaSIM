@@ -259,13 +259,15 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
     
     if config.noise:
         from .skeleton import addnoise
+        
+        if np.min(simu.MacroImages[it,:,:])<0:
+            print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
+            simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+            
         simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
     
     # if np.min(simu.MacroImages[it]) < 0:
     #     print(f'Negative image value at t={it}')
-    
-    
-        
         
     if config.FS['Modulation']=='ABCD':
         # estimates coherences
@@ -522,10 +524,11 @@ given in config ({NA}).")
     
     if config.noise:
         from .skeleton import addnoise
+        if np.min(simu.MacroImages[it,:,:])<0:
+            print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
+            simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+            
         simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
-    
-    # if np.min(simu.MacroImages[it]) < 0:
-    #     print(f'Negative image value at t={it}')
     
     # estimates coherences
     currCfEstimated = np.zeros([config.FS['MW'],NB])*1j
@@ -675,7 +678,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
     for iw in range(config.NW):
         
         Modulation = config.FS['V2PM'][iw,:,:]
-        image_iw = np.abs(np.dot(Modulation,currCfTrue[iw,:]))
+        image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
         simu.MacroImages[it,imw,:] += image_iw
         
