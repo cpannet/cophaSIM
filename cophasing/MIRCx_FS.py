@@ -203,7 +203,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
         for imw in range(MW):
             ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
-            config.FS['ElementsNormDemod'][imw] = ct.NB2NIN(ElementsNorm.T).T
+            config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(ElementsNorm.T).T)
             
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
@@ -237,11 +237,12 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
     
     if config.noise:
         from .skeleton import addnoise
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
-    
+        
         if np.min(simu.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
             simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+        
+        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
     
     # estimates coherences
     currCfEstimated = np.zeros([config.FS['MW'],NB])*1j

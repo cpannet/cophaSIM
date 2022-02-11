@@ -334,8 +334,8 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                     VarPDdenom2[idit,ig,ip,:] += np.mean(simu.varPDdenom2,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     VarPDdenomDebiased[idit,ig,ip,:] += np.mean(simu.varPDdenomDebiased,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
-                    Vmod[idit,ig,ip,:] = ct.NB2NIN(np.abs(simu.VisibilityObject[indWLOfTrack]))
-                    Vangle[idit,ig,ip,:] = ct.NB2NIN(np.angle(simu.VisibilityObject[indWLOfTrack]))
+                    Vmod[idit,ig,ip,:] = np.real(ct.NB2NIN(np.abs(simu.VisibilityObject[indWLOfTrack])))
+                    Vangle[idit,ig,ip,:] = np.real(ct.NB2NIN(np.angle(simu.VisibilityObject[indWLOfTrack])))
             
                     ThresholdGDs[idit,ig,ip,:] = config.FT['ThresholdGD'] # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
