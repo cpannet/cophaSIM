@@ -1028,12 +1028,14 @@ def get_CfObj(filepath, spectra):
     NewRealCf = f(spectra)
     f = interpolate.interp1d(WLsampling, imagCf, axis=0)
     NewImagCf = f(spectra)
+    NewImagCf[np.abs(NewImagCf)<np.abs(NewRealCf)*1e-6]=0
     CoherentIrradiance = NewRealCf + NewImagCf*1j
     
     f = interpolate.interp1d(WLsampling, realV, axis=0)
     NewRealV = f(spectra)
     f = interpolate.interp1d(WLsampling, imagV, axis=0)
     NewImagV = f(spectra)
+    NewImagV[np.abs(NewImagV)<np.abs(NewRealV)*1e-6]=0
     ComplexVisObj = NewRealV + NewImagV*1j
     
     if isinstance(spectra,float):
@@ -1042,7 +1044,7 @@ def get_CfObj(filepath, spectra):
     else:
         NW, NBfile = CoherentIrradiance.shape
     NAfile = int(np.sqrt(NBfile))
-    
+
     from .config import NA, NB
     NC = (NA-2)*(NA-1)
     if NW!=1:
@@ -1052,21 +1054,21 @@ def get_CfObj(filepath, spectra):
 
         for ia in range(NA):
             for iap in range(NA):
-                ib = ia*NA+iap
+                ib = ia*NA+iap                    
                 FinalCoherentIrradiance[:,ib] = CoherentIrradiance[:,ia*NAfile+iap]
                 FinalComplexVisObj[:,ib] = ComplexVisObj[:,ia*NAfile+iap]
                 
-    
     else:
         ClosurePhase = np.zeros([NC])
         FinalCoherentIrradiance = np.zeros([NB])*1j
         FinalComplexVisObj = np.zeros([NB])*1j
         for ia in range(NA):
             for iap in range(NA):
-                ib = ia*NA+iap        
+                ib = ia*NA+iap
                 FinalCoherentIrradiance[ib] = CoherentIrradiance[ia*NAfile+iap]
                 FinalComplexVisObj[ib] = ComplexVisObj[ia*NAfile+iap]
-            
+                
+                        
     if NA < 3:
         return FinalCoherentIrradiance, FinalComplexVisObj
     

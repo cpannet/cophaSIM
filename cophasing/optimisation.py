@@ -210,12 +210,12 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
     VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances
     VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances
     InstVarPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
-    InstVarPD2 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
-    InstVarPDdebiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
+    InstVarGD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
+    InstVarGDUnbiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
     VarPDnum = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # Estimated PD variances
+    VarGDdenom = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
+    VarGDdenomUnbiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
     VarPDdenom = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
-    VarPDdenom2 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
-    VarPDdenomDebiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
     VarPiston = np.zeros([NDIT,NgainsGD,NgainsPD,NA])       # Piston variance
     VarPistonGD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston GD variance
     VarPistonPD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston PD variance
@@ -327,12 +327,12 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                     # Average of the estimated instantaneous variance. (has a 
                     # signification only in open loop)
                     InstVarPD[idit,ig,ip,:] += np.mean(simu.varPD,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    InstVarPD2[idit,ig,ip,:] += np.mean(simu.varPD2,axis=0)
-                    InstVarPDdebiased[idit,ig,ip,:] += np.mean(simu.varPDdebiased,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    InstVarGD[idit,ig,ip,:] += np.mean(simu.varGD,axis=0)
+                    InstVarGDUnbiased[idit,ig,ip,:] += np.mean(simu.varGDUnbiased,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     VarPDnum[idit,ig,ip,:] += np.mean(simu.varPDnum,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     VarPDdenom[idit,ig,ip,:] += np.mean(simu.varPDdenom,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    VarPDdenom2[idit,ig,ip,:] += np.mean(simu.varPDdenom2,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    VarPDdenomDebiased[idit,ig,ip,:] += np.mean(simu.varPDdenomDebiased,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarGDdenom[idit,ig,ip,:] += np.mean(simu.varGDdenom,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarGDdenomUnbiased[idit,ig,ip,:] += np.mean(simu.varGDdenomUnbiased,axis=0)  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
                     Vmod[idit,ig,ip,:] = np.real(ct.NB2NIN(np.abs(simu.VisibilityObject[indWLOfTrack])))
                     Vangle[idit,ig,ip,:] = np.real(ct.NB2NIN(np.angle(simu.VisibilityObject[indWLOfTrack])))
@@ -399,8 +399,9 @@ Remains {strtime(RemainingTime)}")
     ichint = [int(''.join([str(int(ic[0]+1)),str(int(ic[1]+1))])) for ic in config.ich] # Convert list of tuples into list of int
     telint = np.arange(1,NA+1)
     criteriasBase = ["LR", "LR2", "LR3", "WLR", "FC", "VarOPD [µm]",
-                     "VarGDRes","VarPDRes","InstVarPD","InstVarPD2","InstVarPDdebiased",
-                     "VarPDnum", "VarPDdenom","VarPDdenom2","VarPDdenomDebiased", "InstSNR","ThresholdGDs",
+                     "VarGDRes","VarPDRes","InstVarPD","InstVarGD","InstVarGDUnbiased",
+                     "VarPDnum", "VarPDdenom","VarGDdenom","VarGDdenomUnbiased", 
+                     "SNRPD","SNRGD","ThresholdGDs",
                      'Vmod','Vangle']
     
     Ncb = len(criteriasBase)
@@ -417,9 +418,9 @@ Remains {strtime(RemainingTime)}")
     D = criteriasBase * NDIT * NgainsGD * NgainsPD 
     
     base_5d = np.array([LockedRatio,LR2,LR3,WLockedRatio,FCArray,VarOPD,
-                        VarGDRes,VarPDRes,InstVarPD,InstVarPD2,InstVarPDdebiased,
-                        VarPDnum, VarPDdenom,VarPDdenom2,VarPDdenomDebiased,
-                        np.sqrt(1/InstVarPD),
+                        VarGDRes,VarPDRes,InstVarPD,InstVarGD,InstVarGDUnbiased,
+                        VarPDnum, VarPDdenom,VarGDdenom,VarGDdenomUnbiased,
+                        np.sqrt(1/InstVarPD),np.sqrt(1/InstVarGD),
                         ThresholdGDs, Vmod,Vangle])
     base_5d = np.transpose(base_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order
     

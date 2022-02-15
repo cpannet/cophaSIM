@@ -138,6 +138,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
         config.FS['ichdetails'] = ichdetails
         config.FS['NINeff'] = NINmes
         
+        
         V2PM = ct.MakeV2PfromA2P(A2P)
         
         P2VM = np.linalg.pinv(V2PM)

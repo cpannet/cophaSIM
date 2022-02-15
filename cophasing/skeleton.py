@@ -11,13 +11,12 @@ import matplotlib.pyplot as plt
 
 from importlib import reload  # Python 3.4+ only.
 
-from . import coh_tools
+from . import coh_tools as ct
 from . import config
 
 from astropy.io import fits
 
 from .decorators import timer
-
 
 # Change the display font
 # plt.rc('font', **{'family' : 'serif', 'serif' : ['Computer Modern Roman']})
@@ -91,9 +90,9 @@ SOURCE:
     LOAD INTERFEROMETER INFOS
     """
 
-    InterfArray = coh_tools.get_array(name=Interferometer)
+    InterfArray = ct.get_array(name=Interferometer)
 
-    Obs, Target = coh_tools.get_ObsInformation(ObsFile)
+    Obs, Target = ct.get_ObsInformation(ObsFile)
 
     NA=InterfArray.NA
     # Redundant number of baselines
@@ -213,13 +212,13 @@ SOURCE:
     config.ich = np.zeros([NIN,2])
     for ia in range(NA):
         for iap in range(ia+1,NA):
-            config.ich[coh_tools.posk(ia,iap,NA)] = [ia,iap]
+            config.ich[ct.posk(ia,iap,NA)] = [ia,iap]
     
     config.CPindex = np.zeros([NC,3])
     for ia in range(NA):
         for iap in range(ia+1,NA):
             for iapp in range(iap+1,NA):
-                config.CPindex[coh_tools.poskfai(ia,iap,iapp,NA)] = [ia,iap,iapp]#int(''.join([ia+1,iap+1,iapp+1]))
+                config.CPindex[ct.poskfai(ia,iap,iapp,NA)] = [ia,iap,iapp]#int(''.join([ia+1,iap+1,iapp+1]))
 
     return 
 
@@ -606,7 +605,7 @@ Longueur timestamps: {len(timestamps)}")
             if 'baselines' in kwargs.keys():
                 baselines = kwargs['baselines']
             else:
-                InterfArray = coh_tools.get_array(config.Name)
+                InterfArray = ct.get_array(config.Name)
                 baselines = InterfArray.BaseNorms
                 coords = InterfArray.TelCoordinates
             
@@ -711,7 +710,7 @@ Longueur timestamps: {len(timestamps)}")
             if 'baselines' in kwargs.keys():
                 baselines = kwargs['baselines']
             else:
-                InterfArray = coh_tools.get_array(name=config.Name)
+                InterfArray = ct.get_array(name=config.Name)
                 baselines = InterfArray.BaseNorms
                 coords = InterfArray.TelCoordinates
             
@@ -955,9 +954,9 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     
     # Importation of the object 
     if NA>=3:
-        CfObj, VisObj, CPObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
+        CfObj, VisObj, CPObj = ct.get_CfObj(config.ObservationFile,spectra)
     else:
-        CfObj, VisObj = coh_tools.get_CfObj(config.ObservationFile,spectra)
+        CfObj, VisObj = ct.get_CfObj(config.ObservationFile,spectra)
         
     
     #scaling it to the spectral sampling  and integration time dt
@@ -968,11 +967,27 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     
     if NA>=3:
         simu.ClosurePhaseObject = CPObj
+        
+        BestTel=config.FT['BestTel'] ; itelbest=BestTel-1
+        if config.FT['CPref']:                     # At time 0, we create the reference vectors
+            for ia in range(NA-1):
+                for iap in range(ia+1,NA):
+                    if not (ia==itelbest or iap==itelbest):
+                        ib = ct.posk(ia,iap,NA)
+                        if itelbest>iap:
+                            ic = ct.poskfai(ia,iap,itelbest,NA)   # Position of the triangle (0,ia,iap)
+                        elif itelbest>ia:
+                            ic = ct.poskfai(ia,itelbest,iap,NA)   # Position of the triangle (0,ia,iap)
+                        else:
+                            ic = ct.poskfai(itelbest,ia,iap,NA)
+                    
+                        simu.OPDrefObject[ib] = np.median(simu.ClosurePhaseObject[:,ic])/(2*np.pi)*config.PDspectra
+        
     simu.CoherentFluxObject = CfObj
     simu.VisibilityObject = VisObj
     
     # Importation of the disturbance
-    CfDist, PistonDist, TransmissionDist = coh_tools.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps,verbose=True)
+    CfDist, PistonDist, TransmissionDist = ct.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps,verbose=True)
     
     simu.CfDisturbance = CfDist
     simu.PistonDisturbance = PistonDist
@@ -1040,7 +1055,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     # Save true OPDs in an observable
     for ia in range(config.NA):
         for iap in range(ia+1,config.NA):
-            ib = coh_tools.posk(ia,iap,config.NA)
+            ib = ct.posk(ia,iap,config.NA)
             simu.OPDTrue[:,ib] = simu.PistonTrue[:,ia] - simu.PistonTrue[:,iap]
             simu.OPDDisturbance[:,ib] = simu.PistonDisturbance[:,ia] - simu.PistonDisturbance[:,iap]
             simu.OPDCommand[:,ib] = simu.CommandODL[:,ia] - simu.CommandODL[:,iap]    
@@ -1444,7 +1459,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         GD = simu.GDEstimated ; PD=simu.PDEstimated
         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-        SquaredSNR = simu.SquaredSNRMovingAverage
+        SquaredSNR = simu.SquaredSNRMovingAveragePD
         # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
         
         
@@ -1663,9 +1678,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         plt.rcParams.update(rcParamsForBaselines)
         
-        #visibilities, _,_,_=coh_tools.VanCittert(WLOfScience,config.Obs,config.Target)
+        #visibilities, _,_,_=ct.VanCittert(WLOfScience,config.Obs,config.Target)
         #simu.VisibilityAtPerfWL = visibilities
-        visibilities = coh_tools.NB2NIN(simu.VisibilityObject[ind])
+        visibilities = ct.NB2NIN(simu.VisibilityObject[ind])
         vismod = np.abs(visibilities) ; visangle = np.angle(visibilities)
         PhotometricBalance = config.FS['PhotometricBalance']
         
@@ -1689,7 +1704,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax1.annotate(name1, (x1+6,y1+1),color="k")
             ax1.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
             for iap in range(ia+1,NA):
-                ib=coh_tools.posk(ia,iap,NA)
+                ib=ct.posk(ia,iap,NA)
                 x2,y2 = InterfArray.TelCoordinates[iap,:2]
                 if PhotometricBalance[ib]>0:
                     ls = (0,(10*PhotometricBalance[ib]/np.max(PhotometricBalance),10*(1-PhotometricBalance[ib]/np.max(PhotometricBalance))))
@@ -1709,7 +1724,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax2.annotate(name1, (x1+6,y1+1),color="k")
             ax2.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
             for iap in range(ia+1,NA):
-                ib=coh_tools.posk(ia,iap,NA)
+                ib=ct.posk(ia,iap,NA)
                 x2,y2 = InterfArray.TelCoordinates[iap,:2]
                 ls = (0,(10*simu.LR3[ib],10*(1-simu.LR3[ib])))
                 if PhotometricBalance[ib]>0:
@@ -1784,7 +1799,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 if iap == ia:
                     iap+=1
                 if ia < iap:
-                    ib = coh_tools.posk(ia,iap,NA)
+                    ib = ct.posk(ia,iap,NA)
                     ax.plot(timestamps, simu.OPDDisturbance[:,ib],color='red')
                     ax.plot(timestamps, simu.OPDCommand[:-1,ib],
                             color='green',linestyle='dotted')
@@ -1792,7 +1807,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                             color='green',linestyle='solid')
                     ax2.plot(timestamps, simu.OPDTrue[:,ib],color='blue')
                 else:
-                    ib = coh_tools.posk(iap,ia,NA)
+                    ib = ct.posk(iap,ia,NA)
                     ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
                     ax.plot(timestamps, -simu.OPDCommand[:-1,ib],
                             color='green',linestyle='dotted')   
@@ -1865,7 +1880,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         R=config.FS['R']
         RMStrueOPD = np.sqrt(simu.VarOPD)
-        VisObj = coh_tools.NB2NIN(simu.VisibilityObject[ind])
+        VisObj = ct.NB2NIN(simu.VisibilityObject[ind])
         
         plt.rcParams.update(rcParamsForBaselines)
         title='True OPD'
@@ -1967,9 +1982,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             BaselinesIndices=[]
             for iap in range(NA):
                 if iap < ia:
-                    BaselinesIndices.append(coh_tools.posk(iap,ia,NA))
+                    BaselinesIndices.append(ct.posk(iap,ia,NA))
                 elif ia < iap:
-                    BaselinesIndices.append(coh_tools.posk(iap,ia,NA))
+                    BaselinesIndices.append(ct.posk(iap,ia,NA))
             
             fig = plt.figure(f"OPD {ia+1}")
 
@@ -2000,7 +2015,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 
                 if iap<ia:
                     linestyles2.append(mlines.Line2D([],[],color=colors[iap],label=f'Baseline {iap+1}{ia+1}'))
-                    ib = coh_tools.posk(iap,ia,NA)
+                    ib = ct.posk(iap,ia,NA)
                     ax1.plot(timestamps, -simu.OPDDisturbance[:,ib],
                              color=colors[iap],linestyle="--")
                     ax1.plot(timestamps, -simu.OPDCommand[:-1,ib],
@@ -2015,7 +2030,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 
                 else: # ia<iap
                     linestyles2.append(mlines.Line2D([],[],color=colors[iap],label=f'Baseline {ia+1}{iap+1}'))
-                    ib = coh_tools.posk(ia,iap,NA)
+                    ib = ct.posk(ia,iap,NA)
                     ax1.plot(timestamps, simu.OPDDisturbance[:,ib],
                              color=colors[iap],linestyle="--")
                     ax1.plot(timestamps, simu.OPDCommand[:-1,ib],
@@ -2102,7 +2117,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 if iap == ia:
                     iap+=1
                 if ia < iap:
-                    ib = coh_tools.posk(ia,iap,NA)
+                    ib = ct.posk(ia,iap,NA)
                     ax.plot(timestamps, simu.OPDDisturbance[:,ib],
                             color=colors[0])
                     ax.plot(timestamps, simu.OPDCommand[:-1,ib],
@@ -2117,7 +2132,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                             color=colors[5])
 
                 else:
-                    ib = coh_tools.posk(iap,ia,NA)
+                    ib = ct.posk(iap,ia,NA)
                     ax2.plot(timestamps, -simu.OPDDisturbance[:,ib],
                             color=colors[0])
                     ax2.plot(timestamps, -simu.OPDCommand[:-1,ib],
@@ -2200,7 +2215,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 if iap == ia:
                     iap+=1
                 if ia < iap:
-                    ib = coh_tools.posk(ia,iap,NA)
+                    ib = ct.posk(ia,iap,NA)
                     ax.plot(timestamps, simu.OPDDisturbance[:,ib],
                             color='red')
                     ax2.plot(timestamps, simu.GDCommand[:-config.latency,ib],
@@ -2210,7 +2225,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                     ax2.plot(timestamps, simu.PDResidual[:,ib]*wl/(2*np.pi),
                              color='black',linestyle='-')
                 else:
-                    ib = coh_tools.posk(iap,ia,NA)
+                    ib = ct.posk(iap,ia,NA)
                     ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
                     ax.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
                             color='green',linestyle='dotted')
@@ -2302,7 +2317,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                                         linestyle=':', label='Start tracking'))
         
         
-        ymax = np.pi
+        ymax = np.pi*1.1
         ylim = [-ymax, ymax]
         fig = plt.figure('Closure Phases')
         fig.suptitle('Closure Phases')
@@ -2311,7 +2326,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         # Plot on ax1 the (NA-1)(NA-2)/2 independant Closure Phases
         for ia in range(1,NA):
             for iap in range(ia+1,NA):
-                ic = coh_tools.poskfai(0,ia,iap,NA)
+                ic = ct.poskfai(0,ia,iap,NA)
                 
                 ax1.plot(timestamps, simu.ClosurePhasePD[:,ic],
                          color=colors[ic])
@@ -2326,7 +2341,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         for ia in range(1,NA):
             for iap in range(ia+1,NA):
                 for iapp in range(iap+1,NA):
-                    ic = coh_tools.poskfai(ia,iap,iapp,NA)
+                    ic = ct.poskfai(ia,iap,iapp,NA)
                     colorindex = int(ic - config.NC//2)
                     ax2.plot(timestamps, simu.ClosurePhasePD[:,ic],
                              color=colors[colorindex])
@@ -2353,6 +2368,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             plt.show()
         config.newfig+=1
         
+        if len(savedir):
+            fig.savefig(savedir+f"Simulation{timestr}_cp.{ext}")
 
     if displayall or ('vis' in args):
         """
@@ -2371,7 +2388,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 if iap == ia:
                     iap+=1
                 
-                ib = coh_tools.posk(ia,iap,NA)
+                ib = ct.posk(ia,iap,NA)
                 ax.plot(timestamps, np.abs(simu.VisibilityEstimated[:,ind,ib]), color='k')
                 ax.plot(timestamps, np.abs(simu.VisibilityTrue[:,ind,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
@@ -2403,7 +2420,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 if iap == ia:
                     iap+=1
                 
-                ib = coh_tools.posk(ia,iap,NA)
+                ib = ct.posk(ia,iap,NA)
                 ax.plot(timestamps, np.angle(simu.VisibilityEstimated[:,ind,ib]), color='k')
                 ax.plot(timestamps, np.angle(simu.VisibilityTrue[:,ind,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
@@ -2511,7 +2528,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         #len2 = NIN//2 ; len1 = NIN-len2
         #basecolors = list(colors[:len1]+colors[:len2])
         
-        SNR = np.sqrt(simu.SquaredSNRMovingAverage)
+        SNR = np.sqrt(simu.SquaredSNRMovingAveragePD)
 
         maxSNR = np.nan_to_num(np.mean(SNR,axis=0))
         snr_ax.bar(baselines,maxSNR, color=colors[6])
@@ -2571,8 +2588,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         len2 = NIN//2 ; len1 = NIN-len2
         basecolors = list(colors[:len1]+colors[:len2])
         
-        SNR = np.sqrt(simu.SquaredSNRMovingAverage)
-        title = "SNR"
+        SNR = np.sqrt(simu.SquaredSNRMovingAveragePD)
+        title = "SNR GD"
         plt.close(title)
         fig=plt.figure(title, clear=True)
         fig.suptitle(title)
@@ -2625,16 +2642,84 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
 
 
 
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle='solid', label='Maximal SNR²'),
+                    mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+        if 'ThresholdGD' in config.FT.keys():
+            linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle='--', label='Squared Threshold GD'))
+                    
+        
+        from mypackage.plot_tools import setaxelim
+        
+        t = simu.timestamps ; timerange = range(NT)
+        len2 = NIN//2 ; len1 = NIN-len2
+        basecolors = list(colors[:len1]+colors[:len2])
+        
+        SNR = np.sqrt(simu.SquaredSNRMovingAveragePD)
+        title = "SNR PD"
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+        fig.suptitle(title)
+        (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
+        ax1.set_title(f"Baselines from {config.FS['ich'][0]} to {config.FS['ich'][len1-1]}")
+        ax2.set_title(f"Baselines from {config.FS['ich'][len1]} to {config.FS['ich'][-1]}")
+        
+        for iBase in range(len1):   # First serie
+            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+            
+        for iBase in range(len1,NIN):   # Second serie
+            ax2.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+            
+        if 'ThresholdPD' in config.FT.keys():
+            ax1.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
+            ax2.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
+
+        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
+                   color='k', linestyle=':')
+        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
+                   color='k', linestyle=':')
+        
+        maxSNR = np.nan_to_num(np.max(SNR,axis=0))
+        ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
+        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(maxSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
+        
+        ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+        ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+        
+        ax1.sharex(ax2)
+        ax1.sharey(ax2) ; ax2.tick_params(labelleft=False)
+        ax3.sharey(ax4) ; ax4.tick_params(labelleft=False)
+        
+        ax1.set_yscale('log')
+        ax1.grid(True) ; ax2.grid(True)
+        ax3.grid(True) ; ax4.grid(True)
+        ax1.set_ylabel('SNR')
+        ax3.set_yscale('log') ; ax3.set_ylabel('SNR &\n Thresholds')
+        ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
+        ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
+        setaxelim(ax3,ydata=maxSNR,ymin=0.5)
+        
+        if display:
+            if pause:
+                plt.pause(0.1)
+            else:
+                plt.show()
+
+
+
+
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
-        ylim=[1e-1,np.max(simu.SquaredSNRMovingAverage)]
+        ylim=[1e-1,np.max(simu.SquaredSNRMovingAveragePD)]
         # State-Machine and SNR
         title="State"
         fig = plt.figure(title,clear=True)
         fig.suptitle("SNR² and State-Machine")
         ax,ax2 = fig.subplots(nrows=2,ncols=1, sharex=True)
         for ib in range(NIN):
-            ax.plot(timestamps, simu.SquaredSNRMovingAverage[:,ib],
+            ax.plot(timestamps, simu.SquaredSNRMovingAveragePD[:,ib],
                     label=f"{ich[ib]}")
             
         ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
@@ -2789,9 +2874,9 @@ WavelengthOfInterest
     simu.FTLocked = np.zeros([Ndit,NIN])
     simu.PhaseStableEnough= np.zeros([Ndit,NIN])
     if 'ThresholdGD' in config.FT.keys():
-        simu.TrackedBaselines = (simu.SquaredSNRMovingAverage >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
+        simu.TrackedBaselines = (simu.SquaredSNRMovingAveragePD >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
         simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
-    simu.InCentralFringe = np.abs(simu.OPDTrue < WavelengthOfInterest/2)
+    simu.InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < WavelengthOfInterest/2
     simu.LR3 = np.mean(simu.InCentralFringe[InFrame:], axis=0)    # Array [NIN]
     
     for it in range(Ndit):
@@ -2837,10 +2922,10 @@ WavelengthOfInterest
     
     simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
 
-    simu.WLR2 = np.mean(simu.InCentralFringe * simu.SquaredSNRMovingAverage, axis=0)
+    simu.WLR2 = np.mean(simu.InCentralFringe * simu.SquaredSNRMovingAveragePD, axis=0)
     
     if 'ThresholdGD' in config.FT.keys():
-        simu.WLR3 = np.mean(simu.TrackedBaselines * simu.SquaredSNRMovingAverage, axis=0)
+        simu.WLR3 = np.mean(simu.TrackedBaselines * simu.SquaredSNRMovingAveragePD, axis=0)
 
 
     if not display:
@@ -2950,7 +3035,7 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0):
     tel1 = OPD[0]-1
     tel2 = OPD[1]-1
     
-    ib = coh_tools.posk(tel1, tel2, NA)
+    ib = ct.posk(tel1, tel2, NA)
     
     if isinstance(TimeBonds,(float,int)):
         BeginSample = round(TimeBonds/dt)
@@ -3111,7 +3196,7 @@ def ReadCf(currCfEstimated):
     # (eliminates photometric and conjugate terms)
     currCfEstimatedNIN = np.zeros([MW, NIN])*1j
     for imw in range(MW):    
-        from .coh_tools import NB2NIN
+        from .ct import NB2NIN
         currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
         
     # Save coherent flux and photometries in stack
@@ -3124,7 +3209,7 @@ def ReadCf(currCfEstimated):
     
     for ia in range(NA):
         for iap in range(ia+1,NA):
-            ib = coh_tools.posk(ia,iap,NA)
+            ib = ct.posk(ia,iap,NA)
             Iaap = currCfEstimatedNIN[:,ib]                     # Interferometric intensity (a,a')
             Ia = PhotEst[:,ia]                                  # Photometry pupil a
             Iap = PhotEst[:,iap]                                # Photometry pupil a'
@@ -3207,19 +3292,19 @@ def ReadCf(currCfEstimated):
     timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
     for ia in range(NA):
         for iap in range(ia+1,NA):
-            ib = coh_tools.posk(ia,iap,NA)      # coherent flux (ia,iap)  
+            ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
             valid1=config.FS['active_ich'][ib]
             cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
             cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
             cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
             for iapp in range(iap+1,NA):
-                ib = coh_tools.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
                 valid2=config.FS['active_ich'][ib]
                 cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
-                ib = coh_tools.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
                 valid3=config.FS['active_ich'][ib]
                 cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
                 cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
@@ -3227,7 +3312,7 @@ def ReadCf(currCfEstimated):
                 
                 # The bispectrum of one time and one triangle adds up to
                 # the Ncp last times
-                ic = coh_tools.poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
+                ic = ct.poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
                 validcp[ic]=valid1*valid2*valid3
                 bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
                 bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
@@ -3238,8 +3323,8 @@ def ReadCf(currCfEstimated):
     if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
         for ia in range(1,NA-1):
             for iap in range(ia+1,NA):
-                k = coh_tools.posk(ia,iap,NA)
-                ic = coh_tools.poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
+                k = ct.posk(ia,iap,NA)
+                ic = ct.poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
                 simu.PDref[it,k] = simu.ClosurePhasePD[it,ic]
                 simu.GDref[it,k] = simu.ClosurePhaseGD[it,ic]
 

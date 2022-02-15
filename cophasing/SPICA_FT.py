@@ -48,7 +48,8 @@ def updateFTparams(verbose=True,**kwargs):
 
 def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
             search=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, maxVelocity=0.300, Vfactors = [], 
-            CPref=True, Ncp = 300, Nvar = 5,cmdOPD=True, switch=1,
+            CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
+            cmdOPD=True, switch=1, continu=True,
             ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,
             Threshold=True, useWmatrices=True,
             latencytime=1,usecupy=False, **kwargs_for_update):
@@ -161,10 +162,15 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
             config.FT['ThresholdRELOCK'] = ThresholdRELOCK
             
         config.FT['ThresholdPD'] = ThresholdPD
+        config.FT['stdPD'] = stdPD
+        config.FT['stdGD'] = stdGD
+        config.FT['stdCP'] = stdCP
         config.FT['CPref'] = CPref
+        config.FT['BestTel'] = BestTel
         config.FT['roundGD'] = roundGD
         config.FT['Threshold'] = Threshold
         config.FT['switch'] = switch
+        config.FT['continu'] = continu
         config.FT['cmdOPD'] = cmdOPD
         config.FT['useWmatrices'] = useWmatrices
         config.FT['usecupy'] = usecupy
@@ -222,12 +228,9 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
     
     currCfEstimated = args[0]
 
-    currPD, currGD = ReadCf(currCfEstimated)
+    CfPD, CfGD = ReadCf(currCfEstimated)
     
-    simu.PDEstimated[it] = currPD
-    simu.GDEstimated[it] = currGD#
-    
-    currCmd = CommandCalc(currPD, currGD)
+    currCmd = CommandCalc(CfPD, CfGD)
     
     return currCmd
 
@@ -311,10 +314,11 @@ def ReadCf(currCfEstimated):
         
         # If ClosurePhase correction before wrapping
         # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref[it])
-        
-    # Current Phase-Delay
-    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))*config.FS['active_ich']
-        
+           
+    # Patch to stabilize the PD when too close to the Pi/-Pi shift.
+    # --> force it to Pi.
+    #currPD[(currPD+np.pi)<config.FT['stdPD']]=np.pi
+
     """
     Group-Delays extration
     GD_ is a global stack variable [NT, NIN]
@@ -341,79 +345,19 @@ def ReadCf(currCfEstimated):
         
         simu.CfGD[it,:,:] += cfgd
 
-    currGD = np.zeros(NIN)
-    for ib in range(NIN):
-        cfGDlmbdas = simu.CfGD[it,:-Ncross,ib]*np.conjugate(simu.CfGD[it,Ncross:,ib])
-        cfGDmoy = np.sum(cfGDlmbdas)
 
-        currGD[ib] = np.angle(cfGDmoy)*config.FS['active_ich'][ib]    # Group-delay on baseline (ib).
+    # Patch to stabilize the GD when too close to the Pi/-Pi shift.
+    # --> force it to Pi.
+    #currGD[(currGD+np.pi)<config.FT['stdGD']]=np.pi
     
-    """
-    Closure phase calculation
-    cpPD_ is a global stack variable [NT, NC]
-    cpGD_ is a global stack variable [NT, NC]
-    Eq. 17 & 18
-    """
-    
-    Ncp = config.FT['Ncp']
-    
-    if it < Ncp:
-        Ncp = it+1
-        
-    bispectrumPD = np.zeros([NC])*1j
-    bispectrumGD = np.zeros([NC])*1j
-    
-    timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
-    for ia in range(NA):
-        for iap in range(ia+1,NA):
-            ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
-            valid1=config.FS['active_ich'][ib]
-            cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
-            cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
-            cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
-            for iapp in range(iap+1,NA):
-                ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-                valid2=config.FS['active_ich'][ib]
-                cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
-                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
-                cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
-                
-                ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-                valid3=config.FS['active_ich'][ib]
-                cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
-                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
-                cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
-                
-                # The bispectrum of one time and one triangle adds up to
-                # the Ncp last times
-                ic = poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
-                validcp[ic]=valid1*valid2*valid3
-                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
-                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
-    
-    simu.BispectrumGD[it] = bispectrumGD
-    simu.BispectrumPD[it] = bispectrumPD
-    
-    bispectrumPD[bispectrumPD<0.05] = 0
-    bispectrumGD[bispectrumGD<0.05] = 0
-    
-    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
-    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
-    
-    if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
-        for ia in range(1,NA-1):
-            for iap in range(ia+1,NA):
-                k = posk(ia,iap,NA)
-                ic = poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
-                simu.PDref[it,k] = simu.ClosurePhasePD[it,ic]
-                simu.GDref[it,k] = simu.ClosurePhaseGD[it,ic]
+    CfPD = simu.CfPD[it]
+    CfGD = simu.CfGD[it]
 
-                    
-    return currPD, currGD
+    return CfPD, CfGD
 
 
 
-def CommandCalc(currPD,currGD):
+def CommandCalc(CfPD,CfGD):
     """
     Generates the command to send to the optical delay line according to the
     group-delay and phase-delay reduced from the OPDCalculator.
@@ -437,7 +381,7 @@ def CommandCalc(currPD,currGD):
     INIT MODE
     """
     
-    from .config import NA,NIN
+    from .config import NA,NIN,NC
     from .config import FT,FS
     
     it = simu.it            # Frame number
@@ -460,29 +404,25 @@ def CommandCalc(currPD,currGD):
 
     if config.FT['useWmatrices']:
         
-        varcurrPD, varcurrPD2 = getvar()
+        varcurrPD, varcurrGD = getvar()
         
         # Raw Weighting matrix in the OPD-space
         
         timerange = range(it+1-Ngd, it+1)
-        simu.SquaredSNRMovingAverage[it] = np.nan_to_num(1/np.mean(simu.varPD[timerange], axis=0))
-        simu.SquaredSNRMovingAverage2[it] = np.nan_to_num(1/np.mean(simu.varPD2[timerange], axis=0))
-        simu.SquaredSNRMovingAverageDebiased[it] = np.nan_to_num(1/np.mean(simu.varPDdebiased[timerange], axis=0))
+        simu.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(simu.varPD[timerange], axis=0))
+        simu.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(simu.varGD[timerange], axis=0))
+        simu.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(simu.varGDUnbiased[timerange], axis=0))
         
         simu.TemporalVariancePD[it] = np.var(simu.PDEstimated[timerange], axis=0)
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
         
-        if config.FT['state'][it-1]:
-            SquaredSNRMovingAverage = simu.SquaredSNRMovingAverage2[it]
-            reliablebaselines = (SquaredSNRMovingAverage >= FT['ThresholdRELOCK']**2)
-        else:
-            SquaredSNRMovingAverage = simu.SquaredSNRMovingAverage[it]
-            reliablebaselines = (SquaredSNRMovingAverage >= FT['ThresholdGD']**2)
-            
+        SquaredSNRMovingAverage = simu.SquaredSNRMovingAveragePD[it]
+        reliablebaselines = (SquaredSNRMovingAverage >= FT['ThresholdGD']**2)
+        
         simu.TrackedBaselines[it] = reliablebaselines
         
         Wdiag=np.zeros(NIN)
-        Wdiag[reliablebaselines] = 1/varcurrPD[reliablebaselines]
+        Wdiag[reliablebaselines] = 1/varcurrGD[reliablebaselines]
         W = np.diag(Wdiag)
         # Transpose the W matrix in the Piston-space
         MtWM = np.dot(FS['OPD2Piston'], np.dot(W,FS['Piston2OPD']))
@@ -534,6 +474,104 @@ def CommandCalc(currPD,currGD):
     simu.Igd[it,:,:] = currIgd
     simu.Ipd[it,:,:] = currIpd
     
+    
+    """
+    Closure phase calculation
+    cpPD_ is a global stack variable [NT, NC]
+    cpGD_ is a global stack variable [NT, NC]
+    Eq. 17 & 18
+    """
+    
+    Ncp = config.FT['Ncp']
+    
+    if it < Ncp:
+        Ncp = it+1
+        
+    bispectrumPD = np.zeros([NC])*1j
+    bispectrumGD = np.zeros([NC])*1j
+    
+    Ncross = config.FT['Ncross']           # Distance between wavelengths channels for GD calculation
+    timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
+            valid1=config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib]
+            cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
+            cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+            cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+            for iapp in range(iap+1,NA):
+                ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                valid2=config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib]
+                cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
+                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+                
+                ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                valid3=config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib]
+                cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
+                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
+                
+                # The bispectrum of one time and one triangle adds up to
+                # the Ncp last times
+                ic = poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
+                validcp[ic]=valid1*valid2*valid3
+                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
+                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+    
+                
+    simu.BispectrumPD[it] = bispectrumPD*validcp+simu.BispectrumPD[it-1]*(1-validcp)
+    simu.BispectrumGD[it] = bispectrumGD*validcp+simu.BispectrumGD[it-1]*(1-validcp)
+    
+    cpPD = np.angle(simu.BispectrumPD[it])
+    cpGD = np.angle(simu.BispectrumGD[it])
+    
+    # cpPD[cpPD<-np.pi+config.FT['stdCP']]=np.pi
+    # cpGD[cpGD<-np.pi+config.FT['stdCP']]=np.pi
+    
+    simu.ClosurePhasePD[it] = cpPD
+    simu.ClosurePhaseGD[it] = cpPD/config.FS['R']
+    
+    BestTel=config.FT['BestTel'] ; itelbest=BestTel-1
+    if config.FT['CPref'] and (it>10):                     # At time 0, we create the reference vectors
+        for ia in range(NA-1):
+            for iap in range(ia+1,NA):
+                if not(ia==itelbest or iap==itelbest):
+                    ib = posk(ia,iap,NA)
+                    if itelbest>iap:
+                        ic = poskfai(ia,iap,itelbest,NA)   # Position of the triangle (0,ia,iap)
+                    elif itelbest>ia:
+                        ic = poskfai(ia,itelbest,iap,NA)   # Position of the triangle (0,ia,iap)
+                    else:
+                        ic = poskfai(itelbest,ia,iap,NA)
+                
+                    simu.PDref[it,ib] = simu.ClosurePhasePD[it,ic]
+                    simu.GDref[it,ib] = simu.ClosurePhaseGD[it,ic]   
+    
+                    simu.CfPDref[it,ib] = simu.BispectrumPD[it,ic]#/np.abs(simu.BispectrumPD[it,ic])
+                    simu.CfGDref[it,ib] = simu.BispectrumGD[it,ic]#/np.abs(simu.BispectrumGD[it,ic])
+    
+    
+    
+    """
+    GD and PD errors calculation
+    """
+        
+    # Current Phase-Delay
+    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0)*np.exp(-1j*simu.PDref[it]))*config.FS['active_ich']
+    # currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0)*np.conj(simu.CfPDref[it]))*config.FS['active_ich']
+    
+    # Current Group-Delay
+    currGD = np.zeros(NIN)
+    for ib in range(NIN):
+        cfGDlmbdas = simu.CfGD[it,:-Ncross,ib]*np.conjugate(simu.CfGD[it,Ncross:,ib])
+        cfGDmoy = np.sum(cfGDlmbdas)
+        
+        currGD[ib] = np.angle(cfGDmoy*np.exp(-1j*simu.GDref[it,ib]))*config.FS['active_ich'][ib]
+        # currGD[ib] = np.angle(cfGDmoy*np.conj(simu.CfGDref[it,ib])*np.conj(simu.CfPDref[it,ib]**(1/config.FS['R'])))*config.FS['active_ich'][ib]
+
+    simu.PDEstimated[it] = currPD
+    simu.GDEstimated[it] = currGD
     
     """
     FRINGE SEARCHING command
@@ -730,21 +768,15 @@ def CommandCalc(currPD,currGD):
         usearch = simu.SearchCommand[it]
         
         
-    # if config.TELref:
-    #     iTel = config.TELref-1
-    #     usearch = usearch - usearch[iTel]
-    
     usearch = config.FT['search']*usearch
     # The command is sent at the next time, that's why we note it+1
     simu.SearchCommand[it+1] = usearch
-    
-   
-    
+        
     """
     Group-Delay tracking
     """
     
-    currGDerr = currGD - simu.GDref[it]
+    currGDerr = currGD #- simu.GDref[it]
     
     # Keep the GD between [-Pi, Pi]
     # Eq. 35
@@ -775,10 +807,10 @@ def CommandCalc(currPD,currGD):
         lower_than_mpi = (currGDerr < -np.pi/R*FT['switch'])
         within_pi = (np.abs(currGDerr) <= np.pi/R*FT['switch'])
         
-        # if FT['continu']:
-        #     currGDerr[higher_than_pi] -= np.pi/R*FT['switch']
-        #     currGDerr[lower_than_mpi] += np.pi/R*FT['switch']
         currGDerr[within_pi] = 0
+        if FT['continu']:
+            currGDerr[higher_than_pi] -= np.pi/R*FT['switch']
+            currGDerr[lower_than_mpi] += np.pi/R*FT['switch']
     
     simu.GDErr[it] = currGDerr
     
@@ -826,7 +858,7 @@ def CommandCalc(currPD,currGD):
     Phase-Delay command
     """
     
-    currPDerr = currPD - simu.PDref[it]
+    currPDerr = currPD #- simu.PDref[it]
  
     # Keep the PD between [-Pi, Pi]
     # Eq. 35
@@ -996,22 +1028,22 @@ def getvar():
     CohFlux = np.mean(simu.CfPD[timerange], axis=0)
     CfSumOverLmbda = np.sum(CohFlux,axis=0)
     
-    simu.varPDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
-    simu.varPDdenomDebiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
-    simu.varPDdenom2[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda)-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14
+    simu.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
+    simu.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
+    simu.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda)-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14
     #simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
     simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
     
+    simu.varGDUnbiased[it] = simu.varPDnum[it]/simu.varGDdenomUnbiased[it]      # Var(|CohFlux|)/|CohFlux|²
     simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
-    simu.varPD2[it] = simu.varPDnum[it]/simu.varPDdenom2[it]      # Var(|CohFlux|)/|CohFlux|²
-    simu.varPDdebiased[it] = simu.varPDnum[it]/simu.varPDdenomDebiased[it]
+    simu.varGD[it] = simu.varPDnum[it]/simu.varGDdenom[it]
     
     simu.SNRPhotometry[it,:] = np.sum(simu.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
     
     varPD = simu.varPD[it]
-    varPD2 = simu.varPD2[it]
+    varGD = simu.varGD[it]
     
-    return varPD, varPD2
+    return varPD, varGD
 
 
 def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel=6):
@@ -1067,29 +1099,6 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
                     newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
             else:
                 raise ValueError("Please answer by 'y','yes','n' or 'no'")
-                
-            test2 = input("Set also a threshold for RELOCK? [y/n]")
-            if (test2 == 'y') or (test2=='yes'):
-                
-                test3 = input("Set all threshold to same value? [y/n]")
-                if (test3 == 'y') or (test3=='yes'):
-                    newThresholdRELOCK = float(input("Set the Threshold RELOCK: "))
-                
-                elif (test3=='n') or (test3=='no'):
-                    newThresholdGD=np.ones(config.NIN)
-                    newThresholdRELOCK=np.ones(config.NIN)
-                    for ib in range(config.NIN):
-                        newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
-                        newThresholdRELOCK[ib] = float(input(f"Threshold RELOCK base {config.FS['ich'][ib]}:"))
-                
-                else:
-                    raise ValueError("Please answer by 'y','yes','n' or 'no'")
-            
-            elif (test2=='n') or (test2=='no'):
-                newThresholdRELOCK=newThresholdGD
-                pass
-            else:
-                raise ValueError("Please answer by 'y','yes','n' or 'no'")
             
         else:
             from cophasing import simu,coh_tools
@@ -1104,18 +1113,16 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
             
             ind=np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
             
-            newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
-            newThresholdRELOCK = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAverage2[ind,:])])
+            newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAveragePD[ind,:])])
                     
             config.FT['ThresholdGD'] = newThresholdGD
-            config.FT['ThresholdRELOCK'] = newThresholdRELOCK
             
             sk.display('snr',WLOfTrack=1.6, pause=True,display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
-                       ThresholdGD=newThresholdGD, ThresholdRELOCK=newThresholdRELOCK,
+                       ThresholdGD=newThresholdGD,
                        verbose=verbose)
     
     
@@ -1149,29 +1156,6 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
                     newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
             else:
                 raise ValueError("Please answer by 'y','yes','n' or 'no'")
-            
-            test2 = input("Set also a threshold for RELOCK? [y/n]")
-            if (test2 == 'y') or (test2=='yes'):
-                
-                test3 = input("Set all threshold to same value? [y/n]")
-                if (test3 == 'y') or (test3=='yes'):
-                    newThresholdRELOCK = float(input("Set the Threshold RELOCK: "))
-                
-                elif (test3=='n') or (test3=='no'):
-                    newThresholdGD=np.ones(config.NIN)
-                    newThresholdRELOCK=np.ones(config.NIN)
-                    for ib in range(config.NIN):
-                        newThresholdGD[ib] = float(input(f"Threshold base {config.FS['ich'][ib]}:"))
-                        newThresholdRELOCK[ib] = float(input(f"Threshold RELOCK base {config.FS['ich'][ib]}:"))
-                
-                else:
-                    raise ValueError("Please answer by 'y','yes','n' or 'no'")
-            
-            elif (test2=='n') or (test2=='no'):
-                newThresholdRELOCK=newThresholdGD
-                pass
-            else:
-                raise ValueError("Please answer by 'y','yes','n' or 'no'")
                 
                 
         else:
@@ -1179,96 +1163,19 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
             
             ind=100
             
-            newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
-            newThresholdRELOCK = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage2[ind,:])])
-            
+            newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAveragePD[ind,:])])
+ 
             config.FT['ThresholdGD'] = newThresholdGD
-            config.FT['ThresholdRELOCK'] = newThresholdRELOCK
+
             sk.display('detector',WLOfTrack=1.6, pause=True,display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
-                       ThresholdGD=newThresholdGD,ThresholdRELOCK=newThresholdRELOCK,
+                       ThresholdGD=newThresholdGD,
                        verbose=verbose)
     
     return newThresholdGD
-
-    
-
-def getvarcupy():
-    """
-    From the image and calibrated quantities (sky), calculates the "Phase variance"
-    which is in reality the inverse of the squared signal-to-noise ratio of the 
-    fringes.
-
-    Parameters
-    ----------
-    image : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    varPD : TYPE
-        DESCRIPTION.
-
-    GLOBAL
-    -------
-    simu.CfPD : 
-        
-    simu.varPD :
-        
-
-    """
-    
-    from . import simu
-    import cupy as cp
-    
-    from .config import NA, NIN, MW
-    from .simu import it
-    
-    
-    image = cp.array(simu.MacroImages[it,:,:])
-    
-    sigsky = config.FS['sigsky']                    # Background noise
-    imsky = config.FS['imsky']                      # Sky image before observation
-    Demod = cp.array(config.FS['MacroP2VM'])        # Macro P2VM matrix used for demodulation
-    
-    # Flux variance calculation (eq. 12)
-    varFlux = sigsky**2 + 1*(image - imsky)
-    
-    """
-    Covariance calculation (eq. 13)
-    """
-    
-    for iw in range(MW):
-    #     # simu.Covariance[it,iw] = cp.dot(Demod[iw], cp.dot(cp.diag(varFlux[iw]),cp.transpose(Demod[iw])))
-        simu.Covariance[it,iw] = cp.sum(Demod[iw]**2*varFlux[iw], axis=1)
-        
-    # Phase variance calculation (eq. 14)
-
-    Nvar = 5                # Integration time for phase variance
-    if it < Nvar:
-        Nvar = it+1
-        
-    vartemp = cp.zeros([MW,NIN])
-    vartemp2 = cp.zeros([MW,NIN])*1j
-    
-    # for iot in range(it+1-Nvar,it+1):
-    timerange = np.arange(it+1-Nvar,it+1)
-    for ia in range(NA):
-        for iap in range(ia+1,NA):
-            ib = posk(ia,iap,NA)
-            ibb = ia*NA+iap
-            vartemp[:,ib] = (cp.sum(cp.abs(cp.real(simu.Covariance[timerange,:,ibb])),axis=0)+cp.sum(cp.abs(cp.imag(simu.Covariance[timerange,:,ibb])),axis=0))/Nvar
-            vartemp2[:,ib] = cp.sum(cp.array(simu.CfPD[timerange,:,ib]), axis=0)/Nvar
-    
-    varPD = cp.sum(vartemp,axis=0)/(2*cp.abs(cp.sum(vartemp2,axis=0))**2)
-
-    varPDnumpy = cp.asnumpy(varPD)
-    simu.varPD[it] = varPDnumpy
-    
-    return varPDnumpy
 
 
 def searchfunction(usaw):
