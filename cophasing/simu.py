@@ -40,8 +40,8 @@ VisibilityTrue = np.zeros([NT, MW, NIN])*1j         # True expected fringe visib
 
 # Closure Phases [NC]
 ClosurePhaseObject = np.zeros([NW,NC])          # Closure Phase Object
-BispectrumGD = np.ones([NT,NC])*1j             # GD bispectrum
-BispectrumPD = np.ones([NT,NC])*1j             # PD bispectrum
+BispectrumGD = np.ones([NT,NC])+0j              # GD bispectrum
+BispectrumPD = np.ones([NT,NC])+0j              # PD bispectrum
 ClosurePhasePD = np.zeros([NT,NC])              # PD closure phase        
 ClosurePhaseGD = np.zeros([NT,NC])              # GD closure phase
 
@@ -103,8 +103,8 @@ PDref = np.zeros([NT,NIN])                      # PD reference vector
 GDref = np.zeros([NT,NIN])                      # GD reference vector
 OPDrefObject = np.zeros([NIN])                  # PD reference of the Object (only for analysis)
 
-CfPDref = np.ones([NT,NIN])*1j
-CfGDref = np.ones([NT,NIN])*1j
+CfPDref = np.ones([NT,NIN])+0j
+CfGDref = np.ones([NT,NIN])+0j
 
 FTmode = np.ones([NT])                          # Save mode of the Fringe Tracker
                                                 # 0: off, 1: Search, 2: Track

@@ -206,12 +206,6 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         
         config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
         
-
-        if usecupy:
-            import cupy as cp
-            config.FS['sigsky'] = cp.asnumpy(config.FS['sigsky'])  # Background noise
-            config.FS['imsky'] = cp.asnumpy(config.FS['imsky'])    # Sky image before observation
-        
         return
 
     elif update:
