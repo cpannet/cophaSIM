@@ -1025,11 +1025,13 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         """
         FRINGE TRACKER: From measured coherences to ODL commands
         """
+        GainGD = config.FT['GainGD']
+        GainPD = config.FT['GainPD']
+        
         if simu.FTmode[it] == 0:
-            GainGD = config.FT['GainGD']
-            GainPD = config.FT['GainPD']
             config.FT['GainGD'] = 0
             config.FT['GainPD'] = 0
+            
         fringetracker = config.FT['func']
         CmdODL = fringetracker(currCfEstimated)
         
