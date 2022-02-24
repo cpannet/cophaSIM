@@ -500,7 +500,7 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     
     # First case: the name of the object has been given. We search it in Simbad
     # database and its AltAzimutal coordinates if a Date has been given.
-    if Target.Name not in ('Simple','Binary'):
+    if Target.Name not in ('Simple','Binary','Unresolved'):
         starttime = Time(Obs.Date)
         print(f"Observation date: {Obs.Date}")
     
@@ -629,8 +629,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
             timestr = time.strftime("%Y%m%d-%H%M%S")
             plt.savefig(savedir+f"UVplane{timestr}.{ext}")
     
-    if NW==1:
-        visibilities = visibilities[0]
+    # if NW==1:
+    #     visibilities = visibilities[0]
     
     return visibilities, chara_uv, uv_plane, UVcoords
 
@@ -703,17 +703,14 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
     
     Lph_H = L0_ph*10**(-0.4*magH)
     
-    # delta_wav = np.abs(spectra[0] - spectra[1])     # Width of a spectral channel
-    
     # Preference for photons directly to keep a uniform spectra
-    UncohIrradiance = Irradiance*Lph_H             # [phot/s/m²/deltalmbda] Source Irradiance 
+    UncohIrradiance = Irradiance*Lph_H             # [phot/s/m²/µm] Source Irradiance 
     
     # Using Watt as reference and converting in photons: drawback=non uniform spectra
     # L0_w = 7 * 10**(-10)                      # [W/m²/µm] Reference luminance at 1.65µm (Lena)
     # L0_w = 11.38 * 10**(-10)                  # [W/m²/µm] Reference luminance at 1.63µm (Bessel)
     # Lw_H = L0_w*10**(-0.4*magH)                        # Definition of the magnitude
-    # UncohIrradiance_w = luminance*Lw_H*delta_wav / (h_*c_/spectra*1e6)          # [phot/s/m²/deltalmbda]
-
+    # UncohIrradiance_w = luminance*Lw_H / (h_*c_/spectra*1e6)          # [phot/s/m²/µm]
 
     filepath = Obs.Filepath
     if not os.path.exists(filepath):
@@ -937,6 +934,72 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
     
     return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
 
+def create_CfObj(spectra,Obs,Target,InterfArray,R=140):
+    """
+    Returns the coherent flux (photometries and mutual intensities) of the
+    object along the given spectra for the given interferometric array.
+
+    Parameters
+    ----------
+    spectra : ARRAY
+        Spectral sampling.
+    Obs : OBS CLASS OBJECT
+        Contains information on the object position in the sky.
+    Target : TARGET CLASS OBJECT
+        Contains information on the target geometry, magnitude, etc...
+    InterfArray : INTERFARRAY CLASS OBJECT
+        Contains information on the interferometer geometry, transmission, etc...
+
+    Returns
+    -------
+    CoherentFluxObject : ARRAY [MW,NB]
+        Coherent flux sorted like follows:
+            - 0 ... NA: photometries
+            - NA ... NA+NIN: Real(Cf)
+            - NA ... NIN:NB: Imag(Cf)
+
+    """
+    
+    MeanWavelength = np.mean(spectra)
+    if hasattr(spectra, "__len__"):
+        MW=len(spectra)
+        MultiWavelength=True
+    else:
+        MultiWavelength=False
+        spectra=np.array([spectra])
+        MW=1
+
+    
+    VisObject, _,_,_=VanCittert(spectra,Obs,Target)
+    mag = Target.Star1['SImag']
+    # Luminance according to apparent magnitude
+    Irradiance = np.ones_like(spectra)
+    L0_ph = 702e8        # Photons.m-2.s-1.µm-1 at 0.7µm
+    Lph_H = L0_ph*10**(-0.4*mag)
+    
+    if MultiWavelength:
+        delta_wav = np.abs(spectra[0]-spectra[1]) 
+    else:
+        delta_wav = MeanWavelength/R
+        
+    UncohIrradiance = Irradiance*Lph_H*delta_wav             # [phot/m²/deltalmbda/dt] Source Irradiance 
+
+    Throughput = InterfArray.TelSurfaces*InterfArray.TelTransmissions
+    
+    NA=len(Throughput)
+    NB=NA**2 ; NIN = int(NA*(NA-1)/2)
+    
+    CoherentFluxObject = np.zeros([MW,NB])
+    for ia in range(NA):
+        CoherentFluxObject[:,ia] = Throughput[ia]*UncohIrradiance
+    
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)
+            CoherentFluxObject[:,NA+ib] = np.sqrt(CoherentFluxObject[:,ia]*CoherentFluxObject[:,iap])*np.real(VisObject[:,ib])
+            CoherentFluxObject[:,NA+NIN+ib] = np.sqrt(CoherentFluxObject[:,ia]*CoherentFluxObject[:,iap])*np.imag(VisObject[:,ib])
+
+    return CoherentFluxObject
 
 def get_ObsInformation(ObservationFile):
     

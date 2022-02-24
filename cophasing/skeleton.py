@@ -2779,7 +2779,9 @@ def investigate(*args):
 
     pass
 
-def ShowPerformance(TimeBonds, WavelengthOfInterest,DIT, R=140, p=10, display=True, get=[]):
+def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
+                    CoherentFluxObject=[],
+                    R=140, p=10, magSI=-1,display=True, get=[]):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
@@ -2820,21 +2822,30 @@ WavelengthOfInterest
     
     ich = config.FS['ich']
     
-    from .config import NA,NIN,NC,dt,NT
+    from .config import NA,NIN,NC,dt,NT,NB
     
-    WOI = WavelengthOfInterest
-    MultiWavelength = False
-    if hasattr(WOI, 'len'): # test if it is a list or array.
-        NW = len(WOI)
-        if NW >1:
-            MultiWavelength = True
-        else:
-            WOI = WOI[0]
-            MultiWavelength = False
-    else:
-        NW=1
+    
+    """
+    LOAD COHERENT FLUX IN SPECTRAL BAND FOR SNR COMPUTATION
+    So far, I assume it is SPICA-VIS
+    """
         
-    Lc = R*WOI      # Vector or float
+    if magSI<0:
+        if 'SImag' not in config.Target.Star1.keys():
+            config.Target.Star1['SImag'] = config.Target.Star1['Hmag']
+    else:
+        config.Target.Star1['SImag'] = magSI
+        
+    MeanWavelength = np.mean(SpectraForScience)
+    if hasattr(SpectraForScience, "__len__"):
+        MW=len(SpectraForScience)
+        MultiWavelength=True
+    else:
+        MultiWavelength=False
+        MW=1
+        SpectraForScience = np.array([MeanWavelength])
+
+    Lc = R*SpectraForScience      # Vector or float
     
     DIT_NumberOfFrames = int(DIT/dt)
     
@@ -2846,10 +2857,31 @@ WavelengthOfInterest
         InFrame = round(TimeBonds[0]/dt)
     else:
         raise '"TimeBonds" must be instance of (float,int,np.ndarray,list)'
+       
         
+    if not len(FileInterferometer):
+        FileInterferometer = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/interferometers/CHARAinterferometerR.fits"
+      
+    if not len(CoherentFluxObject):
+        # The interferometer is "not the same" as for simulation, because not the same band.
+        # In the future, both bands could be integrated in the same Interf class object.
+        InterfArray = ct.get_array(name=FileInterferometer)
+        
+        if MultiWavelength:
+            CoherentFluxObject = ct.create_CfObj(SpectraForScience,
+                                                 config.Obs,config.Target,InterfArray)
+        else:
+            CoherentFluxObject = ct.create_CfObj(MeanWavelength,
+                                                 config.Obs,config.Target,InterfArray,R=R)
+        CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
+    
+    
+    from cophasing.SCIENTIFIC_INSTRUMENTS import SPICAVIS
+    simu.IntegrationTime, simu.VarSquaredVis, simu.SNR_E, simu.SNR_E_perSC = SPICAVIS(CoherentFluxObject,simu.OPDTrue[InFrame:],SpectraForScience,DIT=DIT)
+    
    
     if MultiWavelength:
-        simu.FringeContrast=np.zeros([NW,NIN])  # Fringe Contrast at given wavelengths [0,1]
+        simu.FringeContrast=np.zeros([MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
     else:
         simu.FringeContrast=np.zeros(NIN)       # Fringe Contrast at given wavelengths [0,1]
 
@@ -2869,7 +2901,7 @@ WavelengthOfInterest
     simu.WLockedRatio = np.zeros(NIN)
     
     MaxPhaseVarForLocked = (2*np.pi/p)**2
-    MaxVarOPDForLocked = (WavelengthOfInterest/p)**2
+    MaxVarOPDForLocked = (MeanWavelength/p)**2
     
     Ndit = Period//DIT_NumberOfFrames
     simu.PhaseVar_atWOI = np.zeros([Ndit,NIN])
@@ -2878,18 +2910,18 @@ WavelengthOfInterest
     if 'ThresholdGD' in config.FT.keys():
         simu.TrackedBaselines = (simu.SquaredSNRMovingAveragePD >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
         simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
-    simu.InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < WavelengthOfInterest/2
+    simu.InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < MeanWavelength/2
     simu.LR3 = np.mean(simu.InCentralFringe[InFrame:], axis=0)    # Array [NIN]
     
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
         OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
-        GDResVar = np.var(simu.GDResidual2[InFrame:OutFrame,:],axis=0)
-        PDResVar = np.var(simu.PDResidual2[InFrame:OutFrame,:],axis=0)
+        GDResVar = np.var(simu.GDResidual[InFrame:OutFrame,:],axis=0)
+        PDResVar = np.var(simu.PDResidual[InFrame:OutFrame,:],axis=0)
         PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
         PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
         PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
-        simu.PhaseVar_atWOI[it] = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/WavelengthOfInterest,axis=0)
+        simu.PhaseVar_atWOI[it] = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
         simu.PhaseStableEnough[it] = 1*(OPDVar < MaxVarOPDForLocked)
         #simu.FTLocked[it] =  # Reste à définir en utilisant la matrice de poids.
         simu.VarOPD += 1/Ndit*OPDVar
@@ -2903,10 +2935,11 @@ WavelengthOfInterest
         simu.VarCPD += 1/Ndit*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
         simu.VarCGD += 1/Ndit*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
         
+        
         # Fringe contrast
         if MultiWavelength:
-            for iw in range(NW):
-                wl = WOI[iw]
+            for iw in range(MW):
+                wl = SpectraForScience[iw]
                 for ib in range(NIN):
                     CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
                     Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
@@ -2914,7 +2947,7 @@ WavelengthOfInterest
         else:
             for ib in range(NIN):
                 CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc)
-                Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/WOI)
+                Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/MeanWavelength)
                 simu.FringeContrast[ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
 
         InFrame += DIT_NumberOfFrames
@@ -3007,13 +3040,324 @@ WavelengthOfInterest
     plt.figure('Integrated Visibility')    
     plt.ylim([0.9*np.min(simu.FringeContrast),1.1])
     for ib in range(NIN):
-        plt.scatter(WOI,simu.FringeContrast[:,ib], label=f'{ich[ib]}')
+        plt.scatter(SpectraForScience,simu.FringeContrast[:,ib], label=f'{ich[ib]}')
         
     plt.legend(), plt.grid()
     plt.show()
     config.newfig += 1
     
     return
+
+
+
+def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
+                              CoherentFluxObject=[],FileInterferometer='',
+                              R=140, p=10, magSI=-1,display=True, get=[],
+                              verbose=False):
+    """
+    Processes the performance of the fringe-tracking starting at the StartingTime
+    Observables processed:
+        -VarOPD                 # Temporal Variance OPD [µm]
+        -TempVarPD              # Temporal Variance PD [rad]
+        -TempVarGD              # Temporal Variance of GD [rad]
+        -VarCPD                 # Temporal Variance of CPD [rad]
+        -VarCGD                 # Temporal Variance of CGD [rad]
+        -FringeContrast         # Fringe Contrast [0,1] at given wavelengths
+MeanWavelength
+        
+
+    Parameters
+    ----------
+    TimeBonds : INT or ARRAY [ms]
+        If int:
+            The performance are processed from TimeBonds until the end
+        If array [StartingTime,EndingTime]: 
+            The performance are processed between StartingTime and EndingTime
+    MeanWavelength : ARRAY
+        Wavelength when the Fringe Contrast needs to be calculated.
+    DIT : INT
+        Integration time of the science instrument [ms]
+    p : INT
+        Defines the maximal phase residuals RMS for conseidering a frame as exploitable.
+        MaxRMSForLocked = MeanWavelength/p
+        MaxPhaseRMSForLocked = 2*Pi/p
+    R : FLOAT
+        Spectral resolution of the instrument whose performance are estimated.
+        By default, R=140 (minimal spectral resolution of SPICA-VIS)
+    Returns
+    -------
+    None.
+
+    """
+    from . import simu
+    from . import config
+    
+    ich = config.FS['ich']
+    
+    from .config import NA,NIN,NC,dt,NT,NB
+    
+    
+    """
+    LOAD COHERENT FLUX IN SPECTRAL BAND FOR SNR COMPUTATION
+    So far, I assume it is SPICA-VIS
+    """
+    
+    MeanWavelength = np.mean(SpectraForScience)
+    if hasattr(SpectraForScience, "__len__"):
+        MW=len(SpectraForScience)
+        MultiWavelength=True
+    else:
+        MultiWavelength=False
+        MW=1
+        SpectraForScience = np.array([MeanWavelength])
+
+    Lc = R*SpectraForScience      # Vector or float
+
+    if magSI<0:
+        if 'SImag' not in config.Target.Star1.keys():
+            config.Target.Star1['SImag'] = config.Target.Star1['Hmag']
+    else:
+        config.Target.Star1['SImag'] = magSI
+        
+    if not len(FileInterferometer):
+        FileInterferometer = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/interferometers/CHARAinterferometerR.fits"
+    
+    
+    if isinstance(TimeBonds,(float,int)):
+        Period = int(NT - TimeBonds/dt)
+        InFrame = round(TimeBonds/dt)
+    elif isinstance(TimeBonds,(np.ndarray,list)):
+        Period = int((TimeBonds[1]-TimeBonds[0])/dt)
+        InFrame = round(TimeBonds[0]/dt)
+    else:
+        raise '"TimeBonds" must be instance of (float,int,np.ndarray,list)'
+
+    DITf=np.array(IntegrationTimes/dt)
+    #IntegrationTimes = IntegrationTimes//dt * dt
+    Ndit=len(DITf)
+    
+    ObservingTime = Period*dt
+    print(ObservingTime)
+    print(f"Proposed DITs:{IntegrationTimes}")
+    NewDITf=np.copy(DITf)
+    for idit in range(Ndit):
+        k = Period//NewDITf[idit]
+        r = Period%NewDITf[idit]
+        if r > 0.05*NewDITf[idit]:
+            NewDITf[idit] = Period//(k+1)
+        
+    NewIntegrationTimes = NewDITf*dt
+    ListNframes = Period//NewDITf
+    ThrownFrames = Period%NewDITf
+    LengthOfKeptSequence = ListNframes * Period
+    
+    print(f"ObservingTimes:{ObservingTime}")
+    print(f"ListNframes :{ListNframes}")
+    print(f"ThrownFrames :{ThrownFrames}")
+    print(f"New DITs:{NewIntegrationTimes}")
+    print(f"Percentage of loss: {np.round(ThrownFrames/LengthOfKeptSequence*100,2)}")
+    # if ThrownFrames[idit] > 0.05*LengthOfKeptSequence[idit]:
+    #     NewIntegrationTimes.remove(IntegrationTimes[idit])
+            
+    simu.DITsForPerformance = NewIntegrationTimes
+    Ndit = len(NewIntegrationTimes)
+    
+    if not len(CoherentFluxObject):
+        # The interferometer is "not the same" as for simulation, because not the same band.
+        # In the future, both bands could be integrated in the same Interf class object.
+        InterfArray = ct.get_array(name=FileInterferometer)
+        
+        if MultiWavelength:
+            CoherentFluxObject = ct.create_CfObj(SpectraForScience,
+                                                 config.Obs,config.Target,InterfArray)
+        else:
+            CoherentFluxObject = ct.create_CfObj(MeanWavelength,
+                                                 config.Obs,config.Target,InterfArray,R=R)
+        CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
+    
+    from cophasing.SCIENTIFIC_INSTRUMENTS import SPICAVIS
+   
+    if MultiWavelength:
+        simu.FringeContrast=np.zeros([Ndit,MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
+    
+    simu.VarSquaredVis=np.zeros([Ndit,MW,NIN])*np.nan
+    simu.SNR_E=np.zeros([Ndit,NIN])*np.nan
+    simu.SNR_E_perSC=np.zeros([Ndit,MW,NIN])*np.nan
+
+    simu.VarOPD=np.zeros([Ndit,NIN])
+    simu.VarGDRes=np.zeros([Ndit,NIN])
+    simu.VarPDRes=np.zeros([Ndit,NIN])
+    simu.VarPiston=np.zeros([Ndit,NA])
+    simu.VarPistonGD=np.zeros([Ndit,NA])
+    simu.VarPistonPD=np.zeros([Ndit,NA])
+
+    simu.TempVarPD=np.zeros([Ndit,NIN])
+    simu.TempVarGD=np.zeros([Ndit,NIN])
+    simu.VarCPD =np.zeros([Ndit,NC])
+    simu.VarCGD=np.zeros([Ndit,NC])
+    
+    simu.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
+    simu.LR2 = np.zeros([Ndit,NIN])          # Mode TRACK
+    simu.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
+    simu.WLockedRatio = np.zeros([Ndit,NIN])
+    simu.WLR2 = np.zeros([Ndit,NIN])
+    
+    simu.IntegrationTime=NewIntegrationTimes
+
+    MaxPhaseVarForLocked = (2*np.pi/p)**2
+    MaxVarOPDForLocked = (MeanWavelength/p)**2
+    
+    InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < MeanWavelength/2
+    if 'ThresholdGD' in config.FT.keys():
+        TrackedBaselines = (simu.SquaredSNRMovingAveragePD >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
+        
+    FirstFrame = InFrame
+    for idit in range(Ndit):
+        
+        DIT=NewIntegrationTimes[idit]
+        
+        # Calculation of SNR
+        simu.IntegrationTime[idit], simu.VarSquaredVis[idit], simu.SNR_E[idit], simu.SNR_E_perSC[idit] = SPICAVIS(CoherentFluxObject,simu.OPDTrue[FirstFrame:], SpectraForScience,DIT=DIT)
+        
+        DIT_NumberOfFrames = int(DIT/dt)
+        Nframes = Period//DIT_NumberOfFrames
+        
+        PhaseVar_atWOI = np.zeros([NIN])
+        PhaseStableEnough= np.zeros([NIN])
+        
+        if 'ThresholdGD' in config.FT.keys():
+            simu.LR2[idit] = np.mean(TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
+        
+        simu.LR3[idit] = np.mean(InCentralFringe[InFrame:], axis=0)    # Array [NIN]
+        
+        InFrame = FirstFrame
+        for iframe in range(Nframes):
+            OutFrame=InFrame+DIT_NumberOfFrames
+            OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+            GDResVar = np.var(simu.GDResidual[InFrame:OutFrame,:],axis=0)
+            PDResVar = np.var(simu.PDResidual[InFrame:OutFrame,:],axis=0)
+            PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
+            PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
+            PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
+            PhaseVar_atWOI = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
+            PhaseStableEnough = 1*(OPDVar < MaxVarOPDForLocked)
+            
+            simu.LockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough,axis=0)
+            simu.VarOPD[idit] += 1/Nframes*OPDVar
+            simu.VarPDRes[idit] += 1/Nframes*PDResVar
+            simu.VarGDRes[idit] += 1/Nframes*GDResVar
+            simu.VarPiston[idit] += 1/Nframes*PistonVar
+            simu.VarPistonGD[idit] += 1/Nframes*PistonVarGD
+            simu.VarPistonPD[idit] += 1/Nframes*PistonVarPD
+            simu.TempVarPD[idit] += 1/Nframes*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
+            simu.TempVarGD[idit] += 1/Nframes*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
+            simu.VarCPD[idit] += 1/Nframes*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
+            simu.VarCGD[idit] += 1/Nframes*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
+            
+            # Fringe contrast
+            for iw in range(MW):
+                wl = SpectraForScience[iw]
+                for ib in range(NIN):
+                    CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
+                    Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
+                    simu.FringeContrast[idit,iw,ib] += 1/Nframes*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
+
+            simu.WLockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough*simu.FringeContrast[idit], axis=0)
+            
+            
+    
+            InFrame += DIT_NumberOfFrames
+            
+        # Don't depend on DIT but better for same treatment after.
+        
+        simu.WLR2[idit] = np.mean(InCentralFringe * simu.SquaredSNRMovingAveragePD, axis=0)
+        
+    if display:
+
+        observable = simu.VarOPD
+        xrange = np.arange(NIN)
+        
+        plt.figure(f'Variance OPD @{round(config.PDspectra,2)}µm')    
+        plt.ylim([np.min(observable),np.max(observable)])
+        plt.scatter(np.arange(NIN),observable)
+        plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
+        plt.xticks(ticks=np.arange(NIN),labels=ich, rotation='vertical')    
+        plt.xlabel('Baseline')
+        plt.ylabel('Variance [µm]')
+        plt.grid()
+        plt.show()
+        config.newfig += 1
+        
+        observable = simu.TempVarPD*(config.PDspectra/2/np.pi)
+        
+        plt.figure(f'Variance Estimated PD @{round(config.PDspectra,2)}µm')    
+        plt.ylim([np.min(observable),np.max(observable)])
+        plt.scatter(np.arange(NIN),observable)
+        plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
+        plt.xticks(ticks=np.arange(NIN),labels=ich, rotation='vertical')    
+        plt.xlabel('Baseline')
+        plt.ylabel('Variance [µm]')
+        plt.grid()
+        plt.show()
+        config.newfig += 1
+        
+        
+        observable = simu.TempVarGD*(config.PDspectra/2/np.pi)*config.FS['R']
+        
+        plt.figure(f'Variance Estimated GD @{round(config.PDspectra,2)}µm')    
+        plt.ylim([np.min(observable),np.max(observable)])
+        plt.scatter(np.arange(NIN),observable)
+        plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
+        plt.xticks(ticks=np.arange(NIN),labels=ich, rotation='vertical')    
+        plt.xlabel('Baseline')
+        plt.ylabel('Variance [µm]')
+        plt.grid()
+        plt.show()
+        config.newfig += 1
+        
+        
+        observable = simu.VarCPD
+        xrange = np.arange(config.NC)
+        
+        plt.figure('Variance CPD')    
+        plt.ylim([np.min(observable),np.max(observable)])
+        plt.scatter(xrange,observable)
+        plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
+        plt.xticks(ticks=xrange,labels=config.CPindex, rotation='vertical')    
+        plt.xlabel('Triangle')
+        plt.ylabel('Variance [rad]')
+        plt.grid()
+        plt.show()
+        config.newfig += 1
+    
+    
+        observable = simu.VarCGD
+        
+        plt.figure('Variance CGD')    
+        plt.ylim([np.min(observable),np.max(observable)])
+        plt.scatter(xrange,observable)
+        plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
+        plt.xticks(ticks=xrange,labels=config.CPindex, rotation='vertical')    
+        plt.xlabel('Triangle')
+        plt.ylabel('Variance [rad]')
+        plt.grid()
+        plt.show()
+        config.newfig += 1
+    
+        
+        plt.figure('Integrated Visibility')    
+        plt.ylim([0.9*np.min(simu.FringeContrast),1.1])
+        for ib in range(NIN):
+            plt.scatter(MeanWavelength,simu.FringeContrast[:,ib], label=f'{ich[ib]}')
+            
+        plt.legend(), plt.grid()
+        plt.show()
+        config.newfig += 1
+    
+    return NewIntegrationTimes
+
+
+
 
 
 def SpectralAnalysis(OPD = (1,2),TimeBonds=0):
