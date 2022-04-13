@@ -232,17 +232,31 @@ def SPICAVIS(CoherentFluxObject,ResidualOPDs, spectra,DIT=100,R=140):
     Photometries = CoherentFluxObject[:,:NA]
     ObjectVsquare = CoherentFluxObject[:,NA:NA+NIN]**2+CoherentFluxObject[:,NA+NIN:]**2
 
+    Lc = R*spectra
+
     MutualIntensities = np.zeros([NT,MW,NIN])+0j
     for iw in range(MW):
         wl = spectra[iw]
+        CoherenceEnvelopModulation = np.sinc(ResidualOPDs/Lc[iw])
         for ib in range(NIN):
-            MutualIntensities[:,iw,ib] = ObjectVsquare[iw,ib] * np.exp(2j*np.pi/wl * ResidualOPDs[:,ib])
+            MutualIntensities[:,iw,ib] = ObjectVsquare[iw,ib] * np.exp(2j*np.pi/wl * ResidualOPDs[:,ib])*CoherenceEnvelopModulation[:,ib]
 
     IntegrationTime = DIT//dt * dt
     
     VarSquaredVis = np.empty([MW,NIN])*np.nan
     SNR_E = np.empty([NIN])*np.nan
     SNR_E_perSC = np.empty([MW,NIN])*np.nan
+    
+    try:
+        from . import simu
+        simu.SNRnum=np.zeros([MW,NIN])*np.nan
+        simu.PhNoise=np.zeros([MW,NIN])*np.nan
+        simu.RNoise=np.zeros([NIN])*np.nan
+        simu.CTerms=np.zeros([MW,NIN])*np.nan
+        simu.var_cf=np.zeros([MW,NIN])*np.nan
+    
+    except:
+        pass
     
     OT=DIT/dt
     Nframes = int(NT//OT)
@@ -257,13 +271,13 @@ def SPICAVIS(CoherentFluxObject,ResidualOPDs, spectra,DIT=100,R=140):
 
 
     """ COMPUTATION OF MEAN PHOTOMETRIES"""
-    MeanPhotometries = Photometries
+    MeanPhotometries = Photometries*OT
     # MeanPhotometries=np.zeros([MW,NA])
     # for iframe in range(Nframes):
     #     FramePhotometries = Photometries[iframe*OT:(iframe+1)*OT]
     #     MeanPhotometries += 1/Nframes*np.abs(np.sum(FramePhotometries,axis=0))
 
-
+    
     """ COMPUTATION OF SNR(|V|²) """
     for ia in range(NA):
         for iap in range(ia+1,NA):
@@ -272,6 +286,7 @@ def SPICAVIS(CoherentFluxObject,ResidualOPDs, spectra,DIT=100,R=140):
             P2 = MeanPhotometries[:,iap]
             Pi = (P1+P2)/2*Kappa     # Mean uncoherent energy in interferogram of base ib
 
+            
             EnergyPicFrange = np.abs(MeanMutualIntensities[:,ib]*np.conj(MeanMutualIntensities[:,ib]))
             
             var_mod = F**2*(Pi + (darkcur*DIT*1e-3*Npix)**2+(cic*Npix)**2)
@@ -298,9 +313,20 @@ def SPICAVIS(CoherentFluxObject,ResidualOPDs, spectra,DIT=100,R=140):
             """Variance Squared Visibility"""
             VarSquaredVis[:,ib] = var_cf/D**2 + var_D*(EnergyPicFrange/D**2)**2
 
-            """SNR(|V|²) as computed in Mourard 2017"""
-            SNR_E[ib] = np.sum(EnergyPicFrange,axis=0) / np.sqrt(np.sum(var_cf))
+            """SNR(|V|²) as computed in Mourard 2017 - equation 6.14 thèse MAM"""
+            SNR_E[ib] = np.mean(EnergyPicFrange*Gab_tilde,axis=0) / np.sqrt(np.mean(var_cf))
             SNR_E_perSC[:,ib] = EnergyPicFrange / np.sqrt(var_cf)
+            
+            # simu.VisiSquared[:,ib] = EnergyPicFrange/(P1*P2)
+            try:
+                simu.SNRnum[:,ib] = EnergyPicFrange*Gab_tilde
+                simu.PhNoise[:,ib]=PhotonNoise
+                simu.var_cf[:,ib] = var_cf
+                simu.RNoise[ib] = ReadNoise
+                simu.CTerms[:,ib] = CoupledTerms
+            except:
+                pass
+
     
     return IntegrationTime, VarSquaredVis, SNR_E, SNR_E_perSC
 

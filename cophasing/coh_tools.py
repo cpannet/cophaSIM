@@ -9,12 +9,10 @@ import os
 
 datadir = 'data/'
 
-import pandas as pd
 import numpy as np
 from scipy.special import jv
 from scipy import interpolate
 
-import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 
@@ -119,12 +117,13 @@ def info_array(array, band):
         Total transmission.
 
     """
-    if array == 'chara': # information in SPICA JOSAA paper
+    if array in ['chara','CHARA']: # information in SPICA JOSAA paper
         if band == 'H':     
             T_tel = 0.1
             T_inj = 0.65
             T_strehl = 0.8
             T_BS = 1            # No beam splitter in H ? OA?
+        
         if band == 'R':
             T_tel = 0.03
             T_inj = 0.5
@@ -145,7 +144,7 @@ def info_array(array, band):
     return transmission, surface
     
 
-def get_array(name='',getcoords=False):
+def get_array(name='',band='H',getcoords=False):
     """
     Returns the coordinates, baselines and base names of a given array
 
@@ -240,6 +239,10 @@ def get_array(name='',getcoords=False):
         InterfArray.BaseNames = BaseNames
         InterfArray.TelCoordinates = TelCoordinates
         InterfArray.BaseCoordinates = BaseCoordinates
+        
+        transmission, surface = info_array(name,band)
+        InterfArray.TelSurfaces = np.ones(NA)*surface
+        InterfArray.TelTransmissions = np.ones(NA)*transmission
         
     else:
         raise Exception("For defining the array, you must give a file \
@@ -500,14 +503,16 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     
     # First case: the name of the object has been given. We search it in Simbad
     # database and its AltAzimutal coordinates if a Date has been given.
-    if Target.Name not in ('Simple','Binary','Unresolved'):
-        starttime = Time(Obs.Date)
-        print(f"Observation date: {Obs.Date}")
+    if Target.Name not in ('Simple','Binary','Unresolved') and ('AltAz' not in vars(Obs)):
+        starttime = Time(Obs.DATE)
+        print(f"Observation date: {Obs.DATE}")
     
         starcoords = SkyCoord.from_name(Target.Name)
-        staraltaz = starcoords.transform_to(AltAz(obstime=starttime,location=Obs.ArrayName))
+        ArrayLocation=EarthLocation.of_site(Obs.ArrayName)
+        staraltaz = starcoords.transform_to(AltAz(obstime=starttime,location=ArrayLocation))
         
         (altitude, azimuth) = (staraltaz.alt.radian,staraltaz.az.radian)
+        Obs.AltAz = (180/np.pi*altitude, 180/np.pi*azimuth)
         
     else:
         (altitude, azimuth) = (theta*np.pi/180 for theta in Obs.AltAz)
@@ -538,7 +543,6 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     B_Ep = np.dot(basecoords, np.transpose(u_Ep))
     B_Np = -np.dot(basecoords, np.transpose(u_Np))
     B_Zp = np.dot(basecoords, np.transpose(u_Zp))
-    
     
     # baselines = np.transpose(basedist)*np.sin(altitude-basealtaz[:,0])
     
@@ -573,6 +577,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
             visibilities[iw,ib] = uv_plane[Nu,Nv]
         
     UVcoords = (ucoords,vcoords)
+    #UVcoordsMeters = [1/mas2rad(1/coord)*np.median(lmbda) for coord in UVcoords]
+    
     print("Visibilities calculated.")
     
     
@@ -591,9 +597,9 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
         PhotometricSNR = np.concatenate([PhotSNR[::-1],PhotSNR])
         
         print(f'Plot CHARA (u,v) coverage on figure {config.newfig}')    
-        chara_uv_complete = np.concatenate((chara_uv[0], -chara_uv[0]),axis=0)
+        chara_uv_complete = np.concatenate((chara_uv[NW//2], -chara_uv[NW//2]),axis=0)
         
-        uvmax = np.max(chara_uv[0]/dfreq)+10
+        uvmax = np.max(chara_uv_complete/dfreq)+10
         
         Ndisplay = 2*int(uvmax+10)
         
@@ -635,7 +641,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     return visibilities, chara_uv, uv_plane, UVcoords
 
 
-def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, display=False):
+def create_obsfile(spectra, Obs, Target, savingfilepath='',
+                   savedir='', ext='pdf',overwrite=False, display=False):
     """
     Creates the coherent flux matrix of the object at the entrance of the 
     fringe sensor and save it into a fitsfile.
@@ -779,7 +786,8 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='', overwrite=False, dis
                     bispectrum[:,ic] = bispec
         
     else:           # Van-Cittert theorem visibility
-        visibilities,_,_,_ = VanCittert(spectra, Obs, Target,display=display)
+        visibilities,_,_,_ = VanCittert(spectra, Obs, Target,
+                                        display=display, savedir=savedir, ext=ext)
         
         bispectrum = np.zeros([NW,NC])*1j
         
@@ -978,11 +986,11 @@ def create_CfObj(spectra,Obs,Target,InterfArray,R=140):
     Lph_H = L0_ph*10**(-0.4*mag)
     
     if MultiWavelength:
-        delta_wav = np.abs(spectra[0]-spectra[1]) 
+        delta_wav = np.abs(spectra[0]-spectra[1])
     else:
         delta_wav = MeanWavelength/R
         
-    UncohIrradiance = Irradiance*Lph_H*delta_wav             # [phot/m²/deltalmbda/dt] Source Irradiance 
+    UncohIrradiance = Irradiance*Lph_H*delta_wav             # [phot/m²/deltalmbda/s] Source Irradiance 
 
     Throughput = InterfArray.TelSurfaces*InterfArray.TelTransmissions
     
@@ -1035,10 +1043,9 @@ def get_ObsInformation(ObservationFile):
     Target.Name = hdr['TARGET']
     Obs.ArrayName = hdr['ARRAY']
     Obs.Filepath = hdr['Filepath']
-    if 'AltAz' in hdr.keys():
-        Obs.AltAz = hdr['AltAz']
-    else:
-        Obs.AltAz = (90,0)
+    for key,val in hdr.items():
+        if key not in ['TARGET','ARRAY']:
+            setattr(Obs,key,val)   
         
     return Obs, Target
 

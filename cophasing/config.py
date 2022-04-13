@@ -151,8 +151,9 @@ class Observation():
         
         self.Filepath = Filepath
         self.ArrayName = ArrayName
-        self.AltAz = AltAz
-        self.Date = Date
+        if AltAz != 'no':
+            self.AltAz = AltAz
+        self.DATE = Date
         self.UsedTelescopes = UsedTelescopes
         
         

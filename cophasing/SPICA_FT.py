@@ -1111,7 +1111,7 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
                     
             config.FT['ThresholdGD'] = newThresholdGD
             
-            sk.display('snr',WLOfTrack=1.6, pause=True,display=display)
+            sk.display('snr',WLOfTrack=1.6, pause=True, display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)

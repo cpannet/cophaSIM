@@ -57,9 +57,36 @@ d4 = np.array([[0,1/3,0,1/3,0,1/3],
                [0,1/3,0,1/3,0,1/3],
                [1/3,0,1/3,0,1/3,0]])
 
-descriptions = {"PW6-15-10":d0, "PW6-9-4a":d1,"PW6-9-4b":d2,"PW6-9-2":d3,"PW6-9-0":d4}
+d5 = np.array([[0,0,1/3,1/3,1/3,0],
+              [0,0,0,1/3,1/3,1/3],
+              [1/3,0,0,0,1/3,1/3],
+              [1/3,1/3,0,0,0,1/3],
+              [1/3,1/3,1/3,0,0,0],
+              [0,1/3,1/3,1/3,0,0]])
 
+d6 = np.array([[0,1,0,0,0,0],
+              [1/3,0,0,1/3,0,1/3],
+              [0,0,0,1,0,0],
+              [0,1/3,1/3,0,0,1/3],
+              [0,0,0,0,0,1],
+              [0,1/3,0,1/3,1/3,0]])
 
+d7 = np.array([[0,1,0,0,0,1],
+              [1,0,1,0,0,0],
+              [0,1,0,1,0,0],
+              [0,0,1,0,1,0],
+              [0,0,0,1,0,1],
+              [1,0,0,0,1,0]])/2
+
+d8 = np.array([[0,1,0,0,0,0],
+              [1/2,0,0,0,0,1/2],
+              [0,0,0,1,0,0],
+              [0,0,1/2,0,1/2,0],
+              [0,0,0,1/2,0,1/2],
+              [0,1/2,0,0,1/2,0]])
+
+descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
+               "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8}
 
 
 def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', description='PW6-15-10', modulation='ABCD', clean_up=False, display=False, savedir='',ext='pdf',ArrayDetails=0):
@@ -199,8 +226,18 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                     'weight' : 'normal',
                     'size'   : 22}
             
+            if len(savedir):
+                rcParamsFS = {"axes.grid":False,
+                               "figure.constrained_layout.use": True,
+                               'figure.subplot.hspace': 0,
+                               'figure.subplot.wspace': 0,
+                               'figure.subplot.left':0,
+                               'figure.subplot.right':1
+                               }
+                plt.rcParams.update(rcParamsFS)
+            
             plt.rc('font', **font)
-            title="ConbinationScheme"
+            title=name
             fig=plt.figure(title, clear=True)
             ax=fig.subplots()
             for ia in range(NA):
@@ -225,11 +262,13 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
             ax.set_ylabel("Y [m]")
             ax.set_xlim([-210,160]) ; ax.set_ylim([-50,350])
             
+            
             if len(savedir):
                 if not os.path.exists(savedir):
                     os.makedirs(savedir, exist_ok=True)
                 
-                fig.savefig(savedir+f'CombinationArchitecture.{ext}')
+                ax.axis("off")
+                fig.savefig(f"{savedir}{name}.{ext}")
         
         return
 

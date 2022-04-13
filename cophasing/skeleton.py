@@ -143,6 +143,7 @@ SOURCE:
     config.ObservationFile = ObsFile
     config.Obs = Obs
     config.Target = Target
+    config.InterferometerFile = Interferometer
     config.InterfArray = InterfArray
     config.DisturbanceFile = DisturbanceFile
     config.piston_average = piston_average
@@ -1184,8 +1185,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     stationaryregim = np.arange(stationaryregim_start,NT)
     
     effDIT = min(DIT, config.NT - config.starttracking -1)
-    ShowPerformance(float(timestamps[stationaryregim_start]), WLOfScience, effDIT, display=False)
     
+    if not ('opdcontrol' in args):
+        ShowPerformance(float(timestamps[stationaryregim_start]), WLOfScience, effDIT, display=False)
+    else:
+        print("don't compute performances")
     
     SS = 12     # Small size
     MS = 14     # Medium size
@@ -1910,11 +1914,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         ax3.bar(baselines[:len1],RMStrueOPD[:len1], color=basecolors[:len1])
         ax5.bar(baselines[:len1],simu.LR3[:len1], color=basecolors[:len1])
-        ax5.bar(baselines[:len1],np.abs(VisObj[:len1]), fill=False, edgecolor='black', linestyle='-',linewidth=1.5)
+        ax5.bar(baselines[:len1],np.abs(VisObj[:len1])**2, fill=False, edgecolor='black', linestyle='-',linewidth=1.5)
         
         ax8.bar(baselines[len1:],RMStrueOPD[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],simu.LR3[len1:], color=basecolors[len1:])
-        ax10.bar(baselines[len1:],np.abs(VisObj[len1:]), fill=False, edgecolor='black', linestyle='-', linewidth=1.5)
+        ax10.bar(baselines[len1:],np.abs(VisObj[len1:])**2, fill=False, edgecolor='black', linestyle='-', linewidth=1.5)
 
         ax1.sharex(ax6) ; ax1.sharey(ax6)
         ax3.sharey(ax8) ; ax5.sharey(ax10)
@@ -1929,7 +1933,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         ax1.set_ylabel('OPD [µm]')
         ax3.set_ylabel('$\sigma_{OPD}$\n[µm]',rotation=1,labelpad=40,loc='bottom')
-        ax5.set_ylabel('Lock\nratio',rotation=1,labelpad=40, loc='bottom')
+        ax5.set_ylabel('Lock\nratio\n|V|²',rotation=1,labelpad=40, loc='bottom')
         
         #ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
         
@@ -1948,6 +1952,89 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 print("Saving opd3 figure.")
             plt.savefig(savedir+f"Simulation{timestr}_opd3.{ext}")
         
+    
+    
+    if displayall or ('opdcontrol' in args):
+    
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+                    
+
+        from mypackage.plot_tools import setaxelim
+        
+        t = simu.timestamps ; timerange = range(NT)
+        # NA=6 ; NIN = 15 ; NC = 10
+        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
+        len2 = NIN//2 ; len1 = NIN-len2
+        
+        basecolors = colors[:len1]+colors[:len2]
+        # basestyles = len1*['solid'] + len2*['dashed']
+        # closurecolors = colors[:NC]
+        
+        R=config.FS['R']
+        RMStrueOPD = np.std(simu.OPDTrue,axis=0)
+        print(RMStrueOPD.shape)
+        VisObj = ct.NB2NIN(simu.VisibilityObject[ind])
+        
+        plt.rcParams.update(rcParamsForBaselines)
+        title='True OPD'
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+        fig.suptitle(title)
+        (ax1,ax6),(ax2,ax7),(ax3,ax8),(ax4,ax9),(ax5,ax10)=fig.subplots(nrows=5,ncols=2, gridspec_kw={"height_ratios":[4,.5,1,.2,1]})
+        ax1.set_title("First serie of baselines, from 12 to 25")
+        ax6.set_title("Second serie of baselines, from 26 to 56")
+        
+        for iBase in range(len1):   # First serie
+            ax1.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+
+        for iBase in range(len1,NIN):   # Second serie
+            ax6.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+        
+        ax1.vlines(config.starttracking*dt,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+                   color='k', linestyle=':')
+        ax6.vlines(config.starttracking*dt,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+                   color='k', linestyle=':')
+        
+        # Histogram of OPD rms (colored bars) and visibilities (black lines)
+        ax3.bar(baselines[:len1],RMStrueOPD[:len1], color=basecolors[:len1])
+        ax5.bar(baselines[:len1],np.abs(VisObj[:len1]), color=basecolors[:len1])
+        
+        ax8.bar(baselines[len1:],RMStrueOPD[len1:], color=basecolors[len1:])
+        ax10.bar(baselines[len1:],np.abs(VisObj[len1:]), color=basecolors[len1:])
+
+        ax1.sharex(ax6) ; ax1.sharey(ax6)
+        ax3.sharey(ax8) ; ax5.sharey(ax10)
+        ax3.sharex(ax5) ; ax8.sharex(ax10)
+        
+        ax6.tick_params(labelleft=False)
+        ax8.tick_params(labelleft=False)
+        ax10.tick_params(labelleft=False)
+        ax3.tick_params(labelbottom=False) ; ax8.tick_params(labelbottom=False)
+        
+        ax2.remove() ; ax4.remove();ax7.remove();ax9.remove()
+        
+        ax1.set_ylabel('OPD [µm]')
+        ax3.set_ylabel('$\sigma_{OPD}$\n[µm]',rotation=1,labelpad=40,loc='bottom')
+        ax5.set_ylabel('|V|',rotation=1,labelpad=40, loc='bottom')
+        
+        #ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+        
+        ax1.set_xlabel('Time [ms]') ; ax6.set_xlabel('Time [ms]')
+        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+
+        setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
+        setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
+        ax5.set_ylim(0,1.1) ; ax5.grid(True) ; ax10.grid(True)
+
+        if display:
+            fig.show()
+
+        if len(savedir):
+            if verbose:
+                print("Saving opdcontrol figure.")
+            plt.savefig(savedir+f"Simulation{timestr}_opdcontrol.{ext}")
+    
     
     
     
@@ -2780,7 +2867,7 @@ def investigate(*args):
     pass
 
 def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
-                    CoherentFluxObject=[],
+                    CoherentFluxObject=[],SNR_SI=False,
                     R=140, p=10, magSI=-1,display=True, get=[]):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
@@ -2862,23 +2949,24 @@ WavelengthOfInterest
     if not len(FileInterferometer):
         FileInterferometer = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/interferometers/CHARAinterferometerR.fits"
       
-    if not len(CoherentFluxObject):
-        # The interferometer is "not the same" as for simulation, because not the same band.
-        # In the future, both bands could be integrated in the same Interf class object.
-        InterfArray = ct.get_array(name=FileInterferometer)
+    if SNR_SI:
+        if not len(CoherentFluxObject):
+            # The interferometer is "not the same" as for simulation, because not the same band.
+            # In the future, both bands could be integrated in the same Interf class object.
+            InterfArray = ct.get_array(name=FileInterferometer)
+            
+            if MultiWavelength:
+                CoherentFluxObject = ct.create_CfObj(SpectraForScience,
+                                                     config.Obs,config.Target,InterfArray)
+            else:
+                CoherentFluxObject = ct.create_CfObj(MeanWavelength,
+                                                     config.Obs,config.Target,InterfArray,R=R)
+            CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
         
-        if MultiWavelength:
-            CoherentFluxObject = ct.create_CfObj(SpectraForScience,
-                                                 config.Obs,config.Target,InterfArray)
-        else:
-            CoherentFluxObject = ct.create_CfObj(MeanWavelength,
-                                                 config.Obs,config.Target,InterfArray,R=R)
-        CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
-    
-    
-    from cophasing.SCIENTIFIC_INSTRUMENTS import SPICAVIS
-    simu.IntegrationTime, simu.VarSquaredVis, simu.SNR_E, simu.SNR_E_perSC = SPICAVIS(CoherentFluxObject,simu.OPDTrue[InFrame:],SpectraForScience,DIT=DIT)
-    
+        
+        from cophasing.SCIENTIFIC_INSTRUMENTS import SPICAVIS
+        simu.IntegrationTime, simu.VarSquaredVis, simu.SNR_E, simu.SNR_E_perSC = SPICAVIS(CoherentFluxObject,simu.OPDTrue[InFrame:],SpectraForScience,DIT=DIT)
+        
    
     if MultiWavelength:
         simu.FringeContrast=np.zeros([MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
@@ -3052,8 +3140,8 @@ WavelengthOfInterest
 
 def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
                               CoherentFluxObject=[],FileInterferometer='',
-                              R=140, p=10, magSI=-1,display=True, get=[],
-                              verbose=False):
+                              R=140, p=10, magSI=-1,display=True, get=[],criterias='light',
+                              verbose=False, onlySNR=False,check_DITs=False):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
@@ -3132,33 +3220,43 @@ MeanWavelength
     else:
         raise '"TimeBonds" must be instance of (float,int,np.ndarray,list)'
 
-    DITf=np.array(IntegrationTimes/dt)
-    #IntegrationTimes = IntegrationTimes//dt * dt
-    Ndit=len(DITf)
-    
-    ObservingTime = Period*dt
-    print(ObservingTime)
-    print(f"Proposed DITs:{IntegrationTimes}")
-    NewDITf=np.copy(DITf)
-    for idit in range(Ndit):
-        k = Period//NewDITf[idit]
-        r = Period%NewDITf[idit]
-        if r > 0.05*NewDITf[idit]:
-            NewDITf[idit] = Period//(k+1)
+    if check_DITs:
+        DITf=IntegrationTimes/dt
+        #IntegrationTimes = IntegrationTimes//dt * dt
+        Ndit=len(DITf)
         
-    NewIntegrationTimes = NewDITf*dt
-    ListNframes = Period//NewDITf
-    ThrownFrames = Period%NewDITf
-    LengthOfKeptSequence = ListNframes * Period
-    
-    print(f"ObservingTimes:{ObservingTime}")
-    print(f"ListNframes :{ListNframes}")
-    print(f"ThrownFrames :{ThrownFrames}")
-    print(f"New DITs:{NewIntegrationTimes}")
-    print(f"Percentage of loss: {np.round(ThrownFrames/LengthOfKeptSequence*100,2)}")
-    # if ThrownFrames[idit] > 0.05*LengthOfKeptSequence[idit]:
-    #     NewIntegrationTimes.remove(IntegrationTimes[idit])
+        ObservingTime = Period*dt
+        print(ObservingTime)
+        print(f"Proposed DITs:{IntegrationTimes}")
+        NewDITf=[]#DITf.copy()
+        kbefore=[]
+        for idit in range(Ndit):
+            k = Period//DITf[idit]
+            if k in kbefore: 
+                k=np.min(kbefore)-1  # Avoid that two DITs be the same
+            if k == -1:
+                break # Stop if we reached the unique frame.
+            r = Period%DITf[idit]
+            if r > 0.05*DITf[idit]:
+                NewDITf.append(Period//(k+1))
+            kbefore.append(k)
             
+        NewDITf = np.array(NewDITf)
+        NewIntegrationTimes = NewDITf*dt
+        ListNframes = Period//NewDITf
+        ThrownFrames = Period%NewDITf
+        LengthOfKeptSequence = ListNframes * Period
+        
+        print(f"ObservingTimes:{ObservingTime}")
+        print(f"ListNframes :{ListNframes}")
+        print(f"ThrownFrames :{ThrownFrames}")
+        print(f"New DITs:{NewIntegrationTimes}")
+        print(f"Percentage of loss: {np.round(ThrownFrames/LengthOfKeptSequence*100,2)}")
+    
+        
+    else:
+        NewIntegrationTimes = IntegrationTimes
+        
     simu.DITsForPerformance = NewIntegrationTimes
     Ndit = len(NewIntegrationTimes)
     
@@ -3177,30 +3275,39 @@ MeanWavelength
     
     from cophasing.SCIENTIFIC_INSTRUMENTS import SPICAVIS
    
-    if MultiWavelength:
-        simu.FringeContrast=np.zeros([Ndit,MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
-    
+
     simu.VarSquaredVis=np.zeros([Ndit,MW,NIN])*np.nan
     simu.SNR_E=np.zeros([Ndit,NIN])*np.nan
     simu.SNR_E_perSC=np.zeros([Ndit,MW,NIN])*np.nan
-
     simu.VarOPD=np.zeros([Ndit,NIN])
-    simu.VarGDRes=np.zeros([Ndit,NIN])
-    simu.VarPDRes=np.zeros([Ndit,NIN])
-    simu.VarPiston=np.zeros([Ndit,NA])
-    simu.VarPistonGD=np.zeros([Ndit,NA])
-    simu.VarPistonPD=np.zeros([Ndit,NA])
-
-    simu.TempVarPD=np.zeros([Ndit,NIN])
-    simu.TempVarGD=np.zeros([Ndit,NIN])
-    simu.VarCPD =np.zeros([Ndit,NC])
-    simu.VarCGD=np.zeros([Ndit,NC])
-    
     simu.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
     simu.LR2 = np.zeros([Ndit,NIN])          # Mode TRACK
     simu.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
-    simu.WLockedRatio = np.zeros([Ndit,NIN])
-    simu.WLR2 = np.zeros([Ndit,NIN])
+    simu.FringeContrast=np.zeros([Ndit,MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
+    
+    simu.VarPiston=np.zeros([Ndit,NA])
+    simu.VarPistonGD=np.zeros([Ndit,NA])
+    simu.VarPistonPD=np.zeros([Ndit,NA])
+    
+    if criterias!='light': # additional informations
+
+        simu.EnergyPicFrange=np.zeros([Ndit,MW,NIN])*np.nan
+        simu.PhotonNoise=np.zeros([Ndit,MW,NIN])*np.nan
+        simu.ReadNoise=np.zeros([Ndit,NIN])*np.nan
+        simu.CoupledTerms=np.zeros([Ndit,MW,NIN])*np.nan
+        simu.VarCf=np.zeros([Ndit,MW,NIN])*np.nan
+    
+        simu.VarGDRes=np.zeros([Ndit,NIN])
+        simu.VarPDRes=np.zeros([Ndit,NIN])
+    
+        simu.TempVarPD=np.zeros([Ndit,NIN])
+        simu.TempVarGD=np.zeros([Ndit,NIN])
+        
+        simu.WLockedRatio = np.zeros([Ndit,NIN])
+        simu.WLR2 = np.zeros([Ndit,NIN])
+    
+        simu.VarCPD =np.zeros([Ndit,NC])
+        simu.VarCGD=np.zeros([Ndit,NC])
     
     simu.IntegrationTime=NewIntegrationTimes
 
@@ -3211,13 +3318,24 @@ MeanWavelength
     if 'ThresholdGD' in config.FT.keys():
         TrackedBaselines = (simu.SquaredSNRMovingAveragePD >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
         
+        
     FirstFrame = InFrame
     for idit in range(Ndit):
         
         DIT=NewIntegrationTimes[idit]
         
         # Calculation of SNR
-        simu.IntegrationTime[idit], simu.VarSquaredVis[idit], simu.SNR_E[idit], simu.SNR_E_perSC[idit] = SPICAVIS(CoherentFluxObject,simu.OPDTrue[FirstFrame:], SpectraForScience,DIT=DIT)
+        _, simu.VarSquaredVis[idit], simu.SNR_E[idit], simu.SNR_E_perSC[idit] = SPICAVIS(CoherentFluxObject,simu.OPDTrue[FirstFrame:], SpectraForScience,DIT=DIT)
+        
+        if criterias!='light':
+            simu.EnergyPicFrange[idit] = simu.SNRnum
+            simu.PhotonNoise[idit]= simu.PhNoise
+            simu.ReadNoise[idit]=simu.RNoise
+            simu.CoupledTerms[idit]=simu.CTerms
+            simu.VarCf[idit]=simu.var_cf
+        
+        if onlySNR:
+            continue
         
         DIT_NumberOfFrames = int(DIT/dt)
         Nframes = Period//DIT_NumberOfFrames
@@ -3233,26 +3351,28 @@ MeanWavelength
         InFrame = FirstFrame
         for iframe in range(Nframes):
             OutFrame=InFrame+DIT_NumberOfFrames
+            
+            simu.VarOPD=np.zeros([Ndit,NIN])
+            simu.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
+            simu.LR2 = np.zeros([Ndit,NIN])          # Mode TRACK
+            simu.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
+            
             OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
-            GDResVar = np.var(simu.GDResidual[InFrame:OutFrame,:],axis=0)
-            PDResVar = np.var(simu.PDResidual[InFrame:OutFrame,:],axis=0)
-            PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
-            PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
-            PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
+            
             PhaseVar_atWOI = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
             PhaseStableEnough = 1*(OPDVar < MaxVarOPDForLocked)
             
             simu.LockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough,axis=0)
             simu.VarOPD[idit] += 1/Nframes*OPDVar
-            simu.VarPDRes[idit] += 1/Nframes*PDResVar
-            simu.VarGDRes[idit] += 1/Nframes*GDResVar
+
+
+            # Telescopes
+            PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
+            PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
+            PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
             simu.VarPiston[idit] += 1/Nframes*PistonVar
             simu.VarPistonGD[idit] += 1/Nframes*PistonVarGD
             simu.VarPistonPD[idit] += 1/Nframes*PistonVarPD
-            simu.TempVarPD[idit] += 1/Nframes*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
-            simu.TempVarGD[idit] += 1/Nframes*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
-            simu.VarCPD[idit] += 1/Nframes*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
-            simu.VarCGD[idit] += 1/Nframes*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
             
             # Fringe contrast
             for iw in range(MW):
@@ -3262,16 +3382,31 @@ MeanWavelength
                     Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
                     simu.FringeContrast[idit,iw,ib] += 1/Nframes*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
 
-            simu.WLockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough*simu.FringeContrast[idit], axis=0)
-            
-            
+
+            if criterias!='light':
+                GDResVar = np.var(simu.GDResidual[InFrame:OutFrame,:],axis=0)
+                PDResVar = np.var(simu.PDResidual[InFrame:OutFrame,:],axis=0)
+                simu.VarPDRes[idit] += 1/Nframes*PDResVar
+                simu.VarGDRes[idit] += 1/Nframes*GDResVar
+
+                simu.TempVarPD[idit] += 1/Nframes*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
+                simu.TempVarGD[idit] += 1/Nframes*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
+                simu.VarCPD[idit] += 1/Nframes*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
+                simu.VarCGD[idit] += 1/Nframes*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
+                
+                simu.WLockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough*simu.FringeContrast[idit], axis=0)
     
             InFrame += DIT_NumberOfFrames
             
         # Don't depend on DIT but better for same treatment after.
+        if criterias!='light':
+            simu.WLR2[idit] = np.mean(InCentralFringe * simu.SquaredSNRMovingAveragePD, axis=0)
         
-        simu.WLR2[idit] = np.mean(InCentralFringe * simu.SquaredSNRMovingAveragePD, axis=0)
         
+    if onlySNR:
+        return NewIntegrationTimes
+    
+    
     if display:
 
         observable = simu.VarOPD
@@ -4139,7 +4274,21 @@ def populate_hdr(objet, hdr, prefix="",verbose=False):
                 
         elif isinstance(value, str):
             if len(value.encode('utf-8')) > 80:
-                value = value.split('/')[-1]
+                
+                if ('CHARA' in value) and not ('interferometer' in value):
+                    value = value.split('CHARA/')[-1].replace('µ','micro')
+                else:
+                    value = value.split('/')[-1]
+                    
+                # subfolders=value.split('/')
+                # k=len(subfolders)
+                # value = '/'.join(subfolders[-k:])
+                # while len(value.encode('utf-8')) > 80:
+                #     k-=1
+                #     value = '/'.join(subfolders[-k:])
+                # if k==0:
+                #     value = value.split('/')[-1]
+                    
                 
             hdr[f"{prefix}{varname}"] = value
                 
@@ -4200,7 +4349,8 @@ def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, ver
                 cols.append(fits.Column(name=key, format=form, array=array))
             
         elif np.ndim(array) == 2:
-            imhdu.append(fits.ImageHDU(array, name=key))
+            if not isinstance(array[0,0],complex):
+                imhdu.append(fits.ImageHDU(array, name=key))
             
     hdu = fits.BinTableHDU.from_columns(cols, name='config')
     
@@ -4222,7 +4372,12 @@ def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, ver
     #MacChromPistonData=[] # Will get all arrays of size [NAxMWxNT] 
     #ChromCfData=[] # Will get all arrays of size [NBxMWxNT]
     
-    if LightSave:
+    if LightSave=='OPDTrue':
+        NamesToSave = ['OPDTrue']
+        names = [value for value in names if value in NamesToSave]
+        print(names)
+    
+    elif LightSave==True:
         NamesToSave = ['OPDTrue','GDEstimated','GDResidual',
                        'PDEstimated','PDResidual',
                        'ClosurePhaseGD','ClosurePhasePD',
@@ -4230,6 +4385,7 @@ def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, ver
                        'PistonTrue','EffectiveMoveODL',
                        'PhotometryEstimated']
         names = [value for value in names if value in NamesToSave]
+
     
     for varname in names:
         value = getattr(simuobj, varname)
