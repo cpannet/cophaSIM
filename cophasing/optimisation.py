@@ -631,7 +631,6 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
     CoherentFluxObject = CoherentFluxObject*dt*1e-3
     
     minValue = 10000
-    
     if len(filedir):
         files = [f.replace("\\","/") for f in glob.glob(filedir+'*.fits')]
         Nfiles = len(files)

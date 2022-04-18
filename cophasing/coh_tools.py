@@ -2273,7 +2273,7 @@ def makeA2P(descr, modulator, clean_up=False):
     descr = np.array(descr) # Make sure it is an array so that the indexation works well
     nb_in=len(descr)
     
-    NA=round((1+np.sqrt(1+8*nb_in))/2) # inversion analytique de la ligne suivante
+    NA=int(round((1+np.sqrt(1+8*nb_in))/2)) # inversion analytique de la ligne suivante
     NIN=NA*(NA-1)//2
     if NIN != nb_in:
         print('Taille descr bizarre, attendu=',NIN)
