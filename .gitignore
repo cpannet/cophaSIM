@@ -4,3 +4,8 @@
 *.jpeg
 *.p
 *.jpg
+
+!CHARA*.fits
+!NoDisturbances*fits
+!step1.fits
+!perturbbad.fits
