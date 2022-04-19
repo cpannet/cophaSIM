@@ -3,6 +3,7 @@
 
 import os
 import time
+import pkg_resources
 
 import numpy as np
 # import cupy as cp # NumPy-equivalent module accelerated with NVIDIA GPU  
@@ -358,7 +359,10 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         
 
     if not os.path.exists(InterferometerFile):
-        raise Exception(f"{InterferometerFile} doesn't exist.")
+        try:
+            InterferometerFile = pkg_resources.resource_stream(__name__, InterferometerFile)
+        except:
+            raise Exception(f"{InterferometerFile} doesn't exist.")
     
     with fits.open(InterferometerFile) as hdu:
         ArrayParams = hdu[0].header

@@ -11,4 +11,12 @@ setup(name='cophasing',
       license='',
       install_requires=['matplotlib','numpy','scipy','astropy','pandas','sympy'],
       packages=find_packages(),
-      zip_safe=False)
+      zip_safe=False,
+      include_package_data=True,
+      package_data = {'cophasing':['data/disturbances/*.fits',
+                                   'data/disturbances/NoDisturbances/*.fits',
+                                   'data/disturbances/SimpleTests/*fits',
+                                   'data/interferometers/*.fits',
+                                   'data/observations/CHARA/Unresolved/*.fits',
+                                   'data/observations/CHARA/1mas/*.fits',
+                                   'data/observations/CHARA/2mas/*.fits']})

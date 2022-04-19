@@ -5,7 +5,7 @@ Created on Fri Mar  6 16:14:42 2020
 @author: cpannetier
 """
 
-import os
+import os, pkg_resources
 
 datadir = 'data/'
 
@@ -187,7 +187,11 @@ def get_array(name='',band='H',getcoords=False):
     if "fits" in name:
         filepath = name
         if not os.path.exists(filepath):
-            raise Exception(f"{filepath} doesn't exist.")
+            try:
+                print("Looking for the interferometer file into the package's data")
+                filepath = pkg_resources.resource_stream(__name__,filepath)
+            except:
+                raise Exception(f"{filepath} doesn't exist.")
 
         with fits.open(filepath) as hdu:
             ArrayParams = hdu[0].header
@@ -1014,7 +1018,13 @@ def get_ObsInformation(ObservationFile):
     from .config import ScienceObject, Observation
     from astropy.io import fits
     
-        
+    if not os.path.exists(ObservationFile):
+        try:
+            print("Looking for the observation file into the package's data")
+            ObservationFile = pkg_resources.resource_stream(__name__, ObservationFile)
+        except:
+            raise Exception(f"{ObservationFile} doesn't exist.")
+            
     hdul = fits.open(ObservationFile)
     hdr=hdul['PRIMARY'].header
     
@@ -1081,7 +1091,12 @@ def get_CfObj(filepath, spectra):
 
     fileexists = os.path.exists(filepath)
     if not fileexists:
-        raise Exception(f"{filepath} doesn't exists.")          
+        try:
+            print("Looking for the observation file into the package's data")
+            filepath = pkg_resources.resource_stream(__name__,filepath)
+        except:
+            raise Exception(f"{filepath} doesn't exists.")          
+            
     with fits.open(filepath) as hdu:
 
         ObsParams = hdu[0].header
@@ -1167,6 +1182,13 @@ def get_CfObj(filepath, spectra):
 
 def get_infos(file):
     
+    if not os.path.exists(file):
+        try:
+            print("Looking for the disturbance file into the package's data")
+            file = pkg_resources.resource_stream(__name__,file)
+        except:
+            raise Exception(f"{file} doesn't exist.")
+    
     with fits.open(file) as hdu:
         hdr = hdu[0].header
         dt = hdr['DT']
@@ -1191,6 +1213,7 @@ def get_infos(file):
     
     
 def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=True):
+    
     from .config import piston_average, NA
     filetimestamps, filespectra, PistonDisturbance, TransmissionDisturbance,_,_,_,_ = get_infos(DisturbanceFile)
 
