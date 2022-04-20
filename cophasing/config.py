@@ -227,7 +227,7 @@ dt = 3                      # Frame time
 
 # Create the dictionnary of the Fringe Sensor: will be completed by the fringesensor
 # Expected keys: NP, V2PM, P2VM, MacroP2VM, R
-FS = {'NP':4}                 
+FS = {'NP':4, 'MW':NW}                 
 # FS={}
 
 # Noises

@@ -1025,20 +1025,14 @@ Remains {strtime(RemainingTime)}")
             criteriaName = "VarPiston"
         
         if criteriaName not in ("VarCP","VarPiston"):
-            bestCombi = Base_av.loc[(slice(None),slice(None),slice(None),
-                                     slice(None),slice(None),slice(None),
-                                     criteriaName)].idxmax(skipna=True)[0]
+            bestCombi = Base_av.loc(axis=0)[:,:,:,:,:,:,
+                                            criteriaName].idxmax(skipna=True)[0]
         elif criteriaName == 'VarPiston':
-            bestCombi = Tel_av.loc[(slice(None),slice(None),slice(None),
-                                    slice(None),slice(None),slice(None),
-                                    criteriaName)].idxmax(skipna=True)[0]
+            bestCombi = Tel_av.loc(axis=0)[:,:,:,:,:,:,
+                                           criteriaName].idxmax(skipna=True)[0]
         else:
-            bestCombi = Closure_av.loc[(slice(None),slice(None),slice(None),
-                                        slice(None),slice(None),slice(None),
-                                        criteriaName)].idxmax(skipna=True)[0]
-        
-        print(Base_av)
-        print(bestCombi)
+            bestCombi = Closure_av.loc(axis=0)[:,:,:,:,:,:,
+                                               criteriaName].idxmax(skipna=True)[0]
         
         bestDIT, bestGainGD, bestGainPD = bestCombi[:3]
         

@@ -256,7 +256,7 @@ def update_config(verbose=True,**kwargs):
         config.FT['state'] = np.zeros(config.NT)
         config.FT['usaw'] = np.zeros(config.NT)
         if verbose:
-            print(' - New NT \u2260 len(timestamps) so we change timestamps.')
+            print(' - New NT not equal to len(timestamps) so we change timestamps.')
             
     if 'ron' in kwargs.keys():
         ron = kwargs['ron']
@@ -1527,15 +1527,25 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
-        ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+        ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+        ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+        ax4.get_shared_x_axes().join(ax4,ax5)
+        ax9.get_shared_x_axes().join(ax9,ax10)
         
-        ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
-        ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
+        ax1.get_shared_y_axes(ax1,ax6)
+        ax2.get_shared_y_axes(ax2,ax7)
+        ax3.get_shared_y_axes(ax3,ax8)
+        ax4.get_shared_y_axes(ax4,ax9)
+        ax5.get_shared_y_axes(ax5,ax10)
+        
+        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+        ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+        ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+        ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+        
+        ax4.tick_params(labelbottom=False)
+        ax9.tick_params(labelbottom=False)
         
         ax1.set_ylabel('SNR²')
         ax2.set_ylabel('Group-Delays [µm]')
@@ -1640,15 +1650,26 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
-        ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+        ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+        ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+        ax4.get_shared_x_axes().join(ax4,ax5)
+        ax9.get_shared_x_axes().join(ax9,ax10)
         
-        ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
-        ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
+        ax1.get_shared_y_axes(ax1,ax6)
+        ax2.get_shared_y_axes(ax2,ax7)
+        ax3.get_shared_y_axes(ax3,ax8)
+        ax4.get_shared_y_axes(ax4,ax9)
+        ax5.get_shared_y_axes(ax5,ax10)
+        
+        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+        ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+        ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+        ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+        
+        ax4.tick_params(labelbottom=False)
+        ax9.tick_params(labelbottom=False)
+        
         
         ax1.set_ylabel('SNR²')
         ax2.set_ylabel('Group-Delays [µm]')
@@ -1916,9 +1937,13 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax10.bar(baselines[len1:],simu.LR3[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],np.abs(VisObj[len1:])**2, fill=False, edgecolor='black', linestyle='-', linewidth=1.5)
 
-        ax1.sharex(ax6) ; ax1.sharey(ax6)
-        ax3.sharey(ax8) ; ax5.sharey(ax10)
-        ax3.sharex(ax5) ; ax8.sharex(ax10)
+        ax1.get_shared_x_axes().join(ax1,ax6)
+        ax3.get_shared_x_axes().join(ax3,ax5)
+        ax8.get_shared_x_axes().join(ax8,ax10)
+        
+        ax1.get_shared_y_axes().join(ax1,ax6)
+        ax3.get_shared_y_axes().join(ax3,ax8)
+        ax5.get_shared_y_axes().join(ax5,ax10)
         
         ax6.tick_params(labelleft=False)
         ax8.tick_params(labelleft=False)
@@ -1995,10 +2020,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         ax8.bar(baselines[len1:],RMStrueOPD[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],np.abs(VisObj[len1:]), color=basecolors[len1:])
-
-        ax1.sharex(ax6) ; ax1.sharey(ax6)
-        ax3.sharey(ax8) ; ax5.sharey(ax10)
-        ax3.sharex(ax5) ; ax8.sharex(ax10)
+        
+        ax1.get_shared_x_axes().join(ax1,ax6)
+        ax3.get_shared_x_axes().join(ax3,ax5)
+        ax8.get_shared_x_axes().join(ax8,ax10)
+        
+        ax1.get_shared_y_axes().join(ax1,ax6)
+        ax3.get_shared_y_axes().join(ax3,ax8)
+        ax5.get_shared_y_axes().join(ax5,ax10)
         
         ax6.tick_params(labelleft=False)
         ax8.tick_params(labelleft=False)
@@ -2699,9 +2728,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
         ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
         
-        ax1.sharex(ax2)
-        ax1.sharey(ax2) ; ax2.tick_params(labelleft=False) 
-        ax3.sharey(ax4) ; ax4.tick_params(labelleft=False)
+        ax1.get_shared_x_axes().join(ax1,ax2)
+        ax1.get_shared_y_axes().join(ax1,ax2)
+        ax3.get_shared_y_axes().join(ax3,ax4)
+        
+        ax2.tick_params(labelleft=False) 
+        ax4.tick_params(labelleft=False)
         
         ax1.set_yscale('log')
         ax1.grid(True) ; ax2.grid(True)
@@ -2764,9 +2796,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
         ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
         
-        ax1.sharex(ax2)
-        ax1.sharey(ax2) ; ax2.tick_params(labelleft=False)
-        ax3.sharey(ax4) ; ax4.tick_params(labelleft=False)
+        ax1.get_shared_x_axes().join(ax1,ax2)
+        ax1.get_shared_y_axes().join(ax1,ax2)
+        ax3.get_shared_y_axes().join(ax3,ax4)
+        
+        ax2.tick_params(labelleft=False)
+        ax4.tick_params(labelleft=False)
         
         ax1.set_yscale('log')
         ax1.grid(True) ; ax2.grid(True)
@@ -3128,7 +3163,7 @@ WavelengthOfInterest
 def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
                               CoherentFluxObject=[],FileInterferometer='',
                               R=140, p=10, magSI=-1,display=True, get=[],criterias='light',
-                              verbose=False, onlySNR=False,check_DITs=False):
+                              verbose=False, onlySNR=False,check_DITs=False, OnlyCheckDIT=False):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
@@ -3246,6 +3281,9 @@ MeanWavelength
         
     simu.DITsForPerformance = NewIntegrationTimes
     Ndit = len(NewIntegrationTimes)
+    
+    if OnlyCheckDIT:
+        return NewIntegrationTimes
     
     if not len(CoherentFluxObject):
         # The interferometer is "not the same" as for simulation, because not the same band.
