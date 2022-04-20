@@ -1122,7 +1122,7 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
     
     else:
         
-        DisturbanceFile = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/disturbances/NoDisturbances/NoDisturbances.fits"
+        DisturbanceFile = "data/disturbances/NoDisturbances/NoDisturbances.fits"
         
         NT=200
             
