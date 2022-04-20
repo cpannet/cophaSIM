@@ -612,7 +612,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
     sk.update_config(checkperiod=110,verbose=verbose) # For not seeing the decount.
     
     if not len(FileInterferometer):
-        FileInterferometer = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/interferometers/CHARAinterferometerR.fits"
+        FileInterferometer = "data/interferometers/CHARAinterferometerR.fits"
     
     if MagnitudeInScienceBand<0:
         if 'SImag' not in config.Target.Star1.keys():
