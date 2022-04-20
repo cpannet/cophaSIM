@@ -1452,8 +1452,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle='--', label='Squared Threshold GD'))
                     
-
-        from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
         # NA=6 ; NIN = 15 ; NC = 10
@@ -1530,11 +1528,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=SquaredSNR,ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
         ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
         
         ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
         ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
@@ -1567,9 +1565,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         if 'ThresholdGD' in config.FT.keys():
             linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle='--', label='Squared Threshold GD'))
-                    
-
-        from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
         # NA=6 ; NIN = 15 ; NC = 10
@@ -1646,11 +1641,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=SquaredSNR,ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
         ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
         
         ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
         ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
@@ -1875,9 +1870,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
-                    
-
-        from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
         # NA=6 ; NIN = 15 ; NC = 10
@@ -1944,8 +1936,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax1.set_xlabel('Time [ms]') ; ax6.set_xlabel('Time [ms]')
         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
 
-        setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
-        setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
+        ct.setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
+        ct.setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
         ax5.set_ylim(0,1.1) ; ax5.grid(True) ; ax10.grid(True)
 
         if display:
@@ -1962,9 +1954,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
-                    
-
-        from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
         # NA=6 ; NIN = 15 ; NC = 10
@@ -2027,8 +2016,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax1.set_xlabel('Time [ms]') ; ax6.set_xlabel('Time [ms]')
         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
 
-        setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
-        setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
+        ct.setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
+        ct.setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
         ax5.set_ylim(0,1.1) ; ax5.grid(True) ; ax10.grid(True)
 
         if display:
@@ -2615,7 +2604,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         fig.subplots_adjust(bottom=0.3)
         snr_ax = fig.add_axes([0.18, 0.05, 0.72, 0.1])
         snr_ax.set_title("SNR & Thresholds")
-        from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
         #len2 = NIN//2 ; len1 = NIN-len2
@@ -2633,7 +2621,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         #snr_ax.set_ylabel('SNR &\n Thresholds')
 
         snr_ax.set_xlabel('Baseline')
-        setaxelim(snr_ax,ydata=maxSNR,ymin=0.5)
+        ct.setaxelim(snr_ax,ydata=maxSNR,ymin=0.5)
 
         if display:
             if pause:
@@ -2673,9 +2661,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         if 'ThresholdGD' in config.FT.keys():
             linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle='--', label='Squared Threshold GD'))
-                    
-        
-        from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
         len2 = NIN//2 ; len1 = NIN-len2
@@ -2725,7 +2710,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax3.set_yscale('log') ; ax3.set_ylabel('SNR &\n Thresholds')
         ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
         ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
-        setaxelim(ax3,ydata=maxSNR,ymin=0.5)
+        ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
         
         if display:
             if pause:
@@ -2743,8 +2728,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle='--', label='Squared Threshold GD'))
                     
-        
-        from mypackage.plot_tools import setaxelim
         
         t = simu.timestamps ; timerange = range(NT)
         len2 = NIN//2 ; len1 = NIN-len2
@@ -2792,7 +2775,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax3.set_yscale('log') ; ax3.set_ylabel('SNR &\n Thresholds')
         ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
         ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
-        setaxelim(ax3,ydata=maxSNR,ymin=0.5)
+        ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
         
         if display:
             if pause:

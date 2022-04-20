@@ -2440,4 +2440,24 @@ def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
     return subax
 
 
+def setaxelim(ax, xdata=[],ydata=[],xmargin=0.1,ymargin=0.1, ylim_min=[0,0], **kwargs):
     
+    if len(xdata):
+        xmin = (1+xmargin)*np.min(xdata) ; xmax = (1+xmargin)*np.max(xdata)
+        ax.set_xlim([xmin,xmax])
+        
+    if len(ydata):
+        if not 'ymin' in kwargs.keys():
+            ymin = (1+ymargin)*np.min(ydata)
+        else:
+            ymin=kwargs['ymin']
+        
+        ymax = (1+ymargin)*np.max(ydata)
+        
+        ydown_min, yup_min = ylim_min
+        if yup_min !=0:
+            ymax = np.max([ymax,yup_min])
+        if ydown_min !=0:
+            ymin = np.min([ymin,ydown_min])
+        
+        ax.set_ylim([ymin,ymax])
