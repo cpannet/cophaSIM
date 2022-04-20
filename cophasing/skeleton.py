@@ -4298,7 +4298,7 @@ def populate_hdr(objet, hdr, prefix="",verbose=False):
                 DicoForImageHDU[key] = dico_out[key]
                 
         elif isinstance(value, str):
-            if len(value.encode('utf-8')) > 80:
+            if len(value.encode('utf-8')) > 45:
                 
                 if ('CHARA' in value) and not ('interferometer' in value):
                     value = value.split('CHARA/')[-1].replace('µ','micro')
