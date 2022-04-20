@@ -2951,7 +2951,7 @@ WavelengthOfInterest
        
         
     if not len(FileInterferometer):
-        FileInterferometer = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/interferometers/CHARAinterferometerR.fits"
+        FileInterferometer = "data/interferometers/CHARAinterferometerR.fits"
       
     if SNR_SI:
         if not len(CoherentFluxObject):
@@ -3212,7 +3212,7 @@ MeanWavelength
         config.Target.Star1['SImag'] = magSI
         
     if not len(FileInterferometer):
-        FileInterferometer = "C:/Users/cpannetier/Documents/Python_packages/cophasing/cophasing/data/interferometers/CHARAinterferometerR.fits"
+        FileInterferometer = "data/interferometers/CHARAinterferometerR.fits"
     
     
     if isinstance(TimeBonds,(float,int)):

@@ -1057,7 +1057,7 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
 
     if scan:
 
-        datadir2 = "C:/Users/cpannetier/Documents/These/FringeTracking/Python/Simulations/data/disturbances/"
+        datadir2 = "data/"
     
         R=config.FS['R']
         
