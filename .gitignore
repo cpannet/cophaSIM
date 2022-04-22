@@ -6,9 +6,6 @@
 *.jpg
 
 !CHARA*.fits
-!NoDisturbances*fits
-!step1.fits
-!perturbbad.fits
 
 # Ignore all observation files but Unresolved, 1mas and 2mas
 !mag*.fits

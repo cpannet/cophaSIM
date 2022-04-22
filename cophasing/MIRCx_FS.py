@@ -128,12 +128,13 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         ich = ['12','13','14','15','16','23','24','25','26','34','35','36','45','46','56']
         
         ichorder = np.arange(NIN)
+        active_ich = list(np.ones(NIN))
         
         config.FS['name'] = 'MIRCxFS'
         config.FS['func'] = MIRCxFS
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
-        config.FS['active_ich'] = np.ones(NIN)
+        config.FS['active_ich'] = active_ich
         config.FS['PhotometricBalance'] = np.ones(NIN)
         config.FS['NP'] = NP
         config.FS['MW'] = MW
@@ -208,6 +209,31 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        
+        
+        config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
+        config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        Piston2OPD_forInv = np.zeros([NIN,NA])
+        
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = ct.posk(ia,iap,NA)
+                config.FS['Piston2OPD'][ib,ia] = 1
+                config.FS['Piston2OPD'][ib,iap] = -1
+                if active_ich[ib]:
+                    Piston2OPD_forInv[ib,ia] = 1
+                    Piston2OPD_forInv[ib,iap] = -1
+            
+        config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
+        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
+        
+        if config.TELref:
+            iTELref = config.TELref - 1
+            L_ref = config.FS['OPD2Piston'][iTELref,:]
+            config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+        
+        
+        
         
         return
     
