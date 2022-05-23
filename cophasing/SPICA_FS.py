@@ -171,6 +171,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
         config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
         
+        config.FS['OPD2Piston_moy'] = np.copy(config.FS['OPD2Piston'])
         if config.TELref:
             iTELref = config.TELref - 1
             L_ref = config.FS['OPD2Piston'][iTELref,:]
@@ -374,6 +375,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
         config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
         
+        config.FS['OPD2Piston_moy'] = np.copy(config.FS['OPD2Piston'])
         if config.TELref:
             iTELref = config.TELref - 1
             L_ref = config.FS['OPD2Piston'][iTELref,:]
@@ -707,6 +709,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
                         Piston2OPD_forInv[ib,ia] = 1
                         Piston2OPD_forInv[ib,iap] = -1
                 
+            config.FS['OPD2Piston_moy'] = np.copy(config.FS['OPD2Piston'])
             config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
             config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
             

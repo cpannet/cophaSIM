@@ -209,6 +209,12 @@ SOURCE:
     # Simulation parameters
     # config.SimuFilename=SimuFilename        # Where to save the data
     config.TELref=TELref             # For display only: reference delay line
+    
+    if config.TELref:
+        iTELref = config.TELref - 1
+        L_ref = config.FS['OPD2Piston'][iTELref,:]
+        config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+    
     config.checkperiod = checkperiod
     config.checktime = checktime
     config.ich = np.zeros([NIN,2])
@@ -225,7 +231,7 @@ SOURCE:
     return 
 
 
-def update_config(verbose=True,**kwargs):
+def update_config(verbose=False,**kwargs):
     """
     Update any parameter the same way than first done in initialise function.
 
@@ -235,7 +241,8 @@ def update_config(verbose=True,**kwargs):
 
     """
     
-    print("Update config parameters:")
+    if verbose:
+        print("Update config parameters:")
     for key,value in zip(list(kwargs.keys()),list(kwargs.values())):
         if not hasattr(config, key):
             raise ValueError(f"{key} is not an attribute of config. Maybe it is in FS or FT ?")
@@ -247,7 +254,8 @@ def update_config(verbose=True,**kwargs):
                     if "/" in value:
                         oldval = oldval.split("/")[-1]
                         value = value.split("/")[-1]
-                print(f' - Parameter "{key}" changed from {oldval} to {value}')
+                if verbose:
+                    print(f' - Parameter "{key}" changed from {oldval} to {value}')
             
     if len(config.timestamps) != config.NT:
         config.timestamps = np.arange(config.NT)*config.dt
@@ -293,7 +301,9 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
                             r0=0.15,t0=10, L0=25, direction=0, d=1,
                             Levents=[],
                             TransDisturb={}, PhaseJumps={},
-                            debug=False, tel=0, highCF=True,pows=[],**kwargs):
+                            debug=False, tel=0, highCF=True,pows=[],
+                            verbose=True,
+                            **kwargs):
     '''
     CREATES or LOAD a disturbance scheme INTO or FROM a FITSFILE.
     If filepath is empty, raise error.
@@ -340,12 +350,15 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         raise Exception('No disturbance filepath given.')
         
     elif os.path.exists(filepath):
-        print(f'Disturbance file {filepath} exists.')
+        if verbose:
+            print(f'Disturbance file {filepath} exists.')
         if overwrite:
             os.remove(filepath)
-            print(f'Parameter OVERWRITE is {overwrite}.')
+            if verbose:
+                print(f'Parameter OVERWRITE is {overwrite}.')
         else:
-            print(f'Parameter OVERWRITE is {overwrite}. Loading the disturbance scheme.')
+            if verbose:
+                print(f'Parameter OVERWRITE is {overwrite}. Loading the disturbance scheme.')
             
             with fits.open(filepath) as hdu:
                 CoherentFlux = hdu['RealCf'].data + hdu['ImagCf'].data*1j
@@ -355,7 +368,8 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             return CoherentFlux, timestamps, spectra
        
     else:
-        print(f'Creating the disturbance pattern and saving it in {filepath}')
+        if verbose:
+            print(f'Creating the disturbance pattern and saving it in {filepath}')
         
 
     if not os.path.exists(InterferometerFile):
@@ -427,7 +441,8 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             inj = np.reshape(p[:,:,:,:],[NT1*NT2,NW,NAfile], order='C')
             inj = inj - np.min(inj)         # Because there are negative values
             inj = inj/np.max(inj)
-            print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
+            if verbose:
+                print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
             NTfile = NT1*NT2
             
             if NTfile < NT:
@@ -435,7 +450,8 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             else:
                 TransmissionDisturbance = inj
             
-            print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
+            if verbose:
+                print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
 Longueur timestamps: {len(timestamps)}")
             
             # # inj = p[:, :, 0, 0].ravel()
@@ -481,7 +497,8 @@ Longueur timestamps: {len(timestamps)}")
             inj = np.reshape(p[:,:,:,:],[NT1*NT2,NW,NAfile], order='C')
             inj = inj - np.min(inj)         # Because there are negative values
             inj = inj/np.max(inj)
-            print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
+            if verbose:
+                print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
             NTfile = NT1*NT2
             
             if NTfile < NT:
@@ -489,7 +506,8 @@ Longueur timestamps: {len(timestamps)}")
             else:
                 TransmissionDisturbance = inj
             
-            print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
+            if verbose:
+                print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
 Longueur timestamps: {len(timestamps)}")
             
             
@@ -512,7 +530,8 @@ Longueur timestamps: {len(timestamps)}")
     PistonDisturbance = np.zeros([NT,NA])
 
     if dist == 'coherent':
-        print('No piston')
+        if verbose:
+            print('No piston')
         
     elif dist == 'step':
         if tel <=0:
@@ -580,7 +599,7 @@ Longueur timestamps: {len(timestamps)}")
                     filtre[i] = freq[i]**(-4/3)
                 else:                                   # High frequencies regime
                     filtre[i] = freq[i]**(-8.5/3)
-            print(Fmax,freq[1]-freq[0],dt*1e-3,NT)
+            
             filtre = filtre/np.max(filtre)
     
             if tel:                     # Disturbances on only one pupil
@@ -622,7 +641,8 @@ Longueur timestamps: {len(timestamps)}")
             if ampl==0:
                 wl_r0 = 0.55                # Wavelength at which r0 is defined
                 rmsOPD = np.sqrt(6.88*(L0/r0)**(5/3))*wl_r0/(2*np.pi)    # microns
-                print(f'RMS OPD={rmsOPD}')
+                if verbose:
+                    print(f'RMS OPD={rmsOPD}')
                 
             else:
                 rmsOPD = ampl
@@ -634,7 +654,8 @@ Longueur timestamps: {len(timestamps)}")
                     if ia != itel:
                         continue
     
-                print(f'Piston on pupil {ia}')
+                if verbose:
+                    print(f'Piston on pupil {ia}')
     
                 dfreq = np.min([0.008,1/(2.2*NT*dt*1e-3)]) # Minimal sampling wished
                 freqmax = 1/(2*dt*1e-3)                  # Maximal frequency derived from given temporal sampling
@@ -655,7 +676,8 @@ Longueur timestamps: {len(timestamps)}")
                 b0 = nu1**(pow1-pow2)           # offset for continuity
                 b1 = b0*nu2**(pow2-pow3)        # offset for continuity
                 
-                print(f'Atmospheric cutoff frequencies: {nu1:.2}Hz and {nu2:.2}Hz')
+                if verbose:
+                    print(f'Atmospheric cutoff frequencies: {nu1:.2}Hz and {nu2:.2}Hz')
                 
                 if highCF:
                     filtre = np.zeros(Npix)
@@ -727,7 +749,8 @@ Longueur timestamps: {len(timestamps)}")
             if ampl==0:
                 wl_r0 = 0.55                # Wavelength at which r0 is defined
                 rmsOPD = np.sqrt(6.88*(L0/r0)**(5/3))*wl_r0/(2*np.pi)    # microns
-                print(f'RMS OPD={rmsOPD}')
+                if verbose:
+                    print(f'RMS OPD={rmsOPD}')
                 
             else:
                 rmsOPD = ampl
@@ -741,7 +764,8 @@ Longueur timestamps: {len(timestamps)}")
                         continue
     
                 tstart=time.perf_counter()
-                print(f'Piston on pupil {ia}')
+                if verbose:
+                    print(f'Piston on pupil {ia}')
     
                 dfreq = np.min([0.008,1/(2*NT*dt*1e-3)]) # Minimal sampling wished
                 freqmax = 1/(2*dt*1e-3)                  # Maximal frequency derived from given temporal sampling
@@ -770,7 +794,8 @@ Longueur timestamps: {len(timestamps)}")
                 b0 = nu1**(pow1-pow2)           # offset for continuity
                 b1 = b0*nu2**(pow2-pow3)        # offset for continuity
                 
-                print(f'Atmospheric cutoff frequencies: {nu1:.2}Hz and {nu2:.2}Hz')
+                if verbose:
+                    print(f'Atmospheric cutoff frequencies: {nu1:.2}Hz and {nu2:.2}Hz')
                 
                 if highCF:
                     filtre = np.zeros(Npix)
@@ -778,7 +803,8 @@ Longueur timestamps: {len(timestamps)}")
                     for i in range(Npix):
                         checkpoint = int(Npix/10)
                         if i%checkpoint == 0:
-                            print(f'Filtering....{i/Npix*100}%')
+                            if verbose:
+                                print(f'Filtering....{i/Npix*100}%')
                         if freqfft[i] == 0:
                             filtre[i] = 0
                         elif np.abs(freqfft[i]) < nu1:
@@ -829,7 +855,8 @@ Longueur timestamps: {len(timestamps)}")
                 
                 # PistonDisturbance[:,ia] = PistonDisturbance[:,ia] - PistonDisturbance[startframe,ia]
                 ElapsedTime = time.perf_counter() - tstart
-                print(f'Done. Ellapsed time: {ElapsedTime}s')
+                if verbose:
+                    print(f'Done. Ellapsed time: {ElapsedTime}s')
         
     elif dist == 'chirp':
         f_fin = f_fin*1e-3   # Conversion to kHz
@@ -838,7 +865,8 @@ Longueur timestamps: {len(timestamps)}")
         a = omega_fin/(2*t_fin)
         chirp = lambda phi0,t : np.sin(phi0 + a*t**2)
         if tel:
-            print(f'CHIRP on telescope {tel}')
+            if verbose:
+                print(f'CHIRP on telescope {tel}')
             itel = tel-1
             PistonDisturbance[:,itel] = ampl*chirp(0,timestamps)
             newdsp = np.fft.fftshift(np.fft.fft(PistonDisturbance[:,itel], norm='ortho'))
@@ -916,13 +944,15 @@ Longueur timestamps: {len(timestamps)}")
         hdu.append(im3)
         hdu.append(im4)
 
-    print(f'Saving file into {filepath}')
+    if verbose:
+        print(f'Saving file into {filepath}')
     filedir = '/'.join(filepath.split('/')[:-1])    # remove the filename to get the file directory only
     if not os.path.exists(filedir):
         os.makedirs(filedir)
     hdu.writeto(filepath)
     hdu.close()
-    print('Saved.')
+    if verbose:
+        print('Saved.')
     
     return
 
@@ -992,7 +1022,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     simu.VisibilityObject = VisObj
     
     # Importation of the disturbance
-    CfDist, PistonDist, TransmissionDist = ct.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps,verbose=True)
+    CfDist, PistonDist, TransmissionDist = ct.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps,verbose=verbose)
     
     simu.CfDisturbance = CfDist
     simu.PistonDisturbance = PistonDist
@@ -1052,9 +1082,10 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         if (it>checkpoint) and (it%checkpoint == 0) and (it!=0) and checktime:
             processedfraction = it/NT
             # LeftProcessingTime = (time.time()-time0)*(1-processedfraction)/processedfraction
-            print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
+            if verbose:
+                print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
 
-    if verbose2:
+    if verbose:
         print(f"Done. (Total: {round(time.time()-time0)}s)")
     # Process observables for visualisation
     simu.PistonTrue = simu.PistonDisturbance - simu.EffectiveMoveODL[:-config.latency]
@@ -1081,8 +1112,6 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
                 Lc = config.FS['R']*spectra[iow*OW]
                 simu.VisibilityTrue[:,iow,ib] = Iaap/np.sqrt(Ia*Iap)*np.abs(GammaObject)*np.sinc(simu.OPDTrue[:,ib]/Lc)*np.exp(1j*2*np.pi*simu.OPDTrue[:,ib]/spectra[iow*OW])
     
-    
-    # print(args)
     if len(args):
         filepath = args[0]+f"results_{config.SimuTimeID}.fits"
         save_data(simu, config, filepath, LightSave=LightSave, overwrite=overwrite, verbose=verbose)
@@ -1090,29 +1119,9 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     return
 
 
-# def SaveSimulation():
-    
-#     from . import simu
-    
-#     # infosimu = pd.DataFrame(coh)
-    
-#     # observables = pd.DataFrame({'timestamp':simu.timestamps,'PistonDisturbance':simu.PistonDisturbance,'pis_res':simu.PistonTrue,'cmd_odl':simu.CommandODL,\
-#     #                            'PD_res':simu.PDResidual,'GD_res':simu.GDResidual,'PDCommand':simu.PDCommand,'GDCommand':simu.GDCommand,\
-#     #                            'rmsPD':simu.rmsPD_,'rmsGD':simu.rmsGD_,\
-#     #                                'phot_per':simu.TransmissionDisturbance,'phot_est':simu.PhotometryEstimated,'SquaredCoherenceDegree':simu.SquaredCoherenceDegree})
-    
-#     t2 = Table.from_pandas(df)
-    
-#     currentDT = datetime.datetime.now()
-#     suffix=currentDT.strftime("%Y%m%d%H%M")
-    
-#     fits.writeto(prefix+suffix,np.array(t2))
-    
-    
-        
 def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             Pistondetails=False,OPDdetails=False,
-            OneTelescope=True, pause=False, display=True,verbose=True,
+            OneTelescope=True, pause=False, display=True,verbose=False,
             savedir='',ext='pdf'):
     
     '''
@@ -1193,7 +1202,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     if not ('opdcontrol' in args):
         ShowPerformance(float(timestamps[stationaryregim_start]), WLOfScience, effDIT, display=False)
     else:
-        print("don't compute performances")
+        if verbose:
+            print("don't compute performances")
     
     SS = 12     # Small size
     MS = 14     # Medium size
@@ -1356,12 +1366,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         if config.TELref:
             iTELref = config.TELref - 1
             PistonRef=simu.PistonTrue[:,iTELref]
+            PistonDistRef = simu.PistonDisturbance[:,iTELref]
         else:
             PistonRef=0#np.mean(simu.PistonTrue, axis=1)
+            PistonDistRef = 0
         
         for ia in range(NA):
             
-            ax1.plot(timestamps, simu.PistonDisturbance[:,ia]-simu.PistonDisturbance[:,iTELref],
+            ax1.plot(timestamps, simu.PistonDisturbance[:,ia]-PistonDistRef,
                       color=telcolors[ia+1],linestyle='dashed')
             ax2.plot(timestamps, simu.PistonTrue[:,ia]-PistonRef,
                      color=telcolors[ia+1],linestyle='solid')
@@ -1518,12 +1530,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                    color='k', linestyle=':')
         
         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
-        ax4.bar(baselines[:len1],simu.LR3[:len1],fill=False,edgecolor='black',linestyle='-')
+        ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
         ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
         ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
         
         ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
-        ax9.bar(baselines[len1:],simu.LR3[len1:],fill=False,edgecolor='black',linestyle='-')
+        ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
@@ -1568,6 +1580,130 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             plt.savefig(savedir+f"Simulation{timestr}_perftable.{ext}")
 
 
+    if displayall or ('perftable2' in args):
+ 
+         linestyles=[mlines.Line2D([],[], color='black',
+                                         linestyle=':', label='Start tracking')]
+         if 'ThresholdGD' in config.FT.keys():
+             linestyles.append(mlines.Line2D([],[], color='black',
+                                         linestyle='--', label='Squared Threshold GD'))
+                     
+         
+         t = simu.timestamps ; timerange = range(NT)
+         # NA=6 ; NIN = 15 ; NC = 10
+         # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
+         len2 = NIN//2 ; len1 = NIN-len2
+         
+         basecolors = colors[:len1]+colors[:len2]
+         # basestyles = len1*['solid'] + len2*['dashed']
+         # closurecolors = colors[:NC]
+         
+         R=config.FS['R']
+         
+         GD = simu.GDEstimated2 ; PD=simu.PDEstimated2
+         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
+         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
+         SquaredSNR = simu.SquaredSNRMovingAveragePD
+         # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
+         
+         
+         start_pd_tracking = 100
+         
+         RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
+         RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+         RMStrueOPD = np.sqrt(simu.VarOPD)
+         # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
+         # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
+         
+         
+         
+         plt.rcParams.update(rcParamsForBaselines)
+         title='GD and PD before leastsquare adn after patch'
+         plt.close(title)
+         fig=plt.figure(title, clear=True)
+         fig.suptitle(title)
+         (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+         ax1.set_title("First serie of baselines, from 12 to 25")
+         ax6.set_title("Second serie of baselines, from 26 to 56")
+         
+         for iBase in range(len1):   # First serie
+             ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+             if 'ThresholdGD' in config.FT.keys():
+                 ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+             ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+             ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+         for iBase in range(len1,NIN):   # Second serie
+             ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+             if 'ThresholdGD' in config.FT.keys():
+                 ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+             ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+             ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+             ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+         
+         
+         ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                    color='k', linestyle=':')
+         ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+                    color='k', linestyle=':')
+         ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                    color='k', linestyle=':')
+         ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+                    color='k', linestyle=':')
+         
+         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
+         ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
+         ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
+         ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
+         
+         ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
+         ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
+         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
+         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
+         
+         ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+         ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+         ax4.get_shared_x_axes().join(ax4,ax5)
+         ax9.get_shared_x_axes().join(ax9,ax10)
+         
+         ax1.get_shared_y_axes().join(ax1,ax6)
+         ax2.get_shared_y_axes().join(ax2,ax7)
+         ax3.get_shared_y_axes().join(ax3,ax8)
+         ax4.get_shared_y_axes().join(ax4,ax9)
+         ax5.get_shared_y_axes().join(ax5,ax10)
+         
+         ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+         ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+         ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+         ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+         ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+         
+         ax4.tick_params(labelbottom=False)
+         ax9.tick_params(labelbottom=False)
+         
+         ax1.set_ylabel('SNR²')
+         ax2.set_ylabel('Group-Delays [µm]')
+         ax3.set_ylabel('Phase-Delays [µm]')
+         ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+         ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+         
+         ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+         
+         ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
+         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+    
+         ax7.legend(handles=linestyles, loc='upper right')
+         if display:
+             fig.show()
+    
+         if len(savedir):
+             if verbose:
+                 print("Saving perftable figure.")
+             plt.savefig(savedir+f"Simulation{timestr}_perftable2.{ext}")
+
+
     if displayall or ('perftableres' in args):
     
         linestyles=[mlines.Line2D([],[], color='black',
@@ -1605,7 +1741,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         
         plt.rcParams.update(rcParamsForBaselines)
-        title='GD and PD after leastsquare'
+        title='GD and PD after threshold'
         plt.close(title)
         fig=plt.figure(title, clear=True)
         fig.suptitle(title)
@@ -1641,12 +1777,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                    color='k', linestyle=':')
         
         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
-        ax4.bar(baselines[:len1],simu.LR3[:len1],fill=False,edgecolor='black',linestyle='-')
+        ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
         ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
         ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
         
         ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
-        ax9.bar(baselines[len1:],simu.LR3[len1:],fill=False,edgecolor='black',linestyle='-')
+        ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
@@ -1713,7 +1849,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         R=config.FS['R']
         
-        GD = simu.GDResidual2 ; PD=simu.PDResidual2
+        GD = simu.GDResidual2 ; PD =simu.PDResidual2
         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
         SquaredSNR = simu.SquaredSNRMovingAverage
@@ -1767,12 +1903,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                    color='k', linestyle=':')
         
         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
-        ax4.bar(baselines[:len1],simu.LR3[:len1],fill=False,edgecolor='black',linestyle='-')
+        ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
         ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
         ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
         
         ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
-        ax9.bar(baselines[len1:],simu.LR3[len1:],fill=False,edgecolor='black',linestyle='-')
+        ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
         
@@ -1878,7 +2014,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             for iap in range(ia+1,NA):
                 ib=ct.posk(ia,iap,NA)
                 x2,y2 = InterfArray.TelCoordinates[iap,:2]
-                ls = (0,(10*simu.LR3[ib],10*(1-simu.LR3[ib])))
+                ls = (0,(10*simu.LR4[ib],np.max([0,10*(1-simu.LR4[ib])])))
                 if PhotometricBalance[ib]>0:
                     im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
                             linewidth=3,
@@ -1908,112 +2044,112 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 print("Saving perfarray figure.")
             plt.savefig(savedir+f"Simulation{timestr}_perfarray.{ext}")
 
-    if displayall or ('opd' in args):
-        """
-        OPD 
-        """
+    # if displayall or ('opd' in args):
+    #     """
+    #     OPD 
+    #     """
         
-        OPD_max = 1.1*np.max([np.max(np.abs([simu.OPDDisturbance,
-                              simu.OPDTrue,
-                              simu.OPDCommand[:-1],simu.EffectiveOPDMove[:-config.latency]])),wl/2])
-        OPD_min = -OPD_max
-        ylim = [OPD_min,OPD_max]
+    #     OPD_max = 1.1*np.max([np.max(np.abs([simu.OPDDisturbance,
+    #                           simu.OPDTrue,
+    #                           simu.OPDCommand[:-1],simu.EffectiveOPDMove[:-config.latency]])),wl/2])
+    #     OPD_min = -OPD_max
+    #     ylim = [OPD_min,OPD_max]
     
-        linestyles=[]
-        linestyles.append(mlines.Line2D([], [], color='blue',
-                                        linestyle='solid',label='Residual'))    
-        linestyles.append(mlines.Line2D([], [], color='red',
-                                        linestyle='solid',label='Disturbance'))
-        linestyles.append(mlines.Line2D([], [], color='green',
-                                        linestyle='dotted',label='Command'))
-        linestyles.append(mlines.Line2D([], [], color='green',
-                                        linestyle='solid',label='Effective Move ODL'))
-        linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking'))
+    #     linestyles=[]
+    #     linestyles.append(mlines.Line2D([], [], color='blue',
+    #                                     linestyle='solid',label='Residual'))    
+    #     linestyles.append(mlines.Line2D([], [], color='red',
+    #                                     linestyle='solid',label='Disturbance'))
+    #     linestyles.append(mlines.Line2D([], [], color='green',
+    #                                     linestyle='dotted',label='Command'))
+    #     linestyles.append(mlines.Line2D([], [], color='green',
+    #                                     linestyle='solid',label='Effective Move ODL'))
+    #     linestyles.append(mlines.Line2D([],[], color='black',
+    #                                     linestyle=':', label='Start tracking'))
     
         
-        NumberOfBaselinesToShow = np.min([NIN, NA-1])
-        ShownBaselines = np.arange(NumberOfBaselinesToShow)
-        for ia in range(NumberOfBaselinesToShow):
-            fig = plt.figure(f"OPD {ia+1}")
+    #     NumberOfBaselinesToShow = np.min([NIN, NA-1])
+    #     ShownBaselines = np.arange(NumberOfBaselinesToShow)
+    #     for ia in range(NumberOfBaselinesToShow):
+    #         fig = plt.figure(f"OPD {ia+1}")
 
-            axes = fig.subplots(nrows=NumberOfBaselinesToShow,ncols=2,sharex=True, gridspec_kw={'width_ratios': [4, 1]})
-            iap,iax=0,0
+    #         axes = fig.subplots(nrows=NumberOfBaselinesToShow,ncols=2,sharex=True, gridspec_kw={'width_ratios': [4, 1]})
+    #         iap,iax=0,0
             
-            if np.ndim(axes)==1:
-                axes = [(axes[0], axes[1])]
+    #         if np.ndim(axes)==1:
+    #             axes = [(axes[0], axes[1])]
                 
-            for ax,axText in axes:
-                ax2 = ax.twinx()
-                ax2ymax = 1.1*np.max([np.max(np.abs(simu.OPDTrue[stationaryregim])),wl/2])
-                ax2ylim = [-ax2ymax,ax2ymax]
+    #         for ax,axText in axes:
+    #             ax2 = ax.twinx()
+    #             ax2ymax = 1.1*np.max([np.max(np.abs(simu.OPDTrue[stationaryregim])),wl/2])
+    #             ax2ylim = [-ax2ymax,ax2ymax]
                 
-                if iap == ia:
-                    iap+=1
-                if ia < iap:
-                    ib = ct.posk(ia,iap,NA)
-                    ax.plot(timestamps, simu.OPDDisturbance[:,ib],color='red')
-                    ax.plot(timestamps, simu.OPDCommand[:-1,ib],
-                            color='green',linestyle='dotted')
-                    ax.plot(timestamps, simu.EffectiveOPDMove[:-config.latency,ib],
-                            color='green',linestyle='solid')
-                    ax2.plot(timestamps, simu.OPDTrue[:,ib],color='blue')
-                else:
-                    ib = ct.posk(iap,ia,NA)
-                    ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
-                    ax.plot(timestamps, -simu.OPDCommand[:-1,ib],
-                            color='green',linestyle='dotted')   
-                    ax.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
-                            color='green',linestyle='-')
-                    ax2.plot(timestamps, -simu.OPDTrue[:,ib],color='blue')
+    #             if iap == ia:
+    #                 iap+=1
+    #             if ia < iap:
+    #                 ib = ct.posk(ia,iap,NA)
+    #                 ax.plot(timestamps, simu.OPDDisturbance[:,ib],color='red')
+    #                 ax.plot(timestamps, simu.OPDCommand[:-1,ib],
+    #                         color='green',linestyle='dotted')
+    #                 ax.plot(timestamps, simu.EffectiveOPDMove[:-config.latency,ib],
+    #                         color='green',linestyle='solid')
+    #                 ax2.plot(timestamps, simu.OPDTrue[:,ib],color='blue')
+    #             else:
+    #                 ib = ct.posk(iap,ia,NA)
+    #                 ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
+    #                 ax.plot(timestamps, -simu.OPDCommand[:-1,ib],
+    #                         color='green',linestyle='dotted')   
+    #                 ax.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+    #                         color='green',linestyle='-')
+    #                 ax2.plot(timestamps, -simu.OPDTrue[:,ib],color='blue')
                 
-                ax2.hlines(np.mean(simu.OPDTrue[stationaryregim,ib]),0,NT*dt,
-                           linestyle='-.',color='blue')
-                ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle=':')
+    #             ax2.hlines(np.mean(simu.OPDTrue[stationaryregim,ib]),0,NT*dt,
+    #                        linestyle='-.',color='blue')
+    #             ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+    #                color='k', linestyle=':')
                 
-                axText.text(0.5,0.5,f"{np.sqrt(simu.VarOPD[ib])*1e3:.0f}nm RMS")
-                axText.axis("off")
+    #             axText.text(0.5,0.5,f"{np.sqrt(simu.VarOPD[ib])*1e3:.0f}nm RMS")
+    #             axText.axis("off")
                 
-                ax.set_ylim(ylim)
-                ax2.set_ylim(ax2ylim)
-                if ax2ymax > wl:
-                    ax2.set_yticks([-ax2ylim[0],-wl,0,wl,ax2ylim[1]])
-                else:
-                    ax2.set_yticks([-wl,0,wl])
-                ax.set_ylabel(f'OPD ({ia+1},{iap+1})\n [µm]')
-                ax2.set_ylabel('Residual \n [µm]')
-                fig.tight_layout()
-                # wlr = round(wl,2)
-                # ax2.set_yticks([-wl,0,wl])
-                # ax2.set_yticklabels([-wlr,0,wlr])
-                ax2.tick_params(axis='y',which='major', length=7)
-                ax2.tick_params(axis='y',which='minor', length=4)
-                ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
-                ax2.grid(b=True,which='major')
-                ax2.grid(b=True, which='minor')
+    #             ax.set_ylim(ylim)
+    #             ax2.set_ylim(ax2ylim)
+    #             if ax2ymax > wl:
+    #                 ax2.set_yticks([-ax2ylim[0],-wl,0,wl,ax2ylim[1]])
+    #             else:
+    #                 ax2.set_yticks([-wl,0,wl])
+    #             ax.set_ylabel(f'OPD ({ia+1},{iap+1})\n [µm]')
+    #             ax2.set_ylabel('Residual \n [µm]')
+    #             fig.tight_layout()
+    #             # wlr = round(wl,2)
+    #             # ax2.set_yticks([-wl,0,wl])
+    #             # ax2.set_yticklabels([-wlr,0,wlr])
+    #             ax2.tick_params(axis='y',which='major', length=7)
+    #             ax2.tick_params(axis='y',which='minor', length=4)
+    #             ax2.yaxis.set_minor_locator(AutoMinorLocator(2))
+    #             ax2.grid(b=True,which='major')
+    #             ax2.grid(b=True, which='minor')
                 
                 
-                iap += 1
-                iax+=1
-            # plt.tight_layout()
-            ax.set_xlabel('Time (ms)')
-            axText.legend(handles=linestyles)
+    #             iap += 1
+    #             iax+=1
+    #         # plt.tight_layout()
+    #         ax.set_xlabel('Time (ms)')
+    #         axText.legend(handles=linestyles)
             
-            if display:
-                plt.show()
-            config.newfig+=1
+    #         if display:
+    #             plt.show()
+    #         config.newfig+=1
             
-            if OneTelescope:
-                break
+    #         if OneTelescope:
+    #             break
             
             
-        if len(savedir):
-            if verbose:
-                print("Saving opd figure.")
-            plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
+    #     if len(savedir):
+    #         if verbose:
+    #             print("Saving opd figure.")
+    #         plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
         
-    if displayall or ('opd3' in args):
+    if displayall or ('opd' in args):
     
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
@@ -2056,11 +2192,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         #            color='k', linestyle=':')
         
         ax3.bar(baselines[:len1],RMStrueOPD[:len1], color=basecolors[:len1])
-        ax5.bar(baselines[:len1],simu.LR3[:len1], color=basecolors[:len1])
+        ax5.bar(baselines[:len1],simu.LR4[:len1], color=basecolors[:len1])
         ax5.bar(baselines[:len1],np.abs(VisObj[:len1])**2, fill=False, edgecolor='black', linestyle='-',linewidth=1.5)
         
         ax8.bar(baselines[len1:],RMStrueOPD[len1:], color=basecolors[len1:])
-        ax10.bar(baselines[len1:],simu.LR3[len1:], color=basecolors[len1:])
+        ax10.bar(baselines[len1:],simu.LR4[len1:], color=basecolors[len1:])
         ax10.bar(baselines[len1:],np.abs(VisObj[len1:])**2, fill=False, edgecolor='black', linestyle='-', linewidth=1.5)
 
         ax1.get_shared_x_axes().join(ax1,ax6)
@@ -2117,7 +2253,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         R=config.FS['R']
         RMStrueOPD = np.std(simu.OPDTrue,axis=0)
-        print(RMStrueOPD.shape)
+        
         VisObj = ct.NB2NIN(simu.VisibilityObject[ind])
         
         plt.rcParams.update(rcParamsForBaselines)
@@ -2845,7 +2981,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
                    color='k', linestyle=':')
         
-        maxSNR = np.nan_to_num(np.max(SNR,axis=0))
+        maxSNR = np.nanmax(SNR,axis=0)
         ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
         ax3.bar(baselines[:len1],config.FT['ThresholdGD'][:len1], fill=False,edgecolor='k')
 
@@ -2915,7 +3051,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
                    color='k', linestyle=':')
         
-        maxSNR = np.nan_to_num(np.max(SNR,axis=0))
+        maxSNR = np.nanmax(SNR,axis=0)
         ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
         ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(maxSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
         
@@ -3016,7 +3152,8 @@ def investigate(*args):
 
 def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
                     CoherentFluxObject=[],SNR_SI=False,
-                    R=140, p=10, magSI=-1,display=True, get=[]):
+                    R=140, p=10, magSI=-1,display=True, get=[],
+                    verbose=False):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
@@ -3134,6 +3271,7 @@ WavelengthOfInterest
     simu.LockedRatio=np.zeros(NIN)          # sig_opd < lambda/p
     simu.LR2 = np.zeros(NIN)                # Mode TRACK
     simu.LR3= np.zeros(NIN)                 # In Central Fringe
+    simu.LR4= np.zeros(NIN)                 # No fringe jump
     simu.WLockedRatio = np.zeros(NIN)
     
     MaxPhaseVarForLocked = (2*np.pi/p)**2
@@ -3152,6 +3290,8 @@ WavelengthOfInterest
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
         OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+        OPDptp = np.ptp(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+        
         GDResVar = np.var(simu.GDResidual2[InFrame:OutFrame,:],axis=0)
         PDResVar = np.var(simu.PDResidual2[InFrame:OutFrame,:],axis=0)
         PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
@@ -3159,8 +3299,12 @@ WavelengthOfInterest
         PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
         simu.PhaseVar_atWOI[it] = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
         simu.PhaseStableEnough[it] = 1*(OPDVar < MaxVarOPDForLocked)
+        NoFringeJumpDuringPose = 1*(OPDptp < 1.5*MeanWavelength)
+        
         #simu.FTLocked[it] =  # Reste à définir en utilisant la matrice de poids.
         simu.VarOPD += 1/Ndit*OPDVar
+        simu.LR4 += 1/Ndit*NoFringeJumpDuringPose
+        
         simu.VarPDRes += 1/Ndit*PDResVar
         simu.VarGDRes += 1/Ndit*GDResVar
         simu.VarPiston += 1/Ndit*PistonVar
@@ -3374,8 +3518,7 @@ MeanWavelength
         Ndit=len(DITf)
         
         ObservingTime = Period*dt
-        print(ObservingTime)
-        print(f"Proposed DITs:{IntegrationTimes}")
+        
         NewDITf=[]#DITf.copy()
         kbefore=[]
         for idit in range(Ndit):
@@ -3395,11 +3538,13 @@ MeanWavelength
         ThrownFrames = Period%NewDITf
         LengthOfKeptSequence = ListNframes * Period
         
-        print(f"ObservingTimes:{ObservingTime}")
-        print(f"ListNframes :{ListNframes}")
-        print(f"ThrownFrames :{ThrownFrames}")
-        print(f"New DITs:{NewIntegrationTimes}")
-        print(f"Percentage of loss: {np.round(ThrownFrames/LengthOfKeptSequence*100,2)}")
+        if verbose:
+            print(f"ObservingTimes:{ObservingTime}")
+            print(f"Proposed DITs:{IntegrationTimes}")
+            print(f"ListNframes :{ListNframes}")
+            print(f"ThrownFrames :{ThrownFrames}")
+            print(f"New DITs:{NewIntegrationTimes}")
+            print(f"Percentage of loss: {np.round(ThrownFrames/LengthOfKeptSequence*100,2)}")
     
         
     else:
@@ -3434,6 +3579,7 @@ MeanWavelength
     simu.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
     simu.LR2 = np.zeros([Ndit,NIN])          # Mode TRACK
     simu.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
+    simu.LR4 = np.zeros([Ndit,NIN])          # No Fringe Jump
     simu.FringeContrast=np.zeros([Ndit,MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
     
     simu.VarPiston=np.zeros([Ndit,NA])
@@ -3469,7 +3615,6 @@ MeanWavelength
     if 'ThresholdGD' in config.FT.keys():
         TrackedBaselines = (simu.SquaredSNRMovingAveragePD >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
         
-        
     FirstFrame = InFrame
     for idit in range(Ndit):
         
@@ -3503,17 +3648,15 @@ MeanWavelength
         for iframe in range(Nframes):
             OutFrame=InFrame+DIT_NumberOfFrames
             
-            simu.VarOPD=np.zeros([Ndit,NIN])
-            simu.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
-            simu.LR2 = np.zeros([Ndit,NIN])          # Mode TRACK
-            simu.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
-            
             OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+            OPDptp = np.ptp(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
             
             PhaseVar_atWOI = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
             PhaseStableEnough = 1*(OPDVar < MaxVarOPDForLocked)
+            NoFringeJumpDuringPose = 1*(OPDptp < 1.5*MeanWavelength)
             
             simu.LockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough,axis=0)
+            simu.LR4[idit] += 1/Nframes*np.mean(NoFringeJumpDuringPose,axis=0)
             simu.VarOPD[idit] += 1/Nframes*OPDVar
 
 
@@ -3535,13 +3678,13 @@ MeanWavelength
 
 
             if criterias!='light':
-                GDResVar = np.var(simu.GDResidual[InFrame:OutFrame,:],axis=0)
-                PDResVar = np.var(simu.PDResidual[InFrame:OutFrame,:],axis=0)
+                GDResVar = np.var(simu.GDResidual2[InFrame:OutFrame,:],axis=0)
+                PDResVar = np.var(simu.PDResidual2[InFrame:OutFrame,:],axis=0)
                 simu.VarPDRes[idit] += 1/Nframes*PDResVar
                 simu.VarGDRes[idit] += 1/Nframes*GDResVar
 
-                simu.TempVarPD[idit] += 1/Nframes*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
-                simu.TempVarGD[idit] += 1/Nframes*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
+                simu.TempVarPD[idit] += 1/Nframes*np.var(simu.PDEstimated2[InFrame:OutFrame,:],axis=0)
+                simu.TempVarGD[idit] += 1/Nframes*np.var(simu.GDEstimated2[InFrame:OutFrame,:],axis=0)
                 simu.VarCPD[idit] += 1/Nframes*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
                 simu.VarCGD[idit] += 1/Nframes*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
                 
@@ -3641,7 +3784,6 @@ MeanWavelength
         config.newfig += 1
     
     return NewIntegrationTimes
-
 
 
 
@@ -3784,6 +3926,7 @@ def FSdefault(NA, NW):
                 ich[NA*i+j] = (int(i),int(j))
                 
     return V2PM, P2VM, ich
+
 
 
 def ReadCf(currCfEstimated):
@@ -3964,8 +4107,11 @@ def ReadCf(currCfEstimated):
     return currPD, currGD
 
 
+
+
 def SimpleIntegrator(*args, init=False, Ngd=1, Npd=1, Ncp = 1, GainPD=0, GainGD=0,
-                      Ncross = 1, CPref=True,roundGD='round',Threshold=True):
+                      Ncross = 1, CPref=True,roundGD='round',Threshold=True,
+                      usePDref=True,verbose=False):
     """
     Calculates, from the measured coherent flux, the new positions to send to the delay lines.
     
@@ -4039,8 +4185,10 @@ def SimpleIntegrator(*args, init=False, Ngd=1, Npd=1, Ncp = 1, GainPD=0, GainGD=
         config.FT['Threshold'] = Threshold
         config.FT['cmdOPD'] = True
         config.FT['CPref'] = CPref
+        config.FT['BestTel'] = 1
         
-        print(f"*** \n Inititilise Integrator: \n GainPD={GainPD} ; GainGD={GainGD} \n \
+        if verbose:
+            print(f"*** \n Inititilise Integrator: \n GainPD={GainPD} ; GainGD={GainGD} \n \
 Ngd={Ngd} ; Type={config.FT['Name']} \n\ ***")
               
         return
@@ -4060,7 +4208,7 @@ Ngd={Ngd} ; Type={config.FT['Name']} \n\ ***")
     return currCmd
     
 
-def SimpleCommandCalc(currPD,currGD):
+def SimpleCommandCalc(currPD,currGD, verbose=False):
     """
     Generates the command to send to the optical delay line according to the
     group-delay and phase-delay reduced from the OPDCalculator.
@@ -4151,7 +4299,8 @@ def SimpleCommandCalc(currPD,currGD):
         pass
 
     else:
-        print("roundGD must be either 'round', 'int' or 'no'.")
+        if verbose:
+            print("roundGD must be either 'round', 'int' or 'no'.")
        
     """
     Phase-Delay command
@@ -4365,14 +4514,15 @@ def coh__matcoher2real(NA, *args):
     return MatB
 
 
-
-def repeat_sequence(sequence, newNT):
+def repeat_sequence(sequence, newNT, verbose=False):
     NT = len(sequence)
     if NT > newNT:
-        print(f"The given sequence is longer than the desired length, we take only the {newNT} elements.")
+        if verbose:
+            print(f"The given sequence is longer than the desired length, we take only the {newNT} elements.")
         newseq = sequence[:newNT]
     elif NT==newNT:
-        print("The given sequence already has the desired length, we return the sequence without any modification.")
+        if verbose:
+            print("The given sequence already has the desired length, we return the sequence without any modification.")
         newseq = sequence
     else:
         IntRepetitions, NumberOfRemainingElements = newNT//NT, newNT%NT
@@ -4385,8 +4535,6 @@ def repeat_sequence(sequence, newNT):
                 newseq = np.concatenate([newseq,sequence])
             newseq = np.concatenate([newseq,sequence[:NumberOfRemainingElements]])
     return newseq
-
-
 
 def populate_hdr(objet, hdr, prefix="",verbose=False):
     """
@@ -4526,7 +4674,8 @@ def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, ver
     if LightSave=='OPDTrue':
         NamesToSave = ['OPDTrue']
         names = [value for value in names if value in NamesToSave]
-        print(names)
+        if verbose:
+            print(names)
     
     elif LightSave==True:
         NamesToSave = ['OPDTrue','GDEstimated','GDResidual',

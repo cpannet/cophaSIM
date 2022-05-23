@@ -214,6 +214,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
         config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
         config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
         
+        config.FS['OPD2Piston_moy'] = np.copy(config.FS['OPD2Piston'])
         if config.TELref:
             iTELref = config.TELref - 1
             L_ref = config.FS['OPD2Piston'][iTELref,:]
@@ -256,8 +257,11 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                     UncoherentPhotometry = T1*T2*(NA-1) # Normalised by the maximal photometry
                     PhotometricBalance = UncoherentPhotometry * PhotometricCoherence
                     if T1*T2:
-                        ax.plot([x1,x2],[y1,y2],color=colors[0],linestyle='-',linewidth=5*PhotometricCoherence)
+                        ax.plot([x1,(x2+x1)/2],[y1,(y2+y1)/2],color=colors[0],linestyle='-',linewidth=15*T1**2)
+                        ax.plot([(x2+x1)/2,x2],[(y2+y1)/2,y2],color=colors[0],linestyle='-',linewidth=15*T2**2)
                         ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
+            
+            ax.text(-150,50,name,fontsize='large')
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
             ax.set_xlim([-210,160]) ; ax.set_ylim([-50,350])
@@ -453,6 +457,7 @@ given in config ({NA}).")
         
         ich = np.array([[1,2]])
         
+        active_ich = list(np.ones(NIN))
         ichorder = np.arange(NIN)
         
         config.FS['func'] = ALLINONE
@@ -471,7 +476,7 @@ given in config ({NA}).")
         config.FS['PSDwindow'] = PSDwindow
         config.FS['Tphot'] = Tphot ; config.FS['Tint'] = Tint
         config.FS['description'] = (np.ones([NA,NA]) - np.identity(NA))/(NA-1)
-        config.FS['active_ich'] = np.ones(NIN)
+        config.FS['active_ich'] = active_ich
         config.FS['PhotometricBalance'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         # Noise maps
@@ -534,6 +539,29 @@ given in config ({NA}).")
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        
+        config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
+        config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        Piston2OPD_forInv = np.zeros([NIN,NA])
+        
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = ct.posk(ia,iap,NA)
+                config.FS['Piston2OPD'][ib,ia] = 1
+                config.FS['Piston2OPD'][ib,iap] = -1
+                if active_ich[ib]:
+                    Piston2OPD_forInv[ib,ia] = 1
+                    Piston2OPD_forInv[ib,iap] = -1
+            
+        config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
+        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
+        
+        config.FS['OPD2Piston_moy'] = np.copy(config.FS['OPD2Piston'])
+        if config.TELref:
+            iTELref = config.TELref - 1
+            L_ref = config.FS['OPD2Piston'][iTELref,:]
+            config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+        
         
         return
     

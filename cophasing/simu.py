@@ -50,6 +50,7 @@ ClosurePhaseGD = np.zeros([NT,NC])              # GD closure phase
 OPDTrue = np.zeros([NT,NIN])                    # True Optical Path Delay
 OPDDisturbance = np.zeros([NT,NIN])             # OPD-space disturbance
 PDEstimated = np.zeros([NT,NIN])                # Estimated baselines PD [rad]
+PDEstimated2 = np.zeros([NT,NIN])                # Estimated baselines PD after patch [rad]
 varPD = np.zeros([NT,NIN])                      # Estimated "PD variance" = 1/SNR²
 varGD = np.zeros([NT,NIN])                      # Estimated "GD variance" = 1/SNR²
 SquaredSNRMovingAverage = np.zeros([NT,NIN])    # Estimated SNR² averaged over N dit
@@ -57,6 +58,7 @@ TrackedBaselines = np.zeros([NT,NIN])
 TemporalVariancePD = np.zeros([NT,NIN])         # Temporal Variance PD estimator
 TemporalVarianceGD = np.zeros([NT,NIN])         # Temporal Variance GD estimator
 GDEstimated = np.zeros([NT,NIN])                # Estimated baselines GD [rad]
+GDEstimated2 = np.zeros([NT,NIN])                # Estimated baselines GD after patch [rad]
 OPDCommand = np.zeros([NT+1,NIN])               # OPD-space command ODL
 PDCommand = np.zeros([NT+1,NIN])                # OPD-space PD command
 GDCommand = np.zeros([NT+1,NIN])                # OPD-space GD command

@@ -270,6 +270,9 @@ TELref=0            # For display only: reference delay line
 newfig=0
 timestamps = np.arange(NT)*dt       # Timestamps in [ms]
 
+verbose,vebose2=False,False
+
+
 # a_dict={}
 
 # var_names = [name for name in dir() 

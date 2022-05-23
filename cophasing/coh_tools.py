@@ -36,6 +36,28 @@ k_ = 1.38e-23    # Boltzmann's constant
 
 colors = tol_cset('bright')
 
+SS = 12     # Small size
+MS = 14     # Medium size
+BS = 16     # Big size
+figsize = (16,8)
+rcParamsForBaselines = {"font.size":SS,
+       "axes.titlesize":SS,
+       "axes.labelsize":MS,
+       "axes.grid":True,
+       
+       "xtick.labelsize":SS,
+       "ytick.labelsize":SS,
+       "legend.fontsize":SS,
+       "figure.titlesize":BS,
+       "figure.constrained_layout.use": False,
+       "figure.figsize":figsize,
+       'figure.subplot.hspace': 0.05,
+       'figure.subplot.wspace': 0,
+       'figure.subplot.left':0.1,
+       'figure.subplot.right':0.95
+       }
+
+
 class Error(Exception):
     """Base class for exceptions in this module."""
     pass
@@ -144,7 +166,8 @@ def info_array(array, band):
     return transmission, surface
     
 
-def get_array(name='',band='H',getcoords=False):
+def get_array(name='',band='H',getcoords=False,
+              verbose=False):
     """
     Returns the coordinates, baselines and base names of a given array
 
@@ -188,7 +211,8 @@ def get_array(name='',band='H',getcoords=False):
         filepath = name
         if not os.path.exists(filepath):
             try:
-                print("Looking for the interferometer file into the package's data")
+                if verbose:
+                    print("Looking for the interferometer file into the package's data")
                 filepath = pkg_resources.resource_stream(__name__,filepath)
             except:
                 raise Exception(f"{filepath} doesn't exist.")
@@ -312,8 +336,9 @@ def get_visibility(alpha, baseline, spectra, model='disk'):
     return V
 
 
-@deco.timer
-def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext='pdf'):
+#@deco.timer
+def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
+               savedir='',ext='pdf',verbose=False):
     """
     Create the Coherent flux matrix of an object in the (u,v) plane according
     to:
@@ -344,7 +369,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     if (len(savedir)) and (not os.path.exists(savedir)):
         os.makedirs(savedir)
         
-    print("Calculation of object's visibilities from Van Cittert theorem\n ...")
+    if verbose:
+        print("Calculation of object's visibilities from Van Cittert theorem\n ...")
 
     # Relative positions of the two stars
     pos_star1 = Target.Star1['Position']
@@ -357,7 +383,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
         angular_diameter2 = Target.Star2['AngDiameter']
         H2 = Target.Star2['Hmag']
     except:
-        print('Simple centered star1')
+        if verbose:
+            print('Simple centered star1')
         BinaryObject = False
         
         # angular_diameter2 = angular_diameter1
@@ -509,7 +536,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     # database and its AltAzimutal coordinates if a Date has been given.
     if Target.Name not in ('Simple','Binary','Unresolved') and ('AltAz' not in vars(Obs)):
         starttime = Time(Obs.DATE)
-        print(f"Observation date: {Obs.DATE}")
+        if verbose:
+            print(f"Observation date: {Obs.DATE}")
     
         starcoords = SkyCoord.from_name(Target.Name)
         ArrayLocation=EarthLocation.of_site(Obs.ArrayName)
@@ -520,7 +548,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
         
     else:
         (altitude, azimuth) = (theta*np.pi/180 for theta in Obs.AltAz)
-        print(f"User defined {Target.Name} object with AltAz={Obs.AltAz}")
+        if verbose:
+            print(f"User defined {Target.Name} object with AltAz={Obs.AltAz}")
         
         
     
@@ -583,7 +612,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
     UVcoords = (ucoords,vcoords)
     #UVcoordsMeters = [1/mas2rad(1/coord)*np.median(lmbda) for coord in UVcoords]
     
-    print("Visibilities calculated.")
+    if verbose:
+        print("Visibilities calculated.")
     
     
     if display:         # Display (u,v) plane with interferometer projections (first wavelength)
@@ -600,7 +630,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
         
         PhotometricSNR = np.concatenate([PhotSNR[::-1],PhotSNR])
         
-        print(f'Plot CHARA (u,v) coverage on figure {config.newfig}')    
+        if verbose:
+            print(f'Plot CHARA (u,v) coverage on figure {config.newfig}')    
         chara_uv_complete = np.concatenate((chara_uv[NW//2], -chara_uv[NW//2]),axis=0)
         
         uvmax = np.max(chara_uv_complete/dfreq)+10
@@ -646,7 +677,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,savedir='',ext=
 
 
 def create_obsfile(spectra, Obs, Target, savingfilepath='',
-                   savedir='', ext='pdf',overwrite=False, display=False):
+                   savedir='', ext='pdf',overwrite=False, display=False,
+                   verbose=True):
     """
     Creates the coherent flux matrix of the object at the entrance of the 
     fringe sensor and save it into a fitsfile.
@@ -870,17 +902,20 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='',
         
         
     if savingfilepath=='no':
-        print("Not saving the data.")
+        if verbose:
+            print("Not saving the data.")
         return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
 
     else:
         fileexists = os.path.exists(savingfilepath)
         if fileexists:
-            print(f'{savingfilepath} already exists.')
+            if verbose:
+                print(f'{savingfilepath} already exists.')
             if overwrite:
                 os.remove(savingfilepath)
             else:
-                print("The file already exists and you didn't ask to overwrite it. I don't save the file.")          
+                if verbose:
+                    print("The file already exists and you didn't ask to overwrite it. I don't save the file.")          
                 return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
     
         filedir = '/'.join(savingfilepath.split('/')[:-1])+'/'
@@ -941,7 +976,8 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='',
         
         hdu = fits.HDUList([primary,hdu1,im1,im2,im3,im4,im5])
         
-        print(f'Saving file into {savingfilepath}')
+        if verbose:
+            print(f'Saving file into {savingfilepath}')
         hdu.writeto(savingfilepath)
     
     return CohIrradiance, UncohIrradiance, VisObj, BaseNorms, TelNames
@@ -1013,14 +1049,15 @@ def create_CfObj(spectra,Obs,Target,InterfArray,R=140):
 
     return CoherentFluxObject
 
-def get_ObsInformation(ObservationFile):
+def get_ObsInformation(ObservationFile,verbose=False):
     
     from .config import ScienceObject, Observation
     from astropy.io import fits
     
     if not os.path.exists(ObservationFile):
         try:
-            print("Looking for the observation file into the package's data")
+            if verbose:
+                print("Looking for the observation file into the package's data")
             ObservationFile = pkg_resources.resource_stream(__name__, ObservationFile)
         except:
             raise Exception(f"{ObservationFile} doesn't exist.")
@@ -1060,7 +1097,7 @@ def get_ObsInformation(ObservationFile):
     return Obs, Target
 
 
-def get_CfObj(filepath, spectra):
+def get_CfObj(filepath, spectra,verbose=False):
     """
     Reads data of an observation contained in a FITSfile.
     Adapt the spectral sampling to the FS spectral sampling.
@@ -1092,7 +1129,8 @@ def get_CfObj(filepath, spectra):
     fileexists = os.path.exists(filepath)
     if not fileexists:
         try:
-            print("Looking for the observation file into the package's data")
+            if verbose:
+                print("Looking for the observation file into the package's data")
             filepath = pkg_resources.resource_stream(__name__,filepath)
         except:
             raise Exception(f"{filepath} doesn't exists.")          
@@ -1180,11 +1218,12 @@ def get_CfObj(filepath, spectra):
     return FinalCoherentIrradiance, FinalComplexVisObj, ClosurePhase
 
 
-def get_infos(file):
+def get_infos(file,verbose=False):
     
     if not os.path.exists(file):
         try:
-            print("Looking for the disturbance file into the package's data")
+            if verbose:
+                print("Looking for the disturbance file into the package's data")
             file = pkg_resources.resource_stream(__name__,file)
         except:
             raise Exception(f"{file} doesn't exist.")
@@ -1206,35 +1245,39 @@ def get_infos(file):
             FreqSampling = np.arange(NF)*df
             
         except:
-            # print('No Disturbance PSD in FITSfile. The arrays FreqSampling, PSD and Filter are put to zero.')
             FreqSampling = np.zeros(NT); PSD = np.zeros(NT); Filter = np.zeros(NT)
 
     return filetimestamps,filelmbdas, piston, transmission, FreqSampling, PSD, Filter,hdr
     
     
-def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=True):
+def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=False):
     
-    from .config import piston_average, NA
-    filetimestamps, filespectra, PistonDisturbance, TransmissionDisturbance,_,_,_,_ = get_infos(DisturbanceFile)
-
-    PistonDisturbance = PistonDisturbance[:,:NA]
-    TransmissionDisturbance = TransmissionDisturbance[:,:,:NA]
-
-    # Interpolate on the time axis   
-    newobservables = []
-    for observable in [PistonDisturbance, TransmissionDisturbance]:
-        f = interpolate.interp1d(filetimestamps,observable, axis=0, bounds_error=False, fill_value=(observable[0],observable[-1]))
-        newobservables.append(f(timestamps))
-        
-    
-    PistonDisturbance, TempTransmissionDisturbance = newobservables
-    
-    # Interpolate transmission on the spectral axis (Piston is not chromatic)    
-    f = interpolate.interp1d(filespectra*1e6,TempTransmissionDisturbance, axis=1, bounds_error=False,fill_value=(TempTransmissionDisturbance[:,0,:],TempTransmissionDisturbance[:,-1,:]))
-    TransmissionDisturbance = np.abs(f(spectra))
-    
+    from .config import piston_average,NA,NB
     NT = len(timestamps) ; NW = len(spectra)
-    NB = np.shape(PistonDisturbance)[1]**2
+    
+    if 'fits' not in DisturbanceFile:
+        if DisturbanceFile == 'NoDisturbance':
+            PistonDisturbance = np.zeros([NT,NA])
+            TransmissionDisturbance = np.ones([NT,NW,NA])
+    
+    else:
+        filetimestamps, filespectra, PistonDisturbance, TransmissionDisturbance,_,_,_,_ = get_infos(DisturbanceFile)
+    
+        PistonDisturbance = PistonDisturbance[:,:NA]
+        TransmissionDisturbance = TransmissionDisturbance[:,:,:NA]
+    
+        # Interpolate on the time axis   
+        newobservables = []
+        for observable in [PistonDisturbance, TransmissionDisturbance]:
+            f = interpolate.interp1d(filetimestamps,observable, axis=0, bounds_error=False, fill_value=(observable[0],observable[-1]))
+            newobservables.append(f(timestamps))
+            
+        
+        PistonDisturbance, TempTransmissionDisturbance = newobservables
+        
+        # Interpolate transmission on the spectral axis (Piston is not chromatic)    
+        f = interpolate.interp1d(filespectra*1e6,TempTransmissionDisturbance, axis=1, bounds_error=False,fill_value=(TempTransmissionDisturbance[:,0,:],TempTransmissionDisturbance[:,-1,:]))
+        TransmissionDisturbance = np.abs(f(spectra))
 
     if piston_average==1:
         if verbose:
@@ -1691,7 +1734,7 @@ def sortmatrix(matrix,ich,ABCDindex,direction='v2pm'):
 
     return matrix_sorted
 
-def studyP2VM(*args,nfig=0):
+def studyP2VM(*args,savedir='',ext='pdf',nfig=0):
     """
     Show the V2PM and the V2PM with grids that enable to see clearly the baselines
 
@@ -2001,6 +2044,31 @@ def studyP2VM(*args,nfig=0):
     
     if ('repartition' in args) or ('displayall' in args):
         
+        #plt.rcParams.update(rcParamsForBaselines)
+        SS = 12     # Small size
+        MS = 14     # Medium size
+        BS = 16     # Big size
+        figsize = (16,12)
+        rcParamsForRepartitions = {"font.size":SS,
+                "axes.titlesize":SS,
+                "axes.labelsize":SS,
+                "axes.grid":True,
+               
+                "xtick.labelsize":SS,
+                "ytick.labelsize":SS,
+                "legend.fontsize":SS,
+                "figure.titlesize":BS,
+                # "figure.constrained_layout.use": False,
+                "figure.dpi":300,
+                "figure.figsize":figsize
+                # 'figure.subplot.hspace': 0.05,
+                # 'figure.subplot.wspace': 0,
+                # 'figure.subplot.left':0.1,
+                # 'figure.subplot.right':0.95
+                }
+
+        plt.rcParams.update(rcParamsForRepartitions)
+        
         if pairwise:
             newfig+=1
             fig=plt.figure(newfig, clear=True)
@@ -2049,13 +2117,13 @@ def studyP2VM(*args,nfig=0):
                 
                 for rect1,rect2,rect_moy in zip(rects1,rects2,rects_moy1):
                     height = np.max([rect1.get_height(),rect2.get_height(),rect_moy.get_height()])
-                    ax1.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
-                            ha='center', va='bottom')
+                    # ax1.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
+                    #         ha='center', va='bottom')
                     
                 for rect1,rect2,rect_moy in zip(rects4,rects5,rects_moy2):
                     height = np.max([rect1.get_height(),rect2.get_height(),rect_moy.get_height()])
-                    ax2.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
-                            ha='center', va='bottom')
+                    # ax2.text(rect_moy.get_x() + rect_moy.get_width() / 2, height+0.1, round(height,1),
+                    #         ha='center', va='bottom')
                     
                 bar_patches2.append(mpatches.Patch(color=colors[k],label="ABCD"[k]))
             
@@ -2063,8 +2131,8 @@ def studyP2VM(*args,nfig=0):
             ax1_ymin,ax1_ymax = ax1.get_ylim() ; ax2_ymin,ax2_ymax = ax2.get_ylim()
             ax1_normalised_width = 1/(ax1_ymax-ax1_ymin)*width*.7
             ax1_normalised_height = 1/(ax1_ymax-ax1_ymin)*width
-            ax2_normalised_width = 1/(ax2_ymax-ax2_ymin)*width*.7
-            ax2_normalised_height = 1/(ax2_ymax-ax2_ymin)*width
+            ax2_normalised_width = 1/(ax1_ymax-ax1_ymin)*width*.7
+            ax2_normalised_height = 1/(ax1_ymax-ax1_ymin)*width
             ax1_bottomleft = 1/(ax1_xmax-ax1_xmin)*(ax1_firstbar_positions+barwidth/2-ax1_xmin)
             ax2_bottomleft = 1/(ax2_xmax-ax2_xmin)*(ax2_firstbar_positions+barwidth/2-ax2_xmin)
             
@@ -2072,6 +2140,9 @@ def studyP2VM(*args,nfig=0):
                 subpos=(ax1_bottomleft[ib],0.75,ax1_normalised_width,ax1_normalised_height)#firstbar_pos[0] + 2*k*barwidth,
                 label = True if ib==0 else False
                 ax=add_subplot_axes(ax1,subpos,polar=True,label=label)
+                if label:
+                    ax.xaxis.label.set_size(2)
+                    ax.yaxis.label.set_size(2)
                 ax.set_ylim(0,1)
                 for k in range(Nmod):
                     phase = phases[0,ib,k] ; norm = normphasors[0,ib,k]/np.max(normphasors[0,ib,:])
@@ -2110,13 +2181,17 @@ def studyP2VM(*args,nfig=0):
             
             
             # ax1.set_ylabel("Phase [rad]")
-            ax1.set_ylabel("Transmission \n[% of the beam photometry]")
-            ax2.set_ylabel("Transmission \n[% of the beam photometry]")
+            ax1.set_ylabel("Transmission \n[%]")
+            ax2.set_ylabel("Transmission \n[%]")
             ax1.grid(False)
             ax2.grid(False)
+            
+            if len(savedir):
+                fig.savefig(savedir+f"PICrepartition.{ext}")
+            
             fig.show()
     
-        
+        plt.rcParams.update(plt.rcParamsDefault)
     
     
 # =============================================================================
@@ -2288,7 +2363,7 @@ def NB2NIN(vector):
     return ninvec
 
 
-def makeA2P(descr, modulator, clean_up=False):
+def makeA2P(descr, modulator, verbose=False,clean_up=False):
     """Builds an A2P matrix from a high-level description descr of the FTchip.
        descr (NIN,2) gives for each baseline (order 01,02,..,12,13,...) the amplitude ratio for pups 1 & 2"""
     
@@ -2299,7 +2374,8 @@ def makeA2P(descr, modulator, clean_up=False):
     NA=int(round((1+np.sqrt(1+8*nb_in))/2)) # inversion analytique de la ligne suivante
     NIN=NA*(NA-1)//2
     if NIN != nb_in:
-        print('Taille descr bizarre, attendu=',NIN)
+        if verbose:
+            print('Taille descr bizarre, attendu=',NIN)
         
     NQ = np.shape(modulator)[0] ; NP=NIN*NQ
     if NQ==4:
@@ -2320,7 +2396,6 @@ def makeA2P(descr, modulator, clean_up=False):
     ib=0
     for ia in range(NA):
         for iap in range(ia+1,NA):
-            #print(ia,iap,ib)
             A2Pgen[ib,:,ia ]=modulator[:,0]*descr[ib,0]
             A2Pgen[ib,:,iap]=modulator[:,1]*descr[ib,1]
             if not descr[ib,0]*descr[ib,1]:
@@ -2334,7 +2409,6 @@ def makeA2P(descr, modulator, clean_up=False):
         inc=0
         for ip in range(NP):
             if (A2P[ip,:] == np.zeros(NA)).all():
-                #print(f"Remove {conventional_ich[ip]} because line of the matrix is {A2P[ip,:]}")
                 lightA2P = np.delete(lightA2P, ip-inc, axis=0) # Remove the line at position ip because it doesn't receive any flux
                 del ich[ip-inc]
                 inc+=1

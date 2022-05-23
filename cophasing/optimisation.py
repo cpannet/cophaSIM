@@ -23,132 +23,6 @@ import glob
 
 from importlib import reload  # Python 3.4+ only.
 
-# def OptimGainMultiprocess(GainsPD=[],GainsGD=[],optim='FC',
-#                 TimeBonds=100, WLOfScience=1.5, DIT=50,
-#                 telescopes=0):
-    
-    
-#     import multiprocessing
-    
-#     pool = multiprocessing.Pool()
-    
-#     from .config import NIN, NC
-    
-#     if len(GainsGD):
-#         gainstr='GainGD'
-#         Ngains = len(GainsGD)
-#         Gains = GainsGD
-#     elif len(GainsPD):
-#         gainstr='GainPD'
-#         Ngains = len(GainsPD)
-#         Gains = GainsPD
-#     else:
-#         raise Exception('Need GainsPD or GainsGD.')
-        
-#     print(f"Start {gainstr} optimisation with sample gains={Gains}")
-    
-#     # SimpleIntegrator(init=True, GainPD=Gains[0], GainGD=0)
-    
-    
-#     VarOPD = np.zeros([Ngains,NIN])     # Phase variances
-#     VarCP = np.zeros([Ngains, NC])      # Cosure Phase variances
-#     FCArray = np.zeros([Ngains, NIN])   # Contains the fringe contrasts
-    
-    
-#     minValue = 10000
-#     iOptim = -1
-        
-    
-    # def GiveResults(G):
-        
-    #     config.FT['GainPD'] = G
-        
-    #     print(f'{gainstr}={G}')
-        
-    #     # Launch the simulator
-    #     sk.loop()
-    #     # Load the performance observables into simu module
-    #     sk.ShowPerformance(TimeBonds, WLOfScience,DIT, display=False)
-                
-        
-    #     return simu.VarOPD, simu.VarCPD, simu.VarCGD, simu.FringeContrast
-        
-       
-        # elif (Value > 10*minValue) and (ig < Ngains-1):
-        #     VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
-        #     VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
-        #     FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
-        #     break
-    
-    
-    # result = GiveResults(0.2)
-    # myresult = pool.starmap(GiveResults, Gains.reshape([Ngains,1]))
-    
-    # print(myresult)
-    
-    # for ig in range(Ngains):
-        
-    #     # Initialise the comparison tables
-    #     VarOPD[ig,:] = simu.VarOPD
-    #     if gainstr=='GainPD':
-    #         VarCP[ig,:] = simu.VarCPD
-    #     elif gainstr=='GainGD':
-    #         VarCP[ig,:] = simu.VarCGD
-    #     FCArray[ig,:] = simu.FringeContrast
-        
-    #     if optim=='phase':      # Optimisation on Phase residues
-    #         if not telescopes:
-    #             Value = np.mean(VarOPD[ig,:])
-    #         elif telescopes:
-    #             itel1,itel2 = telescopes[0]-1, telescopes[1]-1
-    #             ib = coh_tools.posk(itel1, itel2, config.NA)
-    #             Value = VarOPD[ig,ib]
-    #         if Value < minValue:    
-    #             minValue = Value
-    #             iOptim = ig
-        
-    #     elif optim == 'FC':     # Optimisation on final fringe contrast
-    #         if not telescopes:
-    #             Value = 1-np.mean(FCArray[ig,:])
-    #         elif telescopes:
-    #             itel1,itel2 = telescopes[0]-1, telescopes[1]-1
-    #             ib = coh_tools.posk(itel1, itel2, config.NA)
-    #             Value = 1-FCArray[ig,ib]
-    #         print(Value, minValue)
-    #         if Value < minValue:
-    #             minValue = Value
-    #             iOptim = ig
-                
-    #     elif optim=='CP':       # Optimisation on Closure Phase variance
-    #         if not telescopes:
-    #             Value = np.mean(VarCP[ig,:])
-    #         elif telescopes:
-    #             if len(telescopes) != 3:
-    #                 raise Exception('For defining a closure phase, telescopes must be three.')
-    #             itel1,itel2,itel3 = telescopes[0]-1, telescopes[1]-1, telescopes[2]-1
-    #             ic = coh_tools.poskfai(itel1, itel2, itel3, config.NA)
-    #             Value = VarCP[ig,ic]
-    #         if Value < minValue:    
-    #             minValue = Value
-    #             iOptim = ig           
-        
-    #     elif (Value > 10*minValue) and (ig < Ngains-1):
-    #         VarOPD[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
-    #         VarCP[ig+1:,:] = 100*np.ones([Ngains-ig-1,NC])
-    #         FCArray[ig+1:,:] = 100*np.ones([Ngains-ig-1,NIN])
-    #         break
-        
-    # bestGain = Gains[iOptim]
-    
-#     print(f"Best gain: {Gains[iOptim]} \n\
-# Average OPD Variance: {minValue} \n\
-# Average CPD Variance: {minValue} \n\
-# Average Fringe Contrast: {1-minValue}")
-    
-
-
-    # return #bestGain, iOptim, VarOPD, VarCP, FCArray
-
 def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20), 
                         optimCriteria="FC",filedir='',Nsamples=5,
                         TimeBonds=100, WLOfTrack=1.5,SpectraForScience=np.arange(0.6,0.9,0.005),
@@ -284,11 +158,11 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
             
                 # Launch the simulator
                 if save_all=='light':
-                    sk.loop(savepath,LightSave=True,verbose=verbose)
+                    sk.loop(savepath,LightSave=True,verbose=verbose,verbose2=verbose2)
                 elif save_all=='yes':
-                    sk.loop(savepath,LightSave=False,verbose=verbose)
+                    sk.loop(savepath,LightSave=False,verbose=verbose,verbose2=verbose2)
                 elif save_all=='no':
-                    sk.loop(verbose=verbose)
+                    sk.loop(verbose=verbose,verbose2=verbose2)
                 else:
                     raise Exception('save_all param must be "light", "yes" or "no".')
                     
@@ -371,25 +245,29 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                 Value = np.max(criteria[:,ig,ip,ib])
                 bestDIT = DITs[np.argmax(criteria[:,ig,ip,ib])]
             
-            print("-------------------------------------------")
-            print(f'\nComputed value={round(Value,5)}')
+            if verbose2:
+                print("-------------------------------------------")
+                print(f'\nComputed value={round(Value,5)}')
             if Value < minValue:    
-                print(f"New value={round(Value,5)} lower than minValue={round(minValue,5)} obtained with (GD,PD)=({Ggd},{Gpd})")
+                if verbose2:
+                    print(f"New value={round(Value,5)} lower than minValue={round(minValue,5)} obtained with (GD,PD)=({Ggd},{Gpd})")
                 minValue = Value
                 iOptim = igp
                 iOptimGD = ig
                 iOptimPD = ip
             else:
-                print(f"We keep minimal value={round(minValue,5)} obtained with gains (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
+                if verbose2:
+                    print(f"We keep minimal value={round(minValue,5)} obtained with gains (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
 
             Progress = LoopNumber/NumberOfLoops
             PassedTime = time.time() - time0
             RemainingTime = PassedTime/Progress - PassedTime
             
             
-            print(f"Progression current optim: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)}) - \
+            if verbose:
+                print(f"Progression current optim: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)}) - \
 Remains {strtime(RemainingTime)}")
-            print("-------------------------------------------\n")
+                print("-------------------------------------------\n")
 
     bestGains = GainsGD[iOptimGD], GainsPD[iOptimPD]
     
@@ -463,7 +341,6 @@ Remains {strtime(RemainingTime)}")
     criteriasTel = ["VarPiston","VarPistonGD","VarPistonPD"]
     
     Nct = len(criteriasTel)
-    # A=list(np.repeat(GainsGD, Ncb)) ; B = criteriasBase*Ngains
     
     A = list(np.repeat(DITs, NgainsGD*NgainsPD*Nct))
     Btemp = list(np.repeat(GainsGD,Nct*NgainsPD))
@@ -546,7 +423,7 @@ disturbance file to show the results.")
         sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=40, verbose=verbose)
         
         # Launch the simulator
-        sk.loop()
+        sk.loop(verbose=verbose,verbose2=verbose2)
         sk.display('perfarray',WLOfScience=np.median(SpectraForScience),display=display,
                    savedir=savepath,ext='pdf',verbose=verbose2)
     
@@ -559,7 +436,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                         FileInterferometer='',MagnitudeInScienceBand=-1,telescopes=0, 
                         save_all='no',onlySNR=False,ComputeAllPerf=True,
                         savepath='./',figsave='',
-                        display=False,verbose=True,verbose2=False, criterias='light'):
+                        display=False,verbose=False,verbose2=False, criterias='light'):
     """
     Estimates the best couple GD and PD gains after calculating the performance 
     (residual phase) of the servo loop on all the files contained in filedir.
@@ -662,8 +539,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
     Ndit=len(DITf)
     
     ObservingTime = Period*dt
-    print(ObservingTime)
-    print(f"Proposed DITs:{DITs}")
+
     NewDITf=[]#DITf.copy()
     kbefore=[]
     for idit in range(Ndit):
@@ -683,11 +559,13 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
     ThrownFrames = Period%NewDITf
     LengthOfKeptSequence = ListNframes * Period
     
-    print(f"ObservingTimes:{ObservingTime}")
-    print(f"ListNframes :{ListNframes}")
-    print(f"ThrownFrames :{ThrownFrames}")
-    print(f"New DITs:{newDITs}")
-    print(f"Percentage of loss: {np.round(ThrownFrames/LengthOfKeptSequence*100,2)}")
+    if verbose:
+        print(f"ObservingTimes:{ObservingTime}")
+        print(f"Proposed DITs:{DITs}")
+        print(f"ListNframes :{ListNframes}")
+        print(f"ThrownFrames :{ThrownFrames}")
+        print(f"New DITs:{newDITs}")
+        print(f"Percentage of loss: {np.round(ThrownFrames/LengthOfKeptSequence*100,2)}")
     # if ThrownFrames[idit] > 0.05*LengthOfKeptSequence[idit]:
     #     NewIntegrationTimes.remove(IntegrationTimes[idit])
             
@@ -728,13 +606,13 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
             
                 # Launch the simulator
                 if save_all=='light':
-                    sk.loop(savepath,LightSave=True,verbose=verbose)
+                    sk.loop(savepath,LightSave=True,verbose=verbose,verbose2=verbose2)
                 elif save_all=='OPDTrue':
-                    sk.loop(savepath,LightSave='OPDTrue',verbose=verbose)
+                    sk.loop(savepath,LightSave='OPDTrue',verbose=verbose,verbose2=verbose2)
                 elif save_all=='yes':
-                    sk.loop(savepath,LightSave=False,verbose=verbose)
+                    sk.loop(savepath,LightSave=False,verbose=verbose,verbose2=verbose2)
                 elif save_all=='no':
-                    sk.loop(verbose=verbose)
+                    sk.loop(verbose=verbose,verbose2=verbose2)
                 else:
                     raise Exception('save_all param must be "light", "yes" or "no".')
                     
@@ -832,59 +710,63 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                         VarGDdenomUnbiased[:,ig,ip,:] += np.repeat(np.mean(simu.varGDdenomUnbiased,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
                         
-                    IDs.append(config.SimuTimeID)
-                    ThresholdGDmins.append(np.min(config.FT['ThresholdGD']))
-                    ThresholdGDmaxs.append(np.max(config.FT['ThresholdGD']))
+            IDs.append(config.SimuTimeID)
+            ThresholdGDmins.append(np.min(config.FT['ThresholdGD']))
+            ThresholdGDmaxs.append(np.max(config.FT['ThresholdGD']))
+            
+            if optimCriteria=="VarOPD":
+                criteria = VarOPD
+            elif optimCriteria=="FC":
+                criteria = 1-FCArray
+            elif optimCriteria=="SNRSI":
+                criteria = 1/SNRSI
+            elif optimCriteria == "LR":
+                criteria = 1-LockedRatio
+            elif optimCriteria == "LR2":
+                criteria = 1-LR2
+            elif optimCriteria == "WLR":
+                criteria = 1-WLockedRatio
+            elif optimCriteria == "VarCP":
+                if (not telescopes) and (len(telescopes) != 3):
+                    raise Exception('For defining a closure phase, telescopes must be three.')
+                else:
+                    criteria = VarCP
+            else:
+                raise Exception(f'The chosen criteria must be in this list: "LR", "LR2","WLR", "FC", "VarOPD", "VarCP"')
                     
-                    if optimCriteria=="VarOPD":
-                        criteria = VarOPD
-                    elif optimCriteria=="FC":
-                        criteria = 1-FCArray
-                    elif optimCriteria=="SNRSI":
-                        criteria = 1/SNRSI
-                    elif optimCriteria == "LR":
-                        criteria = 1-LockedRatio
-                    elif optimCriteria == "LR2":
-                        criteria = 1-LR2
-                    elif optimCriteria == "WLR":
-                        criteria = 1-WLockedRatio
-                    elif optimCriteria == "VarCP":
-                        if (not telescopes) and (len(telescopes) != 3):
-                            raise Exception('For defining a closure phase, telescopes must be three.')
-                        else:
-                            criteria = VarCP
-                    else:
-                        raise Exception(f'The chosen criteria must be in this list: "LR", "LR2","WLR", "FC", "VarOPD", "VarCP"')
-                            
-                            
-                    if not telescopes:
-                        Value = np.max(np.mean(criteria[:,ig,ip,:], axis=-1))   # Maximum (over DITs) of the averaged value (over baselines)
-                        bestDIT = DITs[np.argmax(np.mean(criteria[:,ig,ip,:], axis=-1))]
-                    else:
-                        itel1,itel2 = telescopes[0]-1, telescopes[1]-1
-                        ib = ct.posk(itel1, itel2, config.NA)
-                        Value = np.max(criteria[:,ig,ip,ib])
-                        bestDIT = DITs[np.argmax(criteria[:,ig,ip,ib])]
                     
-                    print("-------------------------------------------")
-                    print(f'\nComputed value={round(Value,5)}')
-                    if Value < minValue:    
-                        print(f"New value={round(Value,5)} lower than minValue={round(minValue,5)} obtained with (GD,PD)=({Ggd},{Gpd})")
-                        minValue = Value
-                        iOptim = igp
-                        iOptimGD = ig
-                        iOptimPD = ip
-                    else:
-                        print(f"We keep minimal value={round(minValue,5)} obtained with gains (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
+            if not telescopes:
+                Value = np.max(np.mean(criteria[:,ig,ip,:], axis=-1))   # Maximum (over DITs) of the averaged value (over baselines)
+                bestDIT = DITs[np.argmax(np.mean(criteria[:,ig,ip,:], axis=-1))]
+            else:
+                itel1,itel2 = telescopes[0]-1, telescopes[1]-1
+                ib = ct.posk(itel1, itel2, config.NA)
+                Value = np.max(criteria[:,ig,ip,ib])
+                bestDIT = DITs[np.argmax(criteria[:,ig,ip,ib])]
+            
+            if verbose2:
+                print("-------------------------------------------")
+                print(f'\nComputed value={round(Value,5)}')
+            if Value < minValue:    
+                if verbose2:
+                    print(f"New value={round(Value,5)} lower than minValue={round(minValue,5)} obtained with (GD,PD)=({Ggd},{Gpd})")
+                minValue = Value
+                iOptim = igp
+                iOptimGD = ig
+                iOptimPD = ip
+            else:
+                if verbose2:
+                    print(f"We keep minimal value={round(minValue,5)} obtained with gains (GD,PD)=({GainsGD[iOptimGD]},{GainsPD[iOptimPD]})")
 
             Progress = LoopNumber/NumberOfLoops
             PassedTime = time.time() - time0
             RemainingTime = PassedTime/Progress - PassedTime
             
             
-            print(f"Progression current optim: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)}) - \
-Remains {strtime(RemainingTime)}")
-            print("-------------------------------------------\n")
+            if verbose:
+                print(f"Progression current optim: {round(LoopNumber/NumberOfLoops*100)}% ({strtime(PassedTime)}) - \
+    Remains {strtime(RemainingTime)}")
+                print("-------------------------------------------\n")
 
     if not ComputeAllPerf:
         return
@@ -937,8 +819,6 @@ Remains {strtime(RemainingTime)}")
         base_5d = np.transpose(base_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order
         
         base_2d = base_5d.reshape([NDIT*Ncb*NgainsGD*NgainsPD,NIN], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
-        
-        # Need another dataframe only for Closure Phase (dimension 10)
         
         resultsBasedf = pd.DataFrame(data=base_2d, columns=[A,B,C,C2,C3,C4,D], index=ichint)
         
@@ -995,7 +875,6 @@ Remains {strtime(RemainingTime)}")
         # Need another dataframe only for Closure Phase (dimension 10)
         
         resultsTeldf = pd.DataFrame(data=tel_2d, columns=[A,B,C,C2,C3,C4,D], index=telint)
-        
         
         if not telescopes:
             Base_av = resultsBasedf.mean(axis=0).to_frame(name='Average')
@@ -1057,7 +936,7 @@ Remains {strtime(RemainingTime)}")
             sk.update_config(DisturbanceFile=DisturbanceFile,checkperiod=40, verbose=verbose)
             
             # Launch the simulator
-            sk.loop()
+            sk.loop(verbose=verbose, verbose2=verbose2)
             sk.display('perfarray',WLOfScience=np.median(SpectraForScience),display=display,
                        savedir=savepath,ext='pdf',verbose=verbose2)
     
