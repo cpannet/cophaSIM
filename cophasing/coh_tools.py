@@ -10,7 +10,7 @@ import os, pkg_resources
 datadir = 'data/'
 
 import numpy as np
-from scipy.special import jv
+from scipy.special import jv,binom
 from scipy import interpolate
 
 from astropy.time import Time
@@ -777,7 +777,7 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='',
     InterfArray = get_array(name=filepath)
     
     NB = NA**2
-    NC = (NA-2)*(NA-1)
+    NC = int(binom(4,3))
     
     # Transportation of the star light into the interferometer
     Throughput = np.reshape(InterfArray.TelSurfaces*InterfArray.TelTransmissions,[1,NA])
@@ -1168,8 +1168,8 @@ def get_CfObj(filepath, spectra,verbose=False):
         NW, NBfile = CoherentIrradiance.shape
     NAfile = int(np.sqrt(NBfile))
 
-    from .config import NA, NB
-    NC = (NA-2)*(NA-1)
+    from .config import NA, NB, NC
+    
     if NW!=1:
         ClosurePhase = np.zeros([NW,NC])
         FinalCoherentIrradiance = np.zeros([NW,NB])*1j
@@ -1200,7 +1200,7 @@ def get_CfObj(filepath, spectra,verbose=False):
             for ia in range(NA):
                 for iap in range(ia+1,NA):
                     for iapp in range(iap+1,NA):
-                        ic = poskfai(ia,iap,iapp,NAfile)
+                        ic = poskfai(ia,iap,iapp,NA)
                         ci1 = CoherentIrradiance[:,ia*NAfile+iap]
                         ci2 = CoherentIrradiance[:,iap*NAfile+iapp]
                         ci3 = CoherentIrradiance[:,iapp*NAfile+ia]
@@ -1209,7 +1209,7 @@ def get_CfObj(filepath, spectra,verbose=False):
             for ia in range(NA):
                 for iap in range(ia+1,NA):
                     for iapp in range(iap+1,NA):
-                        ic = poskfai(ia,iap,iapp,NAfile)
+                        ic = poskfai(ia,iap,iapp,NA)
                         ci1 = CoherentIrradiance[ia*NAfile+iap]
                         ci2 = CoherentIrradiance[iap*NAfile+iapp]
                         ci3 = CoherentIrradiance[iapp*NAfile+ia]
@@ -2473,10 +2473,11 @@ def check_semiunitary(A2P):
     return
 
 def check_cp(gd):
+    
     NIN=len(gd) ; 
     NA = int(1/2+np.sqrt(1/4+2*NIN))
-    NC=(NA-1)*(NA-2)/2
-    NA=6;NC=10
+    NC=int(binom(4,3)/2)
+
     cp=np.zeros(NC)
     for iap in range(1,NA):
         for iapp in range(iap+1,NA):

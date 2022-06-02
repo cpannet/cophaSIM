@@ -99,17 +99,18 @@ SOURCE:
     # Redundant number of baselines
     NB = NA**2
     
-    # Non-redundant number of Closure Phase
-    NC = int((NA-2)*(NA-1))
+    from scipy.special import binom
+    # Number of Closure Phases
+    NC = int(binom(4,3))
     NIN = int(NA*(NA-1)/2)
     # NP = config.FS['NP']
     
-# TEMPORAL PARAMETERS
+    # TEMPORAL PARAMETERS
     
     MT=int(NT/OT)                        # Total number of temporal samples
     timestamps = np.arange(NT)*dt       # Time sampling in [ms]
     
-# SPECTRAL PARAMETERS
+    # SPECTRAL PARAMETERS
     
     if len(spectra) == 0:
         raise ValueError('Lambda array required')      # Array which contains our signal's 
@@ -1237,15 +1238,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     from matplotlib.ticker import AutoMinorLocator
     
     # Define the list of baselines
-    baselines = []
-    for ia in range(1,7):
-        for iap in range(ia+1,7):
-            baselines.append(f'{ia}{iap}')
+    baselines = config.FS['ich']
             
     # Define the list of closures
     closures = []
-    for iap in range(2,7):
-        for iapp in range(iap+1,7):
+    for iap in range(2,NA+1):
+        for iapp in range(iap+1,NA+1):
             closures.append(f'{1}{iap}{iapp}')
     
     colors = tol_cset('muted')
@@ -3971,7 +3969,7 @@ def ReadCf(currCfEstimated):
     # (eliminates photometric and conjugate terms)
     currCfEstimatedNIN = np.zeros([MW, NIN])*1j
     for imw in range(MW):    
-        from .ct import NB2NIN
+        from .coh_tools import NB2NIN
         currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
         
     # Save coherent flux and photometries in stack

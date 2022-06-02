@@ -190,13 +190,14 @@ class ScienceObject():
         self.Name = Name
         self.Star1 = {'AngDiameter':0.01, 'Position':(0,0),'Hmag':0}
 
+from scipy.special import binom
 
 # Interferometer
 Name = 'CHARA'
-NA=6                    # number of apertures
-NB=NA**2                # total number of baselines
-NIN=int((NA-2)*(NA+1)/2+1)    # Number of independant interferometric coherences
-NC = int((NA-2)*(NA-1))   # Number of independant closure phases
+NA=6                        # number of apertures
+NB=NA**2                    # total number of baselines
+NIN=int((NA-2)*(NA+1)/2+1)  # Number of independant interferometric coherences
+NC = int(binom(4,3))        # Number of closure phases
 NT=512
 MT=NT
 OT=1
@@ -209,7 +210,7 @@ ND=0
 dyn=0
 
 # Source
-spectra=np.linspace(1.5,1.75,NW)        # Micro-sampling wavelength
+spectra=np.linspace(1.45,1.75,NW)       # Micro-sampling wavelength
 spectraM=spectra                        # Macro-sampling wavelength
 PDspectra=np.mean(spectra)              # Mean wavelength
 spectrum=np.ones_like(spectra)          # Source distribution spectral power
