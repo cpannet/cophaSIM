@@ -777,7 +777,7 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='',
     InterfArray = get_array(name=filepath)
     
     NB = NA**2
-    NC = int(binom(4,3))
+    NC = int(binom(NA,3))
     
     # Transportation of the star light into the interferometer
     Throughput = np.reshape(InterfArray.TelSurfaces*InterfArray.TelTransmissions,[1,NA])
@@ -2476,7 +2476,7 @@ def check_cp(gd):
     
     NIN=len(gd) ; 
     NA = int(1/2+np.sqrt(1/4+2*NIN))
-    NC=int(binom(4,3)/2)
+    NC=int(binom(NA,3)/2)
 
     cp=np.zeros(NC)
     for iap in range(1,NA):
