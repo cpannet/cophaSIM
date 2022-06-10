@@ -194,10 +194,10 @@ from scipy.special import binom
 
 # Interferometer
 Name = 'CHARA'
-NA=6                        # number of apertures
-NB=NA**2                    # total number of baselines
-NIN=int((NA-2)*(NA+1)/2+1)  # Number of independant interferometric coherences
-NC = int(binom(4,3))        # Number of closure phases
+NA=6                            # number of apertures
+NB=NA**2                        # total number of baselines
+NIN=int(NA*(NA-1)/2)            # Number of independant OPDs
+NC = int(binom(NA,3))           # Number of closure phases
 NT=512
 MT=NT
 OT=1

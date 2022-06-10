@@ -101,7 +101,7 @@ SOURCE:
     
     from scipy.special import binom
     # Number of Closure Phases
-    NC = int(binom(4,3))
+    NC = int(binom(NA,3))
     NIN = int(NA*(NA-1)/2)
     # NP = config.FS['NP']
     
