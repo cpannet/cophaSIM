@@ -943,8 +943,8 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
             
             # Launch the simulator
             sk.loop(verbose=verbose, verbose2=verbose2)
-            sk.display('perfarray',WLOfScience=np.median(SpectraForScience),display=display,
-                       savedir=savepath,ext='pdf',verbose=verbose2)
+            # sk.display('perfarray',WLOfScience=np.median(SpectraForScience),display=display,
+            #            savedir=savepath,ext='pdf',verbose=verbose2)
     
         return bestCombi, resultsBasedf,  resultsClosuredf, resultsTeldf
 

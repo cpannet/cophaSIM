@@ -1598,7 +1598,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                     if newThresholdGD[ib] ==0:
                         newThresholdGD[ib] = 10
                         
-            newThresholdPD = np.min(newThresholdGD)/1.5
+            newThresholdPD = np.min(newThresholdGD)*2
             
             config.FT['ThresholdGD'] = newThresholdGD
             config.FT['ThresholdPD'] = newThresholdPD

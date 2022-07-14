@@ -8,6 +8,7 @@ import pkg_resources
 import numpy as np
 # import cupy as cp # NumPy-equivalent module accelerated with NVIDIA GPU  
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 
 from importlib import reload  # Python 3.4+ only.
@@ -1172,10 +1173,10 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
               - State-machine: 'state'\n")
         return
     
-    if not display:
-        import matplotlib
-        currentGUI = plt.get_backend()
-        matplotlib.use('Qt5Agg')
+    # if not display:
+        # 
+        # currentGUI = plt.get_backend()
+        # matplotlib.use('Qt5Agg')
     
     if (len(savedir)) and (not os.path.exists(savedir)):
         os.makedirs(savedir)
@@ -3124,8 +3125,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 plt.show()
         config.newfig+=1
         
-    if not display:
-        matplotlib.use(currentGUI)
+    # if not display:
+    #     matplotlib.use(currentGUI)
         
     pass
 
