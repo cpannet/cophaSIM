@@ -132,7 +132,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-        config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+        config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
         
         # Resolution of the fringe sensor
         midlmbda = np.mean(spectra)
@@ -334,7 +334,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-        config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+        config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
         
         # Resolution of the fringe sensor
         midlmbda = np.mean(spectra)
@@ -548,7 +548,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])             # Sky background (bias)
         np.random.seed(config.seedron)
-        config.FS['sigsky']=np.random.randn(MW,NP)       # Dark Noise [ron=1rms]
+        config.FS['sigmap']=np.random.randn(MW,NP)       # Dark Noise [ron=1rms]
 
         # Now we pike up the P2VM and sort it according to wavelengths
         V2PM = v2pmdico['V2PM']

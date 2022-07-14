@@ -26,7 +26,7 @@ from .decorators import timer
 def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, ND=1, 
              spectra = [], spectraM=[],PDspectra=0,
              spectrum = [], mode = 'search',
-             fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigsky=[],imsky=[],
+             fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigmap=[],imsky=[],
              ft = 'integrator', state = 0,
              noise=True,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
              seedph=100, seedron=100, seeddist=100,
@@ -174,12 +174,12 @@ SOURCE:
     
     if imsky:
         config.FS['imsky'] = imsky
-    if sigsky:
-        config.FS['sigsky'] = sigsky
+    if sigmap:
+        config.FS['sigmap'] = sigmap
     
     if noise:
         np.random.seed(seedron+60)
-        config.FS['sigsky'] = np.random.randn(MW,config.FS['NP'])*ron
+        config.FS['sigmap'] = np.random.randn(MW,config.FS['NP'])*ron
     
     config.phnoise=phnoise
     config.G = G
@@ -270,9 +270,9 @@ def update_config(verbose=False,**kwargs):
     if 'ron' in kwargs.keys():
         ron = kwargs['ron']
         config.noise=True
-        config.FS['sigsky'] = np.random.randn(config.MW,config.FS['NP'])*ron
+        config.FS['sigmap'] = np.random.randn(config.MW,config.FS['NP'])*ron
         if verbose:
-            print(f' - Updated sigsky for ron={ron}.')
+            print(f' - Updated sigmap for ron={ron}.')
         
     return
 
@@ -2955,7 +2955,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         len2 = NIN//2 ; len1 = NIN-len2
         basecolors = list(colors[:len1]+colors[:len2])
         
-        SNR = np.sqrt(simu.SquaredSNRMovingAveragePD)
+        SNRGD = np.sqrt(simu.SquaredSNRMovingAverageGDUnbiased)
         title = "SNR GD"
         plt.close(title)
         fig=plt.figure(title, clear=True)
@@ -2965,21 +2965,21 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax2.set_title(f"Baselines from {config.FS['ich'][len1]} to {config.FS['ich'][-1]}")
         
         for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+            ax1.plot(t[timerange],SNRGD[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
 
         for iBase in range(len1,NIN):   # Second serie
-            ax2.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+            ax2.plot(t[timerange],SNRGD[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
 
-        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
+        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNRGD),
                    color='k', linestyle=':')
-        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
+        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNRGD),
                    color='k', linestyle=':')
         
-        maxSNR = np.nanmax(SNR,axis=0)
+        maxSNR = np.nanmax(SNRGD,axis=0)
         ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
         ax3.bar(baselines[:len1],config.FT['ThresholdGD'][:len1], fill=False,edgecolor='k')
 
@@ -3036,10 +3036,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         for iBase in range(len1):   # First serie
             ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            
+            if 'ThresholdGD' in config.FT.keys():
+                ax1.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+
         for iBase in range(len1,NIN):   # Second serie
             ax2.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            
+            if 'ThresholdGD' in config.FT.keys():
+                ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+
         if 'ThresholdPD' in config.FT.keys():
             ax1.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
             ax2.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
@@ -3052,6 +3056,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         maxSNR = np.nanmax(SNR,axis=0)
         ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
         ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(maxSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
+        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(config.FT['ThresholdGD'][len1:])+[0]*(len1-len2), fill=False,edgecolor='k')
         
         ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
         ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
@@ -3156,8 +3161,8 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
         -VarOPD                 # Temporal Variance OPD [µm]
-        -TempVarPD              # Temporal Variance PD [rad]
-        -TempVarGD              # Temporal Variance of GD [rad]
+        -VarPDEst              # Temporal Variance PD [rad]
+        -VarGDEst              # Temporal Variance of GD [rad]
         -VarCPD                 # Temporal Variance of CPD [rad]
         -VarCGD                 # Temporal Variance of CGD [rad]
         -FringeContrast         # Fringe Contrast [0,1] at given wavelengths
@@ -3259,11 +3264,12 @@ WavelengthOfInterest
     simu.VarOPD=np.zeros(NIN)
     simu.VarGDRes=np.zeros(NIN)
     simu.VarPDRes=np.zeros(NIN)
+    simu.VarGDEst=np.zeros(NIN)
+    simu.VarPDEst=np.zeros(NIN)
     simu.VarPiston=np.zeros(NA)
     simu.VarPistonGD=np.zeros(NA)
     simu.VarPistonPD=np.zeros(NA)
 
-    simu.TempVarPD=np.zeros(NIN) ; simu.TempVarGD=np.zeros(NIN)
     simu.VarCPD =np.zeros(NC); simu.VarCGD=np.zeros(NC)
     
     simu.LockedRatio=np.zeros(NIN)          # sig_opd < lambda/p
@@ -3292,6 +3298,8 @@ WavelengthOfInterest
         
         GDResVar = np.var(simu.GDResidual2[InFrame:OutFrame,:],axis=0)
         PDResVar = np.var(simu.PDResidual2[InFrame:OutFrame,:],axis=0)
+        GDEstVar = np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
+        PDEstVar = np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
         PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
         PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
         PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
@@ -3305,11 +3313,11 @@ WavelengthOfInterest
         
         simu.VarPDRes += 1/Ndit*PDResVar
         simu.VarGDRes += 1/Ndit*GDResVar
+        simu.VarPDEst += 1/Ndit*PDEstVar
+        simu.VarGDEst += 1/Ndit*GDEstVar
         simu.VarPiston += 1/Ndit*PistonVar
         simu.VarPistonGD += 1/Ndit*PistonVarGD
         simu.VarPistonPD += 1/Ndit*PistonVarPD
-        simu.TempVarPD += 1/Ndit*np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
-        simu.TempVarGD += 1/Ndit*np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
         simu.VarCPD += 1/Ndit*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
         simu.VarCGD += 1/Ndit*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
         
@@ -3358,7 +3366,7 @@ WavelengthOfInterest
     plt.show()
     config.newfig += 1
     
-    observable = simu.TempVarPD*(config.PDspectra/2/np.pi)
+    observable = simu.VarPDEst*(config.PDspectra/2/np.pi)
     
     plt.figure(f'Variance Estimated PD @{round(config.PDspectra,2)}µm')    
     plt.ylim([np.min(observable),np.max(observable)])
@@ -3372,7 +3380,7 @@ WavelengthOfInterest
     config.newfig += 1
     
     
-    observable = simu.TempVarGD*(config.PDspectra/2/np.pi)*config.FS['R']
+    observable = simu.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
     
     plt.figure(f'Variance Estimated GD @{round(config.PDspectra,2)}µm')    
     plt.ylim([np.min(observable),np.max(observable)])
@@ -3436,8 +3444,8 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
     Processes the performance of the fringe-tracking starting at the StartingTime
     Observables processed:
         -VarOPD                 # Temporal Variance OPD [µm]
-        -TempVarPD              # Temporal Variance PD [rad]
-        -TempVarGD              # Temporal Variance of GD [rad]
+        -VarPDEst              # Temporal Variance PD [rad]
+        -VarGDEst              # Temporal Variance of GD [rad]
         -VarCPD                 # Temporal Variance of CPD [rad]
         -VarCGD                 # Temporal Variance of CGD [rad]
         -FringeContrast         # Fringe Contrast [0,1] at given wavelengths
@@ -3595,8 +3603,8 @@ MeanWavelength
         simu.VarGDRes=np.zeros([Ndit,NIN])
         simu.VarPDRes=np.zeros([Ndit,NIN])
     
-        simu.TempVarPD=np.zeros([Ndit,NIN])
-        simu.TempVarGD=np.zeros([Ndit,NIN])
+        simu.VarPDEst=np.zeros([Ndit,NIN])
+        simu.VarGDEst=np.zeros([Ndit,NIN])
         
         simu.WLockedRatio = np.zeros([Ndit,NIN])
         simu.WLR2 = np.zeros([Ndit,NIN])
@@ -3681,8 +3689,8 @@ MeanWavelength
                 simu.VarPDRes[idit] += 1/Nframes*PDResVar
                 simu.VarGDRes[idit] += 1/Nframes*GDResVar
 
-                simu.TempVarPD[idit] += 1/Nframes*np.var(simu.PDEstimated2[InFrame:OutFrame,:],axis=0)
-                simu.TempVarGD[idit] += 1/Nframes*np.var(simu.GDEstimated2[InFrame:OutFrame,:],axis=0)
+                simu.VarPDEst[idit] += 1/Nframes*np.var(simu.PDEstimated2[InFrame:OutFrame,:],axis=0)
+                simu.VarGDEst[idit] += 1/Nframes*np.var(simu.GDEstimated2[InFrame:OutFrame,:],axis=0)
                 simu.VarCPD[idit] += 1/Nframes*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
                 simu.VarCGD[idit] += 1/Nframes*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
                 
@@ -3715,7 +3723,7 @@ MeanWavelength
         plt.show()
         config.newfig += 1
         
-        observable = simu.TempVarPD*(config.PDspectra/2/np.pi)
+        observable = simu.VarPDEst*(config.PDspectra/2/np.pi)
         
         plt.figure(f'Variance Estimated PD @{round(config.PDspectra,2)}µm')    
         plt.ylim([np.min(observable),np.max(observable)])
@@ -3729,7 +3737,7 @@ MeanWavelength
         config.newfig += 1
         
         
-        observable = simu.TempVarGD*(config.PDspectra/2/np.pi)*config.FS['R']
+        observable = simu.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
         
         plt.figure(f'Variance Estimated GD @{round(config.PDspectra,2)}µm')    
         plt.ylim([np.min(observable),np.max(observable)])
@@ -3784,9 +3792,115 @@ MeanWavelength
     return NewIntegrationTimes
 
 
+def BodeDiagrams(Input,Output,Command,timestamps,
+                 fbonds=[], gain=0, details='', window='hanning',
+                 display=True, figsave=False, figdir='',ext='pdf'):
+     
+    nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
+
+    FrequencySampling1 = np.fft.fftfreq(nNT, dt)
+    if len(fbonds):
+        fmin, fmax = fbonds
+    else:
+        fmin=0
+        fmax=np.max(FrequencySampling1)
+    
+    PresentFrequencies = (FrequencySampling1 > fmin) \
+        & (FrequencySampling1 < fmax)
+        
+    FrequencySampling = FrequencySampling1[PresentFrequencies]
+    
+    if window =='hanning':
+        windowsequence = np.hanning(nNT)
+    else:
+        windowsequence = np.ones(nNT)
+        
+    Output = Output*windowsequence
+    Input = Input*windowsequence
+    Command = Command*windowsequence
+    
+    FTResidues = np.fft.fft(Output)[PresentFrequencies]
+    FTTurb = np.fft.fft(Input)[PresentFrequencies]
+    FTCommand = np.fft.fft(Command)[PresentFrequencies]
+    
+    FTrej = FTResidues/FTTurb
+    FTBO = FTCommand/FTResidues
+    FTBF = FTCommand/FTTurb
+
+    if display:
+        plt.rcParams.update(rcParamsForBaselines)
+        title = f'{details} - Bode diagrams'
+        fig = plt.figure(title, clear=True)
+        fig.suptitle(title)
+        ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+        
+        ax1.plot(FrequencySampling, np.abs(FTrej))
+        
+        if gain:
+            gains = [gain] ; delays=np.arange(10,60,10)
+            styles=['-','--',':']
+            linestyles = []
+            for ig in range(len(gains)):
+                gain=gains[ig]
+                linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
+                for idel in range(len(delays)):
+                    gain=gains[ig];delay=delays[idel]
+                    ftr=model(FrequencySampling,delay,gain)
+                    ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
+                    if ig==len(gains)-1:
+                        linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
+            ax1.legend(handles=linestyles)
+            
+
+        # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
+        ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
+        ax1.set_ylabel('FTrej')
+        
+        ax2.plot(FrequencySampling, np.abs(FTBO))
+        ax2.set_yscale('log') #; ax2.set_ylim(1e-3,5)
+        ax2.set_ylabel("FTBO")
+        
+        ax3.plot(FrequencySampling, np.abs(FTBF))
+    
+        ax3.set_xlabel('Frequencies [Hz]')
+        ax3.set_ylabel('FTBF')
+        ax3.set_xscale('log')
+        ax3.set_yscale('log')
+        ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
+
+        if figsave:
+            prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+            figname = "BodeDiagrams"
+            if isinstance(ext,list):
+                for extension in ext:
+                    plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+            else:
+                plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
 
 
-def SpectralAnalysis(OPD = (1,2),TimeBonds=0):
+        fig = plt.figure(f'{details} - Temporal sampling used', clear=True)
+        ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+        
+        ax1.plot(timestamps, Input)
+        # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
+    
+        ax1.set_ylabel('Open loop')
+        
+        ax2.plot(timestamps, Output)
+        ax2.set_ylabel("Close loop")
+        
+        ax3.plot(timestamps,Command)
+    
+        ax3.set_xlabel('Timestamps [s]')
+        ax3.set_ylabel('Command')
+        
+        
+    return FrequencySampling, FTrej, FTBO, FTBF
+
+
+
+def SpectralAnalysis(OPD = (1,2),TimeBonds=0, details='', window='hanning',
+                     figsave=False, figdir='',ext='pdf'):
     """
     Plot the three Transfer Function of the servo loop controlling the OPD between
     the telescopes OPD[0] and OPD[1]
@@ -3828,6 +3942,15 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0):
     Turb = simu.OPDDisturbance[SampleIndices,ib]
     Command = simu.OPDCommand[SampleIndices,ib]
     
+    if window =='hanning':
+        windowsequence = np.hanning(nNT)
+    else:
+        windowsequence = np.ones(nNT)
+        
+    Residues = Residues*windowsequence
+    Turb = Turb*windowsequence
+    Command = Command*windowsequence
+    
     FTResidues = np.fft.fft(Residues)[PresentFrequencies]
     FTTurb = np.fft.fft(Turb)[PresentFrequencies]
     FTCommand = np.fft.fft(Command)[PresentFrequencies]
@@ -3836,26 +3959,30 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0):
     FTBO = FTCommand/FTResidues
     FTBF = FTCommand/FTTurb
 
-
     fig = plt.figure('Rejection Transfer Function')
     ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
     
-    ax1.plot(FrequencySampling, np.abs(FTrej))
-    # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
-    ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
-    ax1.set_ylabel('FTrej')
+    ax1.plot(FrequencySampling, 20*np.log10(np.abs(FTrej)))
+    ax1.set_ylabel('FTrej\nGain [dB]')
     
-    ax2.plot(FrequencySampling, np.abs(FTBO))
-    ax2.set_yscale('log') #; ax2.set_ylim(1e-3,5)
-    ax2.set_ylabel("FTBO")
+    ax2.plot(FrequencySampling, 20*np.log10(np.abs(FTBO)))
+    ax2.set_ylabel("FTBO\nGain [dB]")
     
-    ax3.plot(FrequencySampling, np.abs(FTBF))
+    ax3.plot(FrequencySampling, 20*np.log10(np.abs(FTBF)))
 
     ax3.set_xlabel('Frequencies [Hz]')
-    ax3.set_ylabel('FTBF')
+    ax3.set_ylabel('FTBF\nGain [dB]')
     ax3.set_xscale('log')
-    ax3.set_yscale('log')
-    #ax3.set_ylim(1e-2,1e1)
+
+
+    if figsave:
+        prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+        figname = "BodeDiagrams"
+        if isinstance(ext,list):
+            for extension in ext:
+                plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+        else:
+            plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
 
     pass
 

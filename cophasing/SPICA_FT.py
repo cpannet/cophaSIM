@@ -1381,7 +1381,7 @@ def getvar():
     
     M = config.M            # Amplification ratio camera
     
-    sigsky = config.FS['sigsky']  # Background noise
+    sigmap = config.FS['sigmap']  # Background noise
     imsky = config.FS['imsky']    # Sky image before observation
     Demod = config.FS['MacroP2VM']    # Macro P2VM matrix used for demodulation
     ElementsNormDemod = config.FS['ElementsNormDemod']
@@ -1390,7 +1390,7 @@ def getvar():
     
     DemodGRAV = config.FS['MacroP2VMgrav']
     # Flux variance calculation (eq. 12)
-    varFlux = sigsky**2 + M*(image - imsky)
+    varFlux = sigmap**2 + M*(image - imsky)
     simu.varFlux[it] = varFlux
     
     """
@@ -1444,7 +1444,7 @@ def getvar():
     
     simu.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
     simu.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
-    simu.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda)-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14
+    simu.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda))#-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14
     #simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
     simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
     
@@ -1460,7 +1460,9 @@ def getvar():
     return varPD, varGD
 
 
-def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel=6):
+def SetThreshold(TypeDisturbance="CophasedThenForeground",
+                 manual=False, scan=False,display=False,
+                 verbose=True,scanned_tel=6):
     """
     This function enables to estimate the threshold GD for the state-machine.
     It scans the coherence envelop of the FS and displays the estimated SNR².
@@ -1499,7 +1501,7 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
         updateFTparams(GainPD=0, GainGD=0, search=False, verbose=verbose)
         
         # Launch the scan
-        sk.loop()
+        sk.loop(verbose)
         
         if manual:
             sk.display('snr',WLOfTrack=1.6, pause=True)
@@ -1542,7 +1544,7 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
     
     else:
         
-        DisturbanceFile = "NoDisturbance"
+        DisturbanceFile = TypeDisturbance
         
         NT=200
             
@@ -1557,10 +1559,10 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
         updateFTparams(GainPD=0, GainGD=0, search=False, verbose=verbose)
         
         # Launch the scan
-        sk.loop()
+        sk.loop(verbose=verbose)
         
         if manual:
-            sk.display('detector',WLOfTrack=1.6, pause=True)
+            sk.display('snr','detector',WLOfTrack=1.6, pause=True)
             test1 = input("Set all threshold to same value? [y/n]")
             if (test1=='y') or (test1=='yes'):    
                 newThresholdGD = float(input("Set the Threshold GD: "))
@@ -1575,18 +1577,38 @@ def SetThreshold(manual=False, scan=False,display=False,verbose=True,scanned_tel
         else:
             from cophasing import simu,coh_tools
             
-            ind=100
-            
-            newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAveragePD[ind,:])])
+            if TypeDisturbance=='NoDisturbance':
+                ind=100
+                newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAveragePD[ind,:])])
  
-            config.FT['ThresholdGD'] = newThresholdGD
+            elif TypeDisturbance == 'CophasedThenForeground':
+                CophasedInd = 50 ; ForegroundInd = 180
+                CophasedRange = range(50,100)
+                ForegroundRange = range(160,200)
+                newThresholdGD = np.ones(config.NIN)
 
-            sk.display('detector',WLOfTrack=1.6, pause=True,display=display)
+                for ib in range(config.NIN):
+                    SNRcophased = np.mean(np.sqrt(simu.SquaredSNRMovingAveragePD[CophasedRange,ib]))
+                    SNRfg = np.mean(np.sqrt(simu.SquaredSNRMovingAveragePD[ForegroundRange,ib]))
+                    fgstd = np.std(np.sqrt(simu.SquaredSNRMovingAveragePD[ForegroundRange,ib]))
+                    cophasedstd = np.std(np.sqrt(simu.SquaredSNRMovingAveragePD[CophasedRange,ib]))
+                    
+                    # Set threshold to a value between max and foreground with a lower limit defined by the std of foreground.
+                    newThresholdGD[ib] = np.max([1.5,SNRfg + 10*cophasedstd,SNRfg+0.2*(SNRcophased-SNRfg)])
+                    if newThresholdGD[ib] ==0:
+                        newThresholdGD[ib] = 10
+                        
+            newThresholdPD = np.min(newThresholdGD)/1.5
+            
+            config.FT['ThresholdGD'] = newThresholdGD
+            config.FT['ThresholdPD'] = newThresholdPD
+
+            sk.display('opd','snr','detector',WLOfTrack=1.6, pause=True,display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)
         updateFTparams(GainPD=gainPD, GainGD=gainGD, search=search, 
-                       ThresholdGD=newThresholdGD,
+                       ThresholdGD=newThresholdGD,ThresholdPD=newThresholdPD,
                        verbose=verbose)
     
     return newThresholdGD

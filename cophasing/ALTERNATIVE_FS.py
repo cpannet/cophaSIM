@@ -175,7 +175,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-        config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+        config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
         
         # Resolution of the fringe sensor
         midlmbda = np.mean(spectra)
@@ -481,7 +481,7 @@ given in config ({NA}).")
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-        config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+        config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
         
         # Resolution of the fringe sensor
         midlmbda = np.mean(spectra)
@@ -713,7 +713,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-        config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+        config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
         
         # Resolution of the fringe sensor
         midlmbda = np.mean(spectra)
@@ -879,7 +879,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         
 #         # Noise maps
 #         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-#         config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+#         config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
         
 #         # Resolution of the fringe sensor
 #         midlmbda = np.mean(spectra)

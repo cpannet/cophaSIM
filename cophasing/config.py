@@ -273,29 +273,3 @@ timestamps = np.arange(NT)*dt       # Timestamps in [ms]
 
 verbose,vebose2=False,False
 
-
-# a_dict={}
-
-# var_names = [name for name in dir() 
-#              if ("_" not in name) 
-#              and ("V2PM" not in name) 
-#              and ("P2VM" not in name)
-#              and ("timestamp" not in name)]
-
-# for var_name in var_names:
-#     a_dict[var_name] = eval(var_name)
-# # Tests with classes
-# # PC = FringeTracker.PistonCalculator()
-# # FS = FringeTracker.FringeSensor()
-
-# with open('myfile.txt', 'w') as f:
-#     print(a_dict, file=f)
-    
-# f1=open("myfile.txt","r+")
-# input=f1.read()
-# input=input.replace('), ',')\n')
-# input=input.replace('}, ','}\n')
-# f2=open("myfile.txt","w+")
-# f2.write(input)
-# f1.close()
-# f2.close()

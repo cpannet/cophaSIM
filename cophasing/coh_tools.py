@@ -1259,6 +1259,23 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=False):
         if DisturbanceFile == 'NoDisturbance':
             PistonDisturbance = np.zeros([NT,NA])
             TransmissionDisturbance = np.ones([NT,NW,NA])
+            
+        elif DisturbanceFile == 'Foreground':
+            Lc = config.FS['R']*config.PDspectra
+            PistonDisturbance = np.zeros([NT,NA])
+            for ia in range(NA):  # décoherencing of all telescopes
+                PistonDisturbance[:,ia]=(ia-2)*2*Lc
+            TransmissionDisturbance = np.ones([NT,NW,NA])
+            
+        elif DisturbanceFile == 'CophasedThenForeground':
+            Lc = config.FS['R']*config.PDspectra
+            PistonDisturbance = np.zeros([NT,NA])
+            for ia in range(NA):  # décoherencing of all telescopes from it=100.
+                PistonDisturbance[100:,ia]=(ia-2)*2*Lc
+            TransmissionDisturbance = np.ones([NT,NW,NA])
+    
+        else:
+            raise Exception("DisturbanceFile doesn't correspond to any valid case.")
     
     else:
         filetimestamps, filespectra, PistonDisturbance, TransmissionDisturbance,_,_,_,_ = get_infos(DisturbanceFile)
@@ -1440,7 +1457,7 @@ def generate_spectra(lmbda1, lmbda2, OW, MW=0, R=0, spectraband=[], mode='linear
         for i in range(MW):
             sigbottom = sigma[i]-deltasig/2
             sigtop = sigma[i]+deltasig/2
-            sigma_temp = np.linspace(sigbottom, sigtop, OW)
+            sigma_temp = np.linspace(sigbottom, sigtop, OW+1)[1:]
             sigma_os = np.concatenate((sigma_os,sigma_temp))
         spectra_os = np.sort(1/sigma_os)
         
@@ -1451,7 +1468,7 @@ def generate_spectra(lmbda1, lmbda2, OW, MW=0, R=0, spectraband=[], mode='linear
         for i in range(MW):
             wlbottom = spectra[i]-deltalmbda/2
             wltop = spectra[i]+deltalmbda/2
-            spectra_temp = np.linspace(wlbottom, wltop, OW)
+            spectra_temp = np.linspace(wlbottom, wltop, OW+1)[1:]
             spectra_os = np.concatenate((spectra_os,spectra_temp))
     
     else:
@@ -2265,6 +2282,8 @@ def studyP2VM(*args,savedir='',ext='pdf',nfig=0):
 
         
     return dico
+
+
 
 def poskfai(ia,iap,iapp,N):
     """

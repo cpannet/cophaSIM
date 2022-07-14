@@ -83,6 +83,8 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
     VarOPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])         # Phase variances
     VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances
     VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances
+    VarGDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances
+    VarPDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances
     InstVarPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
     InstVarGD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
     InstVarGDUnbiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
@@ -637,8 +639,10 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                         NDIT=len(newDITs) ; DITs = newDITs
                         
                         VarOPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])         # Phase variances
-                        VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances
-                        VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances
+                        VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances after Igd dot
+                        VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances after Ipd dot
+                        VarGDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD estimator variances 
+                        VarPDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD estimator variances
                         
                         FCArray = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])        # Contains the fringe contrasts
                         LockedRatio = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])    # Locked ratio
@@ -675,6 +679,8 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                     VarCP[:,ig,ip,:] += simu.VarCPD/Nfiles
                     VarGDRes[:,ig,ip,:] += simu.VarGDRes/Nfiles
                     VarPDRes[:,ig,ip,:] += simu.VarPDRes/Nfiles
+                    VarGDEst[:,ig,ip,:] += simu.VarGDEst/Nfiles
+                    VarPDEst[:,ig,ip,:] += simu.VarPDEst/Nfiles
     
                     SNRSI[:,ig,ip,:] += simu.SNR_E/Nfiles
                     FCArray[:,ig,ip,:] += np.mean(simu.FringeContrast,axis=1)/Nfiles
@@ -787,7 +793,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
         
         else:
             criteriasBase = ["LR", "LR2", "LR3", "WLR", "FC", "SNR(|V|²)","VarOPD [µm]",
-                             "VarGDRes","VarPDRes","InstVarPD","InstVarGD","InstVarGDUnbiased",
+                             "VarGDRes","VarPDRes","VarGDEst","VarPDEst","InstVarPD","InstVarGD","InstVarGDUnbiased",
                              "VarPDnum", "VarPDdenom","VarGDdenom","VarGDdenomUnbiased", 
                              "SNRPD","SNRGD","ThresholdGDs",
                                'Vmod','Vangle']  
@@ -811,7 +817,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                                 ThresholdGDs, Vmod,Vangle])
         else:
             base_5d = np.array([LockedRatio,LR2,LR3,WLockedRatio,FCArray,SNRSI,VarOPD,
-                                VarGDRes,VarPDRes,InstVarPD,InstVarGD,InstVarGDUnbiased,
+                                VarGDRes,VarPDRes,VarGDEst,VarPDEst,InstVarPD,InstVarGD,InstVarGDUnbiased,
                                 VarPDnum, VarPDdenom,VarGDdenom,VarGDdenomUnbiased,
                                 np.sqrt(1/InstVarPD),np.sqrt(1/InstVarGD),
                                 ThresholdGDs, Vmod,Vangle])

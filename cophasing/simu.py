@@ -133,10 +133,10 @@ Performance Observables will be introduced and processed when the function
 """
 
 VarOPD = np.zeros([NIN])
-VarGDRes = np.zeros([NIN])
-VarPDRes = np.zeros([NIN])
-TempVarPD = np.zeros([NIN])
-TempVarGD = np.zeros([NIN])
+VarGDRes = np.zeros([NIN])  # Temporal variance estimator GD after Igd weighting
+VarPDRes = np.zeros([NIN])  # Temporal variance estimator PD after Ipd weighting
+VarGDEst = np.zeros([NIN])  # Temporal variance estimator GD
+VarPDEst = np.zeros([NIN])  # Temporal variance estimator PD
 VarCPD = np.zeros([NC])
 VarCGD =np.zeros([NC])
 SNRSI=np.zeros([NIN])

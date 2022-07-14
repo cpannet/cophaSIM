@@ -151,7 +151,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-        config.FS['sigsky']=np.zeros([MW,NP])               # Dark noise
+        config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
         
         # Resolution of the fringe sensor
         midlmbda = np.mean(spectra)
