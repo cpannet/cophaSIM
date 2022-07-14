@@ -7,8 +7,7 @@
 
 !CHARA*.fits
 
-# Ignore all observation files but Unresolved, 1mas and 2mas
+# Ignore all observation files but Unresolved, 1mas, 2mas and 3mas
 !mag*.fits
-*3mas
 *500µas
 
