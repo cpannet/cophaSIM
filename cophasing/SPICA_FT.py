@@ -50,7 +50,7 @@ def updateFTparams(verbose=False,**kwargs):
 def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
             search=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, maxVelocity=0.300, Vfactors = [], 
             CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
-            cmdOPD=True, switch=1, continu=True,
+            cmdOPD=True, switch=1, continu=True,whichSNR='gd',
             ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,
             Threshold=True, useWmatrices=True,
             latencytime=1,usecupy=False, verbose=False,
@@ -176,6 +176,7 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
         config.FT['cmdOPD'] = cmdOPD
         config.FT['useWmatrices'] = useWmatrices
         config.FT['usecupy'] = usecupy
+        config.FT['whichSNR'] = whichSNR
         
         # Search command parameters
         config.FT['search'] = search
@@ -406,7 +407,11 @@ def CommandCalc(CfPD,CfGD):
         simu.TemporalVariancePD[it] = np.var(simu.PDEstimated[timerange], axis=0)
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
         
-        SquaredSNRMovingAverage = simu.SquaredSNRMovingAveragePD[it]
+        if config.FT['whichSNR'] == 'pd':
+            SquaredSNRMovingAverage = simu.SquaredSNRMovingAveragePD[it]
+        else:
+            SquaredSNRMovingAverage = simu.SquaredSNRMovingAverageGD[it]
+            
         reliablebaselines = (SquaredSNRMovingAverage >= FT['ThresholdGD']**2)
         
         simu.TrackedBaselines[it] = reliablebaselines
@@ -448,7 +453,7 @@ def CommandCalc(CfPD,CfGD):
         
         diagS = np.zeros([NA])
         diagS[reliablepistons] = 1/S[reliablepistons]
-        diagS[notreliable] = S[notreliable]/FT['ThresholdPD']**4
+        diagS[notreliable] = 0#S[notreliable]/FT['ThresholdPD']**4
         Sdag = np.diag(diagS)
         
         # Come back to the OPD-space        
@@ -1444,7 +1449,7 @@ def getvar():
     
     simu.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
     simu.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
-    simu.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda))#-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14
+    simu.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda))#-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14    
     #simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
     simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
     
@@ -1594,11 +1599,11 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                     cophasedstd = np.std(np.sqrt(simu.SquaredSNRMovingAveragePD[CophasedRange,ib]))
                     
                     # Set threshold to a value between max and foreground with a lower limit defined by the std of foreground.
-                    newThresholdGD[ib] = np.max([1.5,SNRfg + 10*cophasedstd,SNRfg+0.2*(SNRcophased-SNRfg)])
+                    newThresholdGD[ib] = np.max([1.5,SNRfg + 5*fgstd,SNRfg+0.2*(SNRcophased-SNRfg)])
                     if newThresholdGD[ib] ==0:
                         newThresholdGD[ib] = 10
                         
-            newThresholdPD = np.min(newThresholdGD)*2
+            newThresholdPD = 1#np.min(newThresholdGD)/2
             
             config.FT['ThresholdGD'] = newThresholdGD
             config.FT['ThresholdPD'] = newThresholdPD

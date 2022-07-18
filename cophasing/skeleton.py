@@ -642,7 +642,8 @@ Longueur timestamps: {len(timestamps)}")
                 
             if ampl==0:
                 wl_r0 = 0.55                # Wavelength at which r0 is defined
-                rmsOPD = np.sqrt(6.88*(L0/r0)**(5/3))*wl_r0/(2*np.pi)    # microns
+                # rmsOPD = np.sqrt(6.88*(L0/r0)**(5/3))*wl_r0/(2*np.pi)    # microns
+                rmsOPD = 15*np.sqrt((0.12/r0)**(5/3)) # on fixe rmsOPD = 15µm pour r0=12cm
                 if verbose:
                     print(f'RMS OPD={rmsOPD}')
                 
@@ -667,8 +668,9 @@ Longueur timestamps: {len(timestamps)}")
                 freqfft = (np.arange(Npix)-Npix//2)*dfreq
                 timefft = (np.arange(Npix)-Npix//2)*dt  #ms
             
-                nu1 = 0.2*V/L0                 # Low cut-off frequency
-                nu2 = 0.3*V/d                  # High cut-off frequency
+                #nu0 = 0.2*V/B                      # Very low cut-off frequency
+                nu1 = V/L0                          # Low cut-off frequency
+                nu2 = 0.3*V/d                       # High cut-off frequency
             
                 if not pows:
                     pow1, pow2, pow3 = (-2/3, -8/3, -17/3)  # Conan et al
@@ -1087,8 +1089,8 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
             if verbose:
                 print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
 
-    if verbose:
-        print(f"Done. (Total: {round(time.time()-time0)}s)")
+    print(f"Done. (Total: {round(time.time()-time0)}s)")
+    
     # Process observables for visualisation
     simu.PistonTrue = simu.PistonDisturbance - simu.EffectiveMoveODL[:-config.latency]
 
@@ -3000,7 +3002,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax1.grid(True) ; ax2.grid(True)
         ax3.grid(True) ; ax4.grid(True)
         ax1.set_ylabel('SNR')
-        ax3.set_yscale('log') ; ax3.set_ylabel('SNR &\n Thresholds')
+        ax3.set_yscale('log') ; ax3.set_ylabel('max(SNR) &\n Thresholds')
         ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
         ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
         ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
@@ -3286,9 +3288,7 @@ WavelengthOfInterest
     simu.PhaseVar_atWOI = np.zeros([Ndit,NIN])
     simu.FTLocked = np.zeros([Ndit,NIN])
     simu.PhaseStableEnough= np.zeros([Ndit,NIN])
-    if 'ThresholdGD' in config.FT.keys():
-        simu.TrackedBaselines = (simu.SquaredSNRMovingAveragePD >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
-        simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
+    simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
     simu.InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < MeanWavelength/2
     simu.LR3 = np.mean(simu.InCentralFringe[InFrame:], axis=0)    # Array [NIN]
     

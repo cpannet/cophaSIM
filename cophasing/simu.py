@@ -69,7 +69,7 @@ PDResidual2 = np.zeros([NT,NIN])                 # Estimated residual PD = PD-PD
 GDResidual = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref
 GDResidual2 = np.zeros([NT,NIN])                 # Estimated residual GD = GD-GDref after Igd
 GDErr = np.zeros([NT,NIN])                      # Error that integrates GD integrator
-OPDSearchCommand = np.zeros([NT+latency,NIN])           # Search command projected in the OPD-space
+OPDSearchCommand = np.zeros([NT+1,NIN])           # Search command projected in the OPD-space
 
 # Piston-space observables [NA]
 PistonTrue = np.zeros([NT,NA])                  # True Pistons
