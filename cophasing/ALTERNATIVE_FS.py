@@ -24,7 +24,7 @@ from .FS_DEFAULT import ABCDmod, realisticABCDmod
 from . import tol_colors as tc
 colors=tc.tol_cset('muted')
 
-
+# Order of the telescopes: S1S2E1E2W1W2
 
 NA=6
 d0=(np.ones([NA,NA])-np.identity(NA))/5
@@ -85,8 +85,15 @@ d8 = np.array([[0,1,0,0,0,0],
               [0,0,0,1/2,0,1/2],
               [0,1/2,0,0,1/2,0]])
 
+d9 = np.array([[0,1/2,1/2,0,0,0],
+              [1/2,0,0,0,0,1/2],
+              [1/2,0,0,1/2,0,0],
+              [0,0,1/2,0,1/2,0],
+              [0,0,0,1,0,0],
+              [0,1,0,0,0,0]])
+
 descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
-               "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8}
+               "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8, "PW6-5-0-0":d9}
 
 
 def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', description='PW6-15-10', modulation='ABCD', clean_up=False, display=False, savedir='',ext='pdf',ArrayDetails=0):
@@ -222,12 +229,12 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
         
         if display:
             
-            plt.rcParams['figure.figsize']=(16,12)
-            font = {'family' : 'DejaVu Sans',
-                    'weight' : 'normal',
-                    'size'   : 22}
-            
             if len(savedir):
+                plt.rcParams['figure.figsize']=(16,12)
+                font = {'family' : 'DejaVu Sans',
+                        'weight' : 'normal',
+                        'size'   : 22}
+                
                 rcParamsFS = {"axes.grid":False,
                                "figure.constrained_layout.use": True,
                                'figure.subplot.hspace': 0,
@@ -236,8 +243,8 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                                'figure.subplot.right':1
                                }
                 plt.rcParams.update(rcParamsFS)
+                plt.rc('font', **font)
             
-            plt.rc('font', **font)
             title=name
             fig=plt.figure(title, clear=True)
             ax=fig.subplots()
@@ -273,6 +280,8 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                 
                 ax.axis("off")
                 fig.savefig(f"{savedir}{name}.{ext}")
+        
+            plt.rcParams.update(plt.rcParamsDefault)
         
         return
 

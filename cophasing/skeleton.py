@@ -643,7 +643,7 @@ Longueur timestamps: {len(timestamps)}")
             if ampl==0:
                 wl_r0 = 0.55                # Wavelength at which r0 is defined
                 # rmsOPD = np.sqrt(6.88*(L0/r0)**(5/3))*wl_r0/(2*np.pi)    # microns
-                rmsOPD = 15*np.sqrt((0.12/r0)**(5/3)) # on fixe rmsOPD = 15µm pour r0=12cm
+                rmsOPD = 30*np.sqrt((0.12/r0)**(5/3)) # on fixe rmsOPD = 15µm pour r0=12cm
                 if verbose:
                     print(f'RMS OPD={rmsOPD}')
                 

@@ -453,7 +453,7 @@ def CommandCalc(CfPD,CfGD):
         
         diagS = np.zeros([NA])
         diagS[reliablepistons] = 1/S[reliablepistons]
-        diagS[notreliable] = 0#S[notreliable]/FT['ThresholdPD']**4
+        diagS[notreliable] = S[notreliable]/FT['ThresholdPD']**4
         Sdag = np.diag(diagS)
         
         # Come back to the OPD-space        
