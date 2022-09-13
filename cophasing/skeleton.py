@@ -1127,29 +1127,61 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             Pistondetails=False,OPDdetails=False,
             OneTelescope=True, pause=False, display=True,verbose=False,
             savedir='',ext='pdf',infos={"details":''}):
+    """
     
-    '''
-    NAME:
-    display - Plots different interesting results from the simulation
+    Purpose
+    ---------
+        This procedure plots different results from the simulation,\
+        Available observables to display:
+            - Photometries: 'phot'
+            - Disturbances: 'disturbances'
+            - Pistons: 'piston'
+            - Piston details: 'Pistondetails'
+            - GD, PD, SNR evolution: 'perftable'
+            - OPDs: 'opd'
+            - OPD commands: 'OPDcmd'
+            - OPD details: 'OPDdetails'
+            - All OPDs on the same figure: 'OPDgathered'
+            - Closure phases: 'cp'
+            - Visibilities: 'vis'
+            - Detector: 'detector'
+            - State-machine: 'state'"
+
+    Parameters
+    ----------
+    *args : optional argument
+        Write, as strings, the different observables you want to plot among those listed above.
+    WLOfTrack : FLOAT, optional
+        Wavelength at which the pistonic data are computed. The default is 1.6.
+    DIT : FLOAT, optional
+        Integration time for the variances, averages, etc... The default is 50.
+    WLOfScience : FLOAT, optional
+        Wavelength at which the science instrument is working, for SNR computation. The default is 0.75.
+    Pistondetails : BOOLEAN, optional
+        DESCRIPTION. The default is False.
+    OPDdetails : BOOLEAN, optional
+        DESCRIPTION. The default is False.
+    OneTelescope : BOOLEAN, optional
+        If true, stop opd displaying after the first telescope. The default is True.
+    pause : BOOLEAN, optional
+        Enable to show plots during a simulation. The default is False.
+    display : BOOLEAN, optional
+        If True, display plots. Else, generate but don't display. The default is True.
+    verbose : BOOLEAN, optional
+        If True, writes information in the terminal. The default is False.
+    savedir : STRING, optional
+        Directory path for saving the files. If empty, don't save plots. The default is ''.
+    ext : STRING, optional
+        Extension of the file. The default is 'pdf'.
+    infos : DICTIONARY, optional
+        Managed with few plots: enables to show a part of the baselines. The default is {"details":''}.
+
+    Returns
+    -------
+    None.
+
+    """
     
-    CALLING SEQUENCE:
-        display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
-                    Pistondetails=False,OPDdetails=False,
-                    OneTelescope=True, pause=False, display=True,verbose=False,
-                    savedir='',ext='pdf',infos={"details":''})
-        
-    PURPOSE:
-        This procedure plots different results from the simulation, like \
-        pistons commands and amplitudes of wavefronts function of time. \
-        It is called at the end of a coh_turn routine to show these results\
-        which have been stored in global variables during the loop.
-        
-    INPUTS:
-        - args: write, as strings, the different observables you want to plot
-        among: 'disturbance', phot', 'piston', 'opd','vis','detector'
-        - wl: wavelength 
-        
-    '''
           
     import matplotlib.patches as mpatches
     import matplotlib.lines as mlines
