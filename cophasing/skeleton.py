@@ -1130,10 +1130,13 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     
     '''
     NAME:
-    COH__PLOT - Plots different interesting results from the simulation
+    display - Plots different interesting results from the simulation
     
     CALLING SEQUENCE:
-        coh__plot(coh, pis_display=True, coher_display=True)
+        display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
+                    Pistondetails=False,OPDdetails=False,
+                    OneTelescope=True, pause=False, display=True,verbose=False,
+                    savedir='',ext='pdf',infos={"details":''})
         
     PURPOSE:
         This procedure plots different results from the simulation, like \
