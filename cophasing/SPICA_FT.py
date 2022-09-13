@@ -417,7 +417,11 @@ def CommandCalc(CfPD,CfGD):
         simu.TrackedBaselines[it] = reliablebaselines
         
         Wdiag=np.zeros(NIN)
-        Wdiag[reliablebaselines] = 1/varcurrGD[reliablebaselines]
+        if config.FT['whichSNR'] == 'pd':
+            Wdiag[reliablebaselines] = varcurrPD[reliablebaselines]
+        else:
+            Wdiag[reliablebaselines] = varcurrGD[reliablebaselines]
+            
         W = np.diag(Wdiag)
         # Transpose the W matrix in the Piston-space
         MtWM = np.dot(FS['OPD2Piston'], np.dot(W,FS['Piston2OPD']))

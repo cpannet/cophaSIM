@@ -1126,7 +1126,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
 def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             Pistondetails=False,OPDdetails=False,
             OneTelescope=True, pause=False, display=True,verbose=False,
-            savedir='',ext='pdf'):
+            savedir='',ext='pdf',infos={"details":''}):
     
     '''
     NAME:
@@ -1190,6 +1190,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     timestr=SimuTimeID
     
     ich = config.FS['ich']
+    NC = int(config.NC/2)
     
     dt=config.dt
 
@@ -1259,6 +1260,160 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     pis_max = 1.1*np.max([np.max(np.abs(simu.PistonDisturbance)),wl/2])
     pis_min = -pis_max
     ylim = [pis_min,pis_max]
+    
+    
+    """
+    HANDLE THE POSSILIBITY TO SHOW ONLY A PART OF THE TELESCOPES/BASELINES/CLOSURES
+    """
+    
+    t = simu.timestamps*1e-3 # time in ms
+    timerange = range(NT)
+    
+    TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
+    if 'TelescopeArrangement' in infos.keys():
+        tels = infos['TelescopeArrangement']
+    else:
+        tels = TelConventionalArrangement
+        
+    Tel2Beam = np.zeros([6,6])
+    for ia in range(NA):
+        tel = tels[ia] ; tel0 = TelConventionalArrangement[ia] 
+        pos = np.argwhere(np.array(tels)==tel0)[0][0]
+        Tel2Beam[pos,ia]=1
+
+    
+    baselines = [] ; baselinesForPDref=[0]*(NA-1)
+    itel=0
+    for tel1 in tels:
+        for tel2 in tels[itel+1:]:
+            baselines.append(f'{tel1}{tel2}')
+        itel+=1
+    
+    # For distribute baselines between two subplots
+    NIN = len(baselines)
+    len2 = NIN//2 ; len1 = NIN-len2
+    
+    closures = []  ; baselinesForPDref=baselines.copy()
+    tel1=tels[0] ; itel1=0 ; itel2=itel1+1 
+    for tel2 in tels[itel2:]:
+        itel3=itel2+1
+        for tel3 in tels[itel2+1:]:
+            closures.append(f'{tel1}{tel2}{tel3}')
+            ib = ct.posk(itel2, itel3, NA)
+            baselinesForPDref[ib] = baselinesForPDref[ib] + f"\n({tel1}{tel2}{tel3})"
+            itel3+=1
+        itel2+=1
+    
+    PlotTel = [False]*NA ; PlotTelOrigin=[False]*NA
+    PlotBaseline = [False]*NIN
+    PlotClosure = [False]*NC
+    TelNameLength = 2
+    
+    if 'TelsToDisplay' in infos.keys():
+        TelsToDisplay = infos['TelsToDisplay']
+        for ia in range(NA):
+            tel = tels[ia] ; tel2 = TelConventionalArrangement[ia]
+            if tel in TelsToDisplay:
+                PlotTel[ia]=True
+            if tel2 in TelsToDisplay:  
+                PlotTelOrigin[ia]=True
+                
+        if not 'BaselinesToDisplay' in infos.keys():
+            for ib in range(NIN):
+                baseline = baselines[ib]
+                tel1,tel2=baseline[:TelNameLength],baseline[TelNameLength:]
+                if (tel1 in TelsToDisplay) \
+                    and (tel2 in TelsToDisplay):
+                        PlotBaseline[ib] = True
+                    
+        if not 'ClosuresToDisplay' in infos.keys():
+            for ic in range(NC):
+                closure = closures[ic]
+                tel1,tel2,tel3=closure[:TelNameLength],closure[TelNameLength:2*TelNameLength],closure[2*TelNameLength:]
+                if (tel1 in TelsToDisplay) \
+                    and (tel2 in TelsToDisplay) \
+                        and (tel3 in TelsToDisplay):
+                            PlotClosure[ic] = True
+                
+    if 'BaselinesToDisplay' in infos.keys():
+        BaselinesToDisplay = infos['BaselinesToDisplay']
+        for ia in range(NA):
+            tel = tels[ia] ; tel2 = TelConventionalArrangement[ia]
+            if tel in "".join(BaselinesToDisplay):
+                PlotTel[ia]=True
+            if tel2 in "".join(BaselinesToDisplay):  
+                PlotTelOrigin[ia]=True
+                    
+        for ib in range(NIN):
+            baseline = baselines[ib]
+            if (baseline in BaselinesToDisplay) or (baseline[2:]+baseline[:2] in BaselinesToDisplay):
+                PlotBaseline[ib] = True
+        
+        if not 'ClosuresToDisplay' in infos.keys():
+            for ic in range(NC):
+                closure = closures[ic]
+                base1, base2,base3=closure[:2*TelNameLength],closure[TelNameLength:],"".join([closure[:TelNameLength],closure[2*TelNameLength:]])
+                if (base1 in BaselinesToDisplay) \
+                    and (base2 in BaselinesToDisplay) \
+                        and (base3 in BaselinesToDisplay):
+                            PlotClosure[ic] = True
+                            
+    if 'ClosuresToDisplay' in infos.keys():
+        ClosuresToDisplay = infos['ClosuresToDisplay']
+        for ia in range(NA):
+            tel = tels[ia] ; tel2 = TelConventionalArrangement[ia]
+            if tel in "".join(ClosuresToDisplay):
+                PlotTel[ia]=True
+            if tel2 in "".join(ClosuresToDisplay):
+                PlotTelOrigin[ia]=True
+        
+        for ib in range(NIN):
+            baseline = baselines[ib]
+            for closure in ClosuresToDisplay:
+                if baseline in closure:
+                    PlotBaseline[ib] = True
+        
+        for ic in range(NC):
+            closure = closures[ic]
+            if closure in ClosuresToDisplay:
+                PlotClosure[ic] = True
+                
+    if not (('TelsToDisplay' in infos.keys()) \
+            or ('BaselinesToDisplay' in infos.keys()) \
+                or ('ClosuresToDisplay' in infos.keys())):
+        PlotTel = [True]*NA ; PlotTelOrigin = [True]*NA
+        PlotBaseline = [True]*NIN
+        PlotClosure = [True]*NC
+        
+    PlotBaselineIndex = np.argwhere(PlotBaseline).ravel()
+
+    
+    """
+    COMPUTATION RMS
+    """
+    
+    basecolors = colors[:len1]+colors[:len2]
+    
+    R=config.FS['R']
+    
+    GD = simu.GDEstimated ; PD=simu.PDEstimated
+    GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
+    GDerr = simu.GDResidual2*R*wl/2/np.pi ; PDerr = simu.PDResidual2*wl/2/np.pi
+    GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
+    SquaredSNR = simu.SquaredSNRMovingAveragePD
+    # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
+    
+    
+    start_pd_tracking = 100
+    
+    RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
+    RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+    
+    RMSgderr = np.std(GDerr[start_pd_tracking:,:],axis=0)
+    RMSpderr = np.std(PDerr[start_pd_tracking:,:],axis=0)
+    
+    RMStrueOPD = np.sqrt(simu.VarOPD)
+    
     
     if displayall or ('disturbances' in args):
         
@@ -1465,34 +1620,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle='--', label='Squared Threshold GD'))
                     
-        
-        t = simu.timestamps ; timerange = range(NT)
-        # NA=6 ; NIN = 15 ; NC = 10
-        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
-        len2 = NIN//2 ; len1 = NIN-len2
-        
-        basecolors = colors[:len1]+colors[:len2]
-        # basestyles = len1*['solid'] + len2*['dashed']
-        # closurecolors = colors[:NC]
-        
-        R=config.FS['R']
-        
-        GD = simu.GDEstimated ; PD=simu.PDEstimated
-        GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
-        GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-        SquaredSNR = simu.SquaredSNRMovingAveragePD
-        # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
-        
-        
-        start_pd_tracking = 100
-        
-        RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
-        RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
-        RMStrueOPD = np.sqrt(simu.VarOPD)
         # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
         # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
-        
-        
         
         plt.rcParams.update(rcParamsForBaselines)
         title='GD and PD before leastsquare'
@@ -1607,11 +1736,18 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
          SquaredSNR = simu.SquaredSNRMovingAveragePD
          # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
          
+         GDerr = simu.GDResidual2 ; PDerr =simu.PDResidual2
+         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
          
          start_pd_tracking = 100
          
+         
          RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
          RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+         
+         RMSgderr = np.std(GDerr[start_pd_tracking:,:],axis=0)
+         RMSpderr = np.std(PDerr[start_pd_tracking:,:],axis=0)
+         
          RMStrueOPD = np.sqrt(simu.VarOPD)
          # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
          # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
@@ -2896,12 +3032,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         fig.subplots_adjust(bottom=0.3)
         snr_ax = fig.add_axes([0.18, 0.05, 0.72, 0.1])
         snr_ax.set_title("SNR & Thresholds")
-        
-        t = simu.timestamps ; timerange = range(NT)
-        #len2 = NIN//2 ; len1 = NIN-len2
-        #basecolors = list(colors[:len1]+colors[:len2])
-        
-        SNR = np.sqrt(simu.SquaredSNRMovingAveragePD)
 
         maxSNR = np.nan_to_num(np.mean(SNR,axis=0))
         snr_ax.bar(baselines,maxSNR, color=colors[6])
@@ -2924,7 +3054,16 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             fig.savefig(savedir+f"Simulation{timestr}_detector.{ext}")
             
 
+    SNR_pd = np.sqrt(simu.SquaredSNRMovingAveragePD)
+    SNR_gd = np.sqrt(simu.SquaredSNRMovingAverageGD)
+
+    if config.FT['whichSNR'] == 'pd':
+        SNR = SNR_pd
+    else:
+        SNR = SNR_gd
+        
     if 'snr' in args:
+        
         
         # InstantaneousSquaredSNR=np.nan_to_num(1/simu.varPD)
         # ylim=[1e-1,np.max(InstantaneousSquaredSNR)]
@@ -2945,6 +3084,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         #            color='k', linestyle=':')
         # ax.set_ylabel("$<SNR>²_Ngd$")
         # ax.legend()        
+        
+        
         
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle='solid', label='Maximal SNR²'),
@@ -2998,11 +3139,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax2.tick_params(labelleft=False) 
         ax4.tick_params(labelleft=False)
         
-        ax1.set_yscale('log')
+        # ax1.set_yscale('log')
         ax1.grid(True) ; ax2.grid(True)
         ax3.grid(True) ; ax4.grid(True)
         ax1.set_ylabel('SNR')
-        ax3.set_yscale('log') ; ax3.set_ylabel('max(SNR) &\n Thresholds')
+        ax3.set_ylabel('max(SNR) &\n Thresholds')
         ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
         ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
         ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
@@ -3023,12 +3164,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle='--', label='Squared Threshold GD'))
                     
-        
-        t = simu.timestamps ; timerange = range(NT)
-        len2 = NIN//2 ; len1 = NIN-len2
-        basecolors = list(colors[:len1]+colors[:len2])
-        
-        SNR = np.sqrt(simu.SquaredSNRMovingAveragePD)
+            
         title = "SNR PD"
         plt.close(title)
         fig=plt.figure(title, clear=True)
@@ -3038,12 +3174,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax2.set_title(f"Baselines from {config.FS['ich'][len1]} to {config.FS['ich'][-1]}")
         
         for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+            ax1.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax1.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
 
         for iBase in range(len1,NIN):   # Second serie
-            ax2.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+            ax2.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
 
@@ -3051,12 +3187,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax1.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
             ax2.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
 
-        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
+        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNR_pd),
                    color='k', linestyle=':')
-        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR),
+        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR_pd),
                    color='k', linestyle=':')
         
-        maxSNR = np.nanmax(SNR,axis=0)
+        maxSNR = np.nanmax(SNR_pd,axis=0)
         ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
         ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(maxSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
         ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(config.FT['ThresholdGD'][len1:])+[0]*(len1-len2), fill=False,edgecolor='k')
@@ -3071,11 +3207,10 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax2.tick_params(labelleft=False)
         ax4.tick_params(labelleft=False)
         
-        ax1.set_yscale('log')
         ax1.grid(True) ; ax2.grid(True)
         ax3.grid(True) ; ax4.grid(True)
         ax1.set_ylabel('SNR')
-        ax3.set_yscale('log') ; ax3.set_ylabel('SNR &\n Thresholds')
+        ax3.set_ylabel('SNR &\n Thresholds')
         ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
         ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
         ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
@@ -3084,7 +3219,88 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             if pause:
                 plt.pause(0.1)
             else:
-                plt.show()
+                plt.show()  
+        if len(savedir):
+            fig.savefig(savedir+f"Simulation{timestr}_snr.{ext}")
+
+    if displayall or ("GDonly" in args):
+        plt.rcParams.update(rcParamsForBaselines)
+        title=infos['details']
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+        fig.suptitle(title)
+        
+        OneAxe = False ; NumberOfBaselinesToPlot = np.sum(PlotBaseline)
+        if NumberOfBaselinesToPlot < len1:
+            OneAxe=True
+            ax1,ax2 = fig.subplots(nrows=2,sharex=True,sharey='row')
+        else:    
+            (ax1,ax3),(ax2,ax4),(ax5,ax6) = fig.subplots(nrows=3,ncols=2, sharey='row', gridspec_kw={'height_ratios':[4,4,1]})
+            ax1.set_title("First serie of baselines, from 12 to 25")
+            ax3.set_title("Second serie of baselines, from 26 to 56")
+
+        # ax1.set_ylim(np.sqrt(ylimSNR)) 
+        
+        if OneAxe:
+            baselinestemp = [baselines[iBase] for iBase in PlotBaselineIndex]
+            basecolorstemp = basecolors[:NumberOfBaselinesToPlot]
+            baselinestyles=['-']*len1 + ['--']*len2
+            baselinehatches=['']*len1 + ['/']*len2
+            # barbasecolors = ['grey']*NIN
+            
+            k=0
+            for iBase in PlotBaselineIndex:   # First serie
+                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolorstemp[k],label=baselines[iBase])
+                ax2.plot(t[timerange],GDerr[timerange,iBase],color=basecolorstemp[k])
+                # barbasecolors[iBase] = basecolorstemp[k]
+                k+=1                
+
+            ax1.legend()
+
+        else:
+            for iBase in range(len1):   # First serie
+                if PlotBaseline[iBase]:
+                    ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                    ax2.plot(t[timerange],GDerr[timerange,iBase],color=basecolors[iBase])
+
+            for iBase in range(len1,NIN):   # Second serie
+                if PlotBaseline[iBase]:
+                    ax3.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                    ax4.plot(t[timerange],GDerr[timerange,iBase],color=basecolors[iBase])
+
+            ax1.sharex(ax2)
+            ax3.sharex(ax4)
+            p1=ax5.bar(baselines[:len1],RMSgderr[:len1], color=basecolors[:len1])
+            p2=ax6.bar(baselines[len1:],RMSgderr[len1:], color=basecolors[len1:])
+            # ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
+            # ax4.set_ylim(ylimGD)
+            ct.setaxelim(ax5, ydata=RMSgderr, ymargin=0.4,ymin=0)
+            ct.setaxelim(ax1, ydata=SNR, ymargin=0.4,ymin=0)
+            
+            ax5.set_ylabel('GD rms\n[µm]') ;
+            ax5.bar_label(p1,label_type='edge',fmt='%.2f')
+            ax6.bar_label(p2,label_type='edge',fmt='%.2f')
+            ax5.set_anchor('S') ; ax6.set_anchor('S')
+            ax5.set_box_aspect(1/15) ; ax6.set_box_aspect(1/15)
+            
+        ct.setaxelim(ax2,ydata=[GDerr[timerange,iBase] for iBase in PlotBaselineIndex])
+        ax1.set_ylabel('SNR')
+        ax2.set_ylabel('Group-Delays [µm]')
+    
+        ax2.set_xlabel("Time [ms]")#, labelpad=xlabelpad) ; ax4.set_xlabel("Time (s)", labelpad=xlabelpad)
+
+
+        if display:
+            if pause:
+                plt.pause(0.1)
+            else:
+                plt.show()  
+        if len(savedir):
+            fig.savefig(savedir+f"Simulation{timestr}_GDonly.{ext}")
+
+
+
+
 
 
 
