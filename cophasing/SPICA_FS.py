@@ -273,8 +273,9 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         from .config import NA,NB
         
         # Created by the user here
-        ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
-                  [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
+        ich = ['12','13','23','24','14',
+               '15','25','16','26','36','34','35','45','46','56'] 
+
         ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14] ; NIN=15
         active_ich = np.ones(NIN)
         
@@ -512,7 +513,9 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         config.FS['ABCDind'] = ABCDind
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
-        config.FS['ich'] = np.array([(ichraw[i]) for i in range(0,NP,NMod)])
+        # config.FS['ich'] = np.array([(ichraw[i]) for i in range(0,NP,NMod)])
+        
+        config.FS['ich'] = [str(ichraw[i][0])+str(ichraw[i][1]) for i in range(0,NP,NMod)]
         
         NIN=NP//NMod ; NA=np.max(ichraw)
         ichorder=np.zeros(NIN,dtype=np.int)
@@ -612,6 +615,30 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
                 
             config.FS['MacroP2VM'] = MacroP2VM
             config.FS['MacroP2VMgrav'] = MacroP2VMgrav
+            
+            
+            config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
+            config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+            Piston2OPD_forInv = np.zeros([NIN,NA])
+            
+            for ia in range(NA):
+                for iap in range(ia+1,NA):
+                    ib = ct.posk(ia,iap,NA)
+                    config.FS['Piston2OPD'][ib,ia] = 1
+                    config.FS['Piston2OPD'][ib,iap] = -1
+                    if active_ich[ib]:
+                        Piston2OPD_forInv[ib,ia] = 1
+                        Piston2OPD_forInv[ib,iap] = -1
+                
+            config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
+            config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
+            
+            config.FS['OPD2Piston_moy'] = np.copy(config.FS['OPD2Piston'])
+            if config.TELref:
+                iTELref = config.TELref - 1
+                L_ref = config.FS['OPD2Piston'][iTELref,:]
+                config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+            
             
             # The matrix of the elements norm only for the calculation of the bias of |Cf|².
             # /!\ To save time, it's in [NIN,NP]

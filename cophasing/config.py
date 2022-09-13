@@ -141,12 +141,12 @@ class Observation():
             Init: (90,0) -> Zenith
         - UsedTelescopes:
             Names of the used telescopes during the observation.
-            Init: ['E1','E2','S1','S2','W1','W2']
+            Init: ['S1','S2','E1','E2','W1','W2']
         
     """
     def __init__(self,Filepath='', ArrayName='CHARA', Date='2020-01-01 00:00:00',
                  AltAz=(90,0),
-                 UsedTelescopes = 'all',
+                 UsedTelescopes = ['S1','S2','E1','E2','W1','W2'],
                  **kwargs):
         
         self.Filepath = Filepath
