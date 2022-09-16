@@ -88,7 +88,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         NG = np.shape(ich)[0]       # should always be equal to NIN
-        
+        print(1)
         # Classic balanced ABCD modulation of each baseline
         
         M_ABCD = ABCDmod()          # A2P ABCD modulation
