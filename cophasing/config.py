@@ -192,22 +192,22 @@ class ScienceObject():
 
 from scipy.special import binom
 
+"""
+ALL THESE VALUES ARE BY DEFAULT AND WILL BE UPDATED WITH THE FUNCTION INITIALISE
+"""
+
+
 # Interferometer
 Name = 'CHARA'
 NA=6                            # number of apertures
-NB=NA**2                        # total number of baselines
+NB=NA**2                        # Number of unknown photometries and phases 
 NIN=int(NA*(NA-1)/2)            # Number of independant OPDs
 NC = int(binom(NA,3))           # Number of closure phases
+ND = int((NA-1)*(NA-2)/2)       # Number of independant closure phases
 NT=512
 MT=NT
-OT=1
 NW=5
 OW=1
-
-NY=0
-ND=0
-
-dyn=0
 
 # Source
 spectra=np.linspace(1.45,1.75,NW)       # Micro-sampling wavelength

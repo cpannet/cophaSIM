@@ -1451,8 +1451,8 @@ def getvar():
     CohFlux = np.mean(simu.CfPD[timerange], axis=0)
     CfSumOverLmbda = np.sum(CohFlux,axis=0)
     
-    simu.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
-    simu.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
+    simu.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
+    simu.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
     simu.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda))#-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14    
     #simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
     simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
