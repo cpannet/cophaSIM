@@ -1,0 +1,1613 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.10.0" />
+<title>cophasing.SPICA_FT_cupy API documentation</title>
+<meta name="description" content="Created on Fri Jul 10 15:44:22 2020 …" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>cophasing.SPICA_FT_cupy</code></h1>
+</header>
+<section id="section-intro">
+<p>Created on Fri Jul 10 15:44:22 2020</p>
+<p>@author: cpannetier</p>
+<p>The SPICA Fringe Tracker calculates the commands to send to the telescopes after
+reading the coherent flux and filtering the most noisy measurements.</p>
+<p>INPUT: Coherent flux [MW,NB]</p>
+<p>OUTPUT: Piston commands [NA]</p>
+<p>Calculated and stored observables:
+-
+-
+-
+-
+-
+-
+-</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python"># -*- coding: utf-8 -*-
+&#34;&#34;&#34;
+Created on Fri Jul 10 15:44:22 2020
+
+@author: cpannetier
+
+The SPICA Fringe Tracker calculates the commands to send to the telescopes after 
+reading the coherent flux and filtering the most noisy measurements.
+
+INPUT: Coherent flux [MW,NB]
+
+OUTPUT: Piston commands [NA]
+
+Calculated and stored observables:
+    - 
+    -
+    -
+    -
+    -
+    -
+    -
+
+&#34;&#34;&#34;
+
+import numpy as np
+import cupy as cp
+
+from .coh_tools import posk, poskfai,NB2NIN
+
+from . import config
+
+def SPICAFT(*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=1,
+            Sweep=100, Slope=100, Vfactors = [], CPref=True, Ncp = 300,
+            ThresholdGD=2, ThresholdPD = 1.5, 
+            Threshold=True, usePDref=True, useWmatrices=True,
+            latencytime=1):
+    &#34;&#34;&#34;
+    Uses the measured coherent flux to calculate the new positions to send 
+    to the delay lines. It filters the most noisy baselines in order to 
+    improve the fringe tracking.
+    
+    INPUT:
+        - If init: all the below parameters.
+        - If not init: CfEstimated - Measured Coherent Flux   [MW,NB]
+    
+    OUTPUT:
+        - currCmd: Piston Command to send to the ODL     [NA]
+    
+    USED OBSERVABLES:
+        - config.FT
+    UPDATED OBSERVABLES:
+        - simu.PDEstimated: [NT,MW,NIN] Estimated PD before subtraction of the reference
+        - simu.GDEstimated: [NT,MW,NIN] Estimated GD before subtraction of the reference
+        - simu.CommandODL: Piston Command to send       [NT,NA]
+        
+    SUBROUTINES:
+        - ReadCf
+        - CommandCalc
+
+    Parameters
+    ----------
+    *args : TYPE
+        Expect CfEstimated.
+    init : BOOLEAN, optional
+        If True, initialize the below parameters.
+        Needs to be called before starting the simulation.
+        The default is False.
+    GainPD : FLOAT, optional
+        Gain PD. The default is 0.
+    GainGD : FLOAT, optional
+        Gain GD. The default is 0.
+    Ngd : INT, optional
+        Frame integration GD. The default is 1.
+    Sweep : TYPE, optional
+        DESCRIPTION. The default is 100.
+    Slope : TYPE, optional
+        DESCRIPTION. The default is 100.
+    Vfactors : TYPE, optional
+        DESCRIPTION. The default is [].
+    Ncross : INT, optional
+        Separation between two spectral channels for GD calculation. 
+        The default is 1.
+    CPref : BOOLEAN, optional
+        If False, the Closure Phase is not subtracted for reference. 
+        The default is True.
+    Ncp : INT, optional
+        Frame integration CP. The default is 1.
+    roundGD : BOOLEAN, optional
+        If True, the GD command is rounded to wavelength integers. 
+        Advised to avoid a superposition of the PD and GD commands.
+        The default is True.
+    ThresholdGD : FLOAT, optional
+        If the SNR of the estimated GD of a given baseline is lower than 
+        ThresholdGD, then this baseline is weighted down.
+        The default is 2.
+    ThresholdPD : FLOAT, optional
+        If the SNR of the estimated GD of a given baseline is lower than 
+        ThresholdGD, then this baseline is weighted down.
+        DESCRIPTION. The default is 1.5.
+    Threshold : BOOLEAN, optional
+        If False, the GD works also within a frange. Essentially for debugging.
+    usePDref : BOOLEAN, optional
+        If False, no reference vector
+    useWmatrices: BOOLEAN, optional
+        Wmatrices means Weighting matrices. If True, the weighting of the commands
+        using the SNR of the measurements is used.
+
+    Returns
+    -------
+    currCmd : ARRAY [NA]
+        Piston Command to send to the ODL.
+
+    &#34;&#34;&#34;
+    
+    if init:
+
+        # config.R = np.abs((config.MW-1)*config.PDspectra/(config.spectraM[-1] - config.spectraM[0]))
+        config.FT[&#39;Name&#39;] = &#39;SPICAfromGRAVITY&#39;
+        config.FT[&#39;func&#39;] = SPICAFT
+        config.FT[&#39;Ngd&#39;] = Ngd
+        config.FT[&#39;GainGD&#39;] = GainGD
+        config.FT[&#39;GainPD&#39;] = GainPD
+        config.FT[&#39;Sweep&#39;] = Sweep
+        config.FT[&#39;Slope&#39;] = Slope*config.dt*1e-3
+        config.FT[&#39;Ncross&#39;] = Ncross
+        config.FT[&#39;Ncp&#39;] = Ncp
+        config.FT[&#39;ThresholdGD&#39;] = ThresholdGD
+        config.FT[&#39;ThresholdPD&#39;] = ThresholdPD
+        config.FT[&#39;CPref&#39;] = CPref
+        config.FT[&#39;roundGD&#39;] = roundGD
+        config.FT[&#39;Threshold&#39;] = Threshold
+        config.FT[&#39;cmdOPD&#39;] = True
+        config.FT[&#39;usePDref&#39;] = usePDref
+        config.FT[&#39;useWmatrices&#39;] = useWmatrices
+        
+        if len(Vfactors) != 0:
+            config.FT[&#39;Vfactors&#39;] = Vfactors
+        else:
+            config.FT[&#39;Vfactors&#39;] = np.array([0, -10,-9,-6,2,7])/10
+            print(f&#34;Searching velocity factors are {config.FT[&#39;Vfactors&#39;]}&#34;)
+        
+        from .config import NA,NIN
+        
+        config.FT[&#39;Piston2OPD&#39;] = np.zeros([NIN,NA])    # Piston to OPD matrix
+        config.FT[&#39;OPD2Piston&#39;] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        
+        # if not config.TELref:
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = posk(ia,iap,NA)
+                config.FT[&#39;Piston2OPD&#39;][ib,ia] = 1
+                config.FT[&#39;Piston2OPD&#39;][ib,iap] = -1
+                config.FT[&#39;OPD2Piston&#39;][ia,ib] = 1
+                config.FT[&#39;OPD2Piston&#39;][iap,ib] = -1
+            # config.FT[&#39;OPD2Piston&#39;] = np.linalg.pinv(config.FT[&#39;Piston2OPD&#39;])   # OPD to pistons matrix
+        
+        config.FT[&#39;OPD2Piston&#39;] = config.FT[&#39;OPD2Piston&#39;]/NA
+        
+        if config.TELref:
+            iTELref = config.TELref - 1
+            L_ref = config.FT[&#39;OPD2Piston&#39;][iTELref,:]
+            config.FT[&#39;OPD2Piston&#39;] = config.FT[&#39;OPD2Piston&#39;] - L_ref
+        
+        return
+
+    from . import simu
+
+    it = simu.it
+    
+    currCfEstimated = args[0]
+
+    currPD, currGD = ReadCf(currCfEstimated)
+    
+    simu.PDEstimated[it] = currPD
+    simu.GDEstimated[it] = currGD*config.FS[&#39;R&#39;]
+    
+    currCmd = CommandCalc(currPD, currGD)
+    
+    return currCmd
+
+def ReadCf(currCfEstimated):
+    &#34;&#34;&#34;
+    From measured coherent flux, estimates GD, PD, CP, Photometry, Visibilities
+    
+    NAME: 
+        COH_ALGO - Calculates the group-delay, phase-delay, closure phase and 
+        visibility from the fringe sensor image.
+    
+        
+    INPUT: CfEstimated [MW,NB]
+    
+    OUTPUT: 
+        
+    UPDATE:
+        - simu.CfEstimated_ --&gt; should be coh_turn which do that
+        - simu.CfPD: Coherent Flux Phase-Delay     [NT,MW,NIN]
+        - simu.CfGD: Coherent Flux GD              [NT,MW,NIN]
+        - simu.ClosurePhasePD                       [NT,MW,NC]
+        - simu.ClosurePhaseGD                       [NT,MW,NC]
+        - simu.PhotometryEstimated                  [NT,MW,NA]
+        - simu.ComplexVisibility                    [NT,MW,NIN]*1j
+        - simu.CoherenceDegree                      [NT,MW,NIN]
+    &#34;&#34;&#34;
+    
+    from . import simu
+    
+    from .config import NA,NIN,NC
+    from .config import MW
+    
+    it = simu.it            # Time
+     
+    &#34;&#34;&#34;
+    Photometries extraction
+    [NT,MW,NA]
+    &#34;&#34;&#34;
+    PhotEst = np.zeros([MW,NA])
+    for ia in range(NA):
+        PhotEst[:,ia] = np.real(currCfEstimated[:,ia*(NA+1)])
+    
+    # Extract NIN-sized coherence vector from NB-sized one. 
+    # (eliminates photometric and conjugate terms)
+    currCfEstimatedNIN = np.zeros([MW, NIN])*1j
+    for imw in range(MW):    
+        currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
+        
+    # Save coherent flux and photometries in stack
+    simu.PhotometryEstimated[it] = PhotEst
+    
+    &#34;&#34;&#34;
+    Visibilities extraction
+    [NT,MW,NIN]
+    &#34;&#34;&#34;
+    
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)
+            Iaap = currCfEstimatedNIN[:,ib]                  # Interferometric intensity (a,a&#39;)
+            Ia = PhotEst[:,ia]                     # Photometry pupil a
+            Iap = PhotEst[:,iap]                   # Photometry pupil a&#39;
+            simu.ComplexVisibility[it,:,ib] = 2*Iaap/(Ia+Iap)          # Fringe ComplexVisibility of the base (a,a&#39;)
+            simu.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a&#39;)
+ 
+ 
+    &#34;&#34;&#34;
+    Phase-delays extraction
+    PD_ is a global stack variable [NT, NIN]
+    Eq. 10 &amp; 11
+    &#34;&#34;&#34;
+    D = 0   # Dispersion correction factor: so far, put to zero because it&#39;s a 
+            # calibration term (to define in coh_fs?)
+            
+    LmbdaTrack = config.PDspectra
+    
+    # Coherent flux corrected from dispersion
+    for imw in range(MW):
+        simu.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
+        
+        # If ClosurePhase correction before wrapping
+        # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref)
+        
+    # Current Phase-Delay
+    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))
+        
+    &#34;&#34;&#34;
+    Group-Delays extration
+    GD_ is a global stack variable [NT, NIN]
+    Eq. 15 &amp; 16
+    &#34;&#34;&#34;
+    
+    if MW &lt;= 1:
+        raise ValueError(&#39;Tracking mode = GD but no more than one wavelength. \
+                         Need several wavelengths for group delay&#39;)              # Group-delay calculation
+    
+    Ngd = config.FT[&#39;Ngd&#39;]                 # Group-delay DIT
+    Ncross = config.FT[&#39;Ncross&#39;]           # Distance between wavelengths channels for GD calculation
+    
+    if it &lt; Ngd:
+        Ngd = it+1
+    
+    # Integrates GD with Ngd last frames (from it-Ngd to it)
+    timerange = range(it+1-Ngd,it+1)
+    for iot in timerange:
+        cfgd = simu.CfPD[iot]*np.exp(-1j*simu.PDEstimated[iot])/Ngd
+        
+        # If ClosurePhase correction before wrapping
+        # cfgd = cfgd*np.exp(-1j*simu.GDref)
+        
+        simu.CfGD[it,:,:] += cfgd
+
+
+    currGD = np.zeros(NIN)
+    for ib in range(NIN):
+        cfGDlmbdas = simu.CfGD[it,:-Ncross,ib]*np.conjugate(simu.CfGD[it,Ncross:,ib])
+        cfGDmoy = np.sum(cfGDlmbdas)
+
+        currGD[ib] = np.angle(cfGDmoy)    # Group-delay on baseline (ib).
+    
+    &#34;&#34;&#34;
+    Closure phase calculation
+    cpPD_ is a global stack variable [NT, NC]
+    cpGD_ is a global stack variable [NT, NC]
+    Eq. 17 &amp; 18
+    &#34;&#34;&#34;
+    
+    Ncp = config.FT[&#39;Ncp&#39;]
+    
+    if it &lt; Ncp:
+        Ncp = it+1
+        
+    bispectrumPD = np.zeros([NC])*1j
+    bispectrumGD = np.zeros([NC])*1j
+    
+    timerange = range(it+1-Ncp,it+1)
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)      # coherent flux (ia,iap)    
+            cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
+            cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+            cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+            for iapp in range(iap+1,NA):
+                ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
+                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+                
+                ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
+                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
+                
+                # The bispectrum of one time and one triangle adds up to
+                # the Ncp last times
+                ic = poskfai(ia,iap,iapp,NA)        # 0&lt;=ic&lt;NC=(NA-2)(NA-1) 
+                
+                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
+                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+                    
+    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)
+    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)
+    
+    if config.FT[&#39;CPref&#39;] and (it == 0):                     # At time 0, we create the reference vectors
+        for ia in range(1,NA-1):
+            for iap in range(ia+1,NA):
+                k = posk(ia,iap,NA)
+                ic = poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
+                
+                if config.FT[&#39;usePDref&#39;]:
+                    simu.PDref[k] = simu.ClosurePhasePD[0,ic]
+                    simu.GDref[k] = simu.ClosurePhaseGD[0,ic]
+                else:
+                    simu.PDref[k] = 0
+                    simu.GDref[k] = 0
+                    
+    return currPD, currGD
+
+
+
+def CommandCalc(currPD,currGD):
+    &#34;&#34;&#34;
+    Generates the command to send to the optical delay line according to the
+    group-delay and phase-delay reduced from the OPDCalculator.
+
+    Parameters
+    ----------
+    currPD : TYPE
+        DESCRIPTION.
+    currGD : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    cmd_odl : TYPE
+        DESCRIPTION.
+
+    &#34;&#34;&#34;
+    
+    from . import simu
+    
+    &#34;&#34;&#34;
+    INIT MODE
+    &#34;&#34;&#34;
+    
+    from .config import NA,NB,NIN
+    from .config import FT
+    
+    SNRgd = 2
+    SNRpd = 1.5
+    
+    it = simu.it            # Frame number
+    
+    &#34;&#34;&#34;
+    Signal-to-noise ratio of the fringes (&#34;Phase variance&#34;)
+    The function getvar saves the inverse of the squared SNR (&#34;Phase variance&#34;)
+    in the global stack variable varPD [NT, MW, NIN]
+    Eq. 12, 13 &amp; 14
+    &#34;&#34;&#34;
+            
+    Ngd = FT[&#39;Ngd&#39;]
+    if it &lt; FT[&#39;Ngd&#39;]:
+        Ngd = it+1
+        
+    
+    &#34;&#34;&#34;
+    WEIGHTING MATRIX
+    &#34;&#34;&#34;
+
+    if config.FT[&#39;useWmatrices&#39;]:
+        
+        varcurrPD = getvar()
+        
+        # Raw Weighting matrix in the OPD-space
+        W = np.zeros([NIN,NIN])
+        
+        for ib in range(NIN):
+            if 1/np.mean(simu.varPD[it+1-Ngd:it+1,ib]) &gt;= FT[&#39;ThresholdGD&#39;]**2:
+                W[ib,ib] = 1/varcurrPD[ib]
+        
+        # Transpose the W matrix in the Piston-space
+        MtWM = np.dot(FT[&#39;OPD2Piston&#39;], np.dot(W,FT[&#39;Piston2OPD&#39;]))
+        
+        # Singular-Value-Decomposition of the W matrix
+        U, S, Vt = np.linalg.svd(MtWM)
+        
+        Ut = np.transpose(U)
+        V = np.transpose(Vt)
+        
+        &#34;&#34;&#34;
+        GD weighting matrix
+        &#34;&#34;&#34;
+    
+        Sdag = np.zeros([NA,NA])
+        for ia in range(NA):
+            if S[ia] &gt; 0:
+                Sdag[ia,ia] = 1/S[ia]
+        
+        # Come back to the OPD-space        
+        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
+        
+        # Calculates the weighting matrix
+        currIgd = np.dot(FT[&#39;Piston2OPD&#39;],np.dot(VSdagUt,np.dot(FT[&#39;OPD2Piston&#39;], W)))
+    
+    
+        &#34;&#34;&#34;
+        PD Weighting matrix
+        &#34;&#34;&#34;
+
+        Sdag = np.zeros([NA,NA])
+        for ia in range(NA):
+            if S[ia] &gt; SNRpd**2:
+                Sdag[ia,ia] = 1/S[ia]
+            else:
+                Sdag[ia,ia] = S[ia]/FT[&#39;ThresholdPD&#39;]**4
+        
+        # Come back to the OPD-space        
+        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
+        
+        # Calculates the weighting matrix
+        currIpd = np.dot(FT[&#39;Piston2OPD&#39;],np.dot(VSdagUt,np.dot(FT[&#39;OPD2Piston&#39;], W)))
+            
+    else:
+        currIgd = np.identity(NIN)
+        currIpd = np.identity(NIN)
+    
+    simu.Igd[it,:,:] = currIgd
+    simu.Ipd[it,:,:] = currIpd
+    
+    &#34;&#34;&#34;
+    Group-Delay tracking
+    &#34;&#34;&#34;
+    
+    currGDerr = currGD - simu.GDref
+    
+    # Keep the GD between [-Pi, Pi]
+    # Eq. 35
+    for ib in range(NIN):
+        if currGDerr[ib] &gt; np.pi:
+            currGDerr[ib] -= 2*np.pi
+        elif currGDerr[ib] &lt; -np.pi:
+            currGDerr[ib] += 2*np.pi
+    
+    R = config.FS[&#39;R&#39;]
+    # Store residual GD for display only [radians]
+    simu.GDResidual[it] = currGDerr*R
+    
+    # Weights the GD (Eq.35)
+        
+    currGDerr = np.dot(currIgd,currGDerr)
+     
+    if FT[&#39;Threshold&#39;]:     # Threshold function (eq.36)
+        for ib in range(NIN):
+            if currGDerr[ib] &gt; np.pi/R:
+                currGDerr[ib] -= np.pi/R
+            elif currGDerr[ib] &lt; -np.pi/R:
+                currGDerr[ib] += np.pi/R
+            else:
+                currGDerr[ib] = 0
+    
+    # Integrator (Eq.37)
+    if FT[&#39;cmdOPD&#39;]:     # integrator on OPD
+        # Integrator
+        simu.GDCommand[it] = simu.GDCommand[it-1] + FT[&#39;GainGD&#39;]*currGDerr
+        
+        # From OPD to Pistons
+        uGD = np.dot(FT[&#39;OPD2Piston&#39;], simu.GDCommand[it])
+        
+    else:                       # integrator on Pistons
+        # From OPD to Piston
+        currPistonGD = np.dot(FT[&#39;OPD2Piston&#39;], currGDerr)
+        # Integrator
+        uGD = simu.PistonGDCommand[it-1] + FT[&#39;GainGD&#39;]*currPistonGD
+        
+    # simu.GDCommand[it+1] = simu.GDCommand[it] + FT[&#39;GainGD&#39;]*currGDerr
+    
+    # From OPD to Piston
+    # uGD = np.dot(FT[&#39;OPD2Piston&#39;], simu.GDCommand[it+1])
+    
+    if config.FT[&#39;roundGD&#39;]:
+        for ia in range(NA):
+            jumps = round(uGD[ia]/config.PDspectra)
+            uGD[ia] = jumps*config.PDspectra
+            
+    simu.PistonGDCommand[it] = uGD
+
+    &#34;&#34;&#34;
+    Phase-Delay command
+    &#34;&#34;&#34;
+    
+    currPDerr = currPD - simu.PDref
+ 
+    # Keep the PD between [-Pi, Pi]
+    # Eq. 35
+    for ib in range(NIN):
+        if currPDerr[ib] &gt; np.pi:
+            currPDerr[ib] -= 2*np.pi
+        elif currPDerr[ib] &lt; -np.pi:
+            currPDerr[ib] += 2*np.pi
+    
+    # Store residual PD and piston for display only
+    simu.PDResidual[it] = currPDerr
+    # simu.PistonResidual[it] = np.dot(OPD2Piston_, simu.PDResidual[it])/2/np.pi*config.PDspectra
+    
+    # Weights the PD (Eq.35)
+    currPDerr = np.dot(currIpd,currPDerr)
+    
+    # Integrator (Eq.37)
+            
+    if FT[&#39;cmdOPD&#39;]:     # integrator on OPD
+        # Integrator
+        simu.PDCommand[it] = simu.PDCommand[it-1] + FT[&#39;GainPD&#39;]*currPDerr
+        # From OPD to Pistons
+        uPD = np.dot(FT[&#39;OPD2Piston&#39;], simu.PDCommand[it])
+        
+    else:                       # integrator on Pistons
+        # From OPD to Piston
+        currPistonPD = np.dot(FT[&#39;OPD2Piston&#39;], currPDerr)
+        # Integrator
+        uPD = simu.PistonPDCommand[it-1] + FT[&#39;GainPD&#39;]*currPistonPD
+    
+    simu.PistonPDCommand[it] = uPD
+    
+    &#34;&#34;&#34;
+    FRINGE SEARCHING command
+    &#34;&#34;&#34;
+    
+    usearch = np.zeros([NA])
+    
+    # if config.mode == &#39;track&#39;:
+    #     if np.linalg.matrix_rank(currIgd) &lt; NA-1:
+    #         tsearch_ = it
+    #         config.mode == &#39;search&#39;
+            
+    # elif config.mode == &#39;search&#39;:
+    #     if np.linalg.matrix_rank(currIgd) == NA-1:
+    #         config.mode == &#39;track&#39;
+    #     else:
+    #         usaw = searchfunction(NA,Sweep_,Slope_,it-tsearch_)
+    #         usearch = Vfactors_*usaw
+        
+    
+    &#34;&#34;&#34;
+    MODULATION command
+    &#34;&#34;&#34;
+
+
+    
+    &#34;&#34;&#34;
+    ODL command
+    It is the addition of the GD, PD, SEARCH and modulation functions
+    &#34;&#34;&#34;
+    
+    CommandODL = uPD + uGD + usearch
+    
+    # if config.TELref !=-1:
+    #     CommandODL = CommandODL - CommandODL[config.TELref]
+    
+    return CommandODL
+
+
+def getvar():
+    &#34;&#34;&#34;
+    From the image and calibrated quantities (sky), calculates the &#34;Phase variance&#34;
+    which is in reality the inverse of the squared signal-to-noise ratio of the 
+    fringes.
+
+    Parameters
+    ----------
+    image : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    varPD : TYPE
+        DESCRIPTION.
+
+    GLOBAL
+    -------
+    simu.CfPD : 
+        
+    simu.varPD :
+        
+
+    &#34;&#34;&#34;
+    
+    from . import simu
+    import cupy as cp
+    
+    (NA,NB,NIN)=(config.NA,config.NB,config.NIN)
+    (NW,MW)=(config.NW,config.MW)
+    (MT,NT)=(config.MT,config.NT) 
+    
+    it = simu.it
+    
+    image = cp.array(simu.MacroImages[it,:,:])
+    
+    MW = np.shape(image)[0]
+    M = config.M            # Amplification ratio camera
+    
+    sigsky = cp.array(config.FS[&#39;sigsky&#39;])  # Background noise
+    imsky = cp.array(config.FS[&#39;imsky&#39;])    # Sky image before observation
+    Demod = cp.array(config.FS[&#39;MacroP2VM&#39;])    # Macro P2VM matrix used for demodulation
+    
+    # Flux variance calculation (eq. 12)
+    varFlux = sigsky**2 + 1*(image - imsky)
+    
+    &#34;&#34;&#34;
+    Covariance calculation (eq. 13)
+    &#34;&#34;&#34;
+    
+    covar_ = cp.zeros([NT,MW,NB,NB])*1j
+    for iw in range(MW):
+        covar_[it,iw] = cp.dot(Demod[iw], cp.dot(cp.diag(varFlux[iw]),cp.transpose(Demod[iw])))
+        
+    # Phase variance calculation (eq. 14)
+    # Put to a non-null very low value for the moment
+    varPD = cp.ones([NIN])*1e-1
+
+    Nvar = 5                # Integration time for phase variance
+    if it &lt; Nvar:
+        Nvar = it+1
+        
+    vartemp = cp.zeros([MW,NIN])
+    vartemp2 = cp.zeros([MW,NIN])*1j
+    
+    for iot in range(it+1-Nvar,it+1):
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                k = posk(ia,iap,NA)
+                kp = ia*NA+iap
+                vartemp[:,k] += (cp.abs(cp.real(covar_[iot,:,kp,kp]))+cp.abs(cp.imag(covar_[iot,:,kp,kp])))/Nvar
+                vartemp2[:,k] += cp.array(simu.CfPD[iot,:,k])/Nvar
+    
+    varPD = cp.sum(vartemp,axis=0)/(2*cp.abs(cp.sum(vartemp2,axis=0))**2)
+    
+    varPDnumpy = cp.asnumpy(varPD)
+    simu.varPD[it] = varPDnumpy
+    
+    return varPDnumpy
+
+
+def searchfunction(NA,sweep,a,t):
+    
+    usaw = np.ones([NA])
+    
+    nbtooth = t//sweep
+    tp = t%sweep + nbtooth//2*sweep
+    if nbtooth%2 == 0:
+        usaw *= a*tp
+        
+    elif nbtooth%2 == 1:
+        usaw *= -a*tp
+        
+    return usaw</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="cophasing.SPICA_FT_cupy.CommandCalc"><code class="name flex">
+<span>def <span class="ident">CommandCalc</span></span>(<span>currPD, currGD)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Generates the command to send to the optical delay line according to the
+group-delay and phase-delay reduced from the OPDCalculator.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>currPD</code></strong> :&ensp;<code>TYPE</code></dt>
+<dd>DESCRIPTION.</dd>
+<dt><strong><code>currGD</code></strong> :&ensp;<code>TYPE</code></dt>
+<dd>DESCRIPTION.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>cmd_odl</code></strong> :&ensp;<code>TYPE</code></dt>
+<dd>DESCRIPTION.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def CommandCalc(currPD,currGD):
+    &#34;&#34;&#34;
+    Generates the command to send to the optical delay line according to the
+    group-delay and phase-delay reduced from the OPDCalculator.
+
+    Parameters
+    ----------
+    currPD : TYPE
+        DESCRIPTION.
+    currGD : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    cmd_odl : TYPE
+        DESCRIPTION.
+
+    &#34;&#34;&#34;
+    
+    from . import simu
+    
+    &#34;&#34;&#34;
+    INIT MODE
+    &#34;&#34;&#34;
+    
+    from .config import NA,NB,NIN
+    from .config import FT
+    
+    SNRgd = 2
+    SNRpd = 1.5
+    
+    it = simu.it            # Frame number
+    
+    &#34;&#34;&#34;
+    Signal-to-noise ratio of the fringes (&#34;Phase variance&#34;)
+    The function getvar saves the inverse of the squared SNR (&#34;Phase variance&#34;)
+    in the global stack variable varPD [NT, MW, NIN]
+    Eq. 12, 13 &amp; 14
+    &#34;&#34;&#34;
+            
+    Ngd = FT[&#39;Ngd&#39;]
+    if it &lt; FT[&#39;Ngd&#39;]:
+        Ngd = it+1
+        
+    
+    &#34;&#34;&#34;
+    WEIGHTING MATRIX
+    &#34;&#34;&#34;
+
+    if config.FT[&#39;useWmatrices&#39;]:
+        
+        varcurrPD = getvar()
+        
+        # Raw Weighting matrix in the OPD-space
+        W = np.zeros([NIN,NIN])
+        
+        for ib in range(NIN):
+            if 1/np.mean(simu.varPD[it+1-Ngd:it+1,ib]) &gt;= FT[&#39;ThresholdGD&#39;]**2:
+                W[ib,ib] = 1/varcurrPD[ib]
+        
+        # Transpose the W matrix in the Piston-space
+        MtWM = np.dot(FT[&#39;OPD2Piston&#39;], np.dot(W,FT[&#39;Piston2OPD&#39;]))
+        
+        # Singular-Value-Decomposition of the W matrix
+        U, S, Vt = np.linalg.svd(MtWM)
+        
+        Ut = np.transpose(U)
+        V = np.transpose(Vt)
+        
+        &#34;&#34;&#34;
+        GD weighting matrix
+        &#34;&#34;&#34;
+    
+        Sdag = np.zeros([NA,NA])
+        for ia in range(NA):
+            if S[ia] &gt; 0:
+                Sdag[ia,ia] = 1/S[ia]
+        
+        # Come back to the OPD-space        
+        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
+        
+        # Calculates the weighting matrix
+        currIgd = np.dot(FT[&#39;Piston2OPD&#39;],np.dot(VSdagUt,np.dot(FT[&#39;OPD2Piston&#39;], W)))
+    
+    
+        &#34;&#34;&#34;
+        PD Weighting matrix
+        &#34;&#34;&#34;
+
+        Sdag = np.zeros([NA,NA])
+        for ia in range(NA):
+            if S[ia] &gt; SNRpd**2:
+                Sdag[ia,ia] = 1/S[ia]
+            else:
+                Sdag[ia,ia] = S[ia]/FT[&#39;ThresholdPD&#39;]**4
+        
+        # Come back to the OPD-space        
+        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
+        
+        # Calculates the weighting matrix
+        currIpd = np.dot(FT[&#39;Piston2OPD&#39;],np.dot(VSdagUt,np.dot(FT[&#39;OPD2Piston&#39;], W)))
+            
+    else:
+        currIgd = np.identity(NIN)
+        currIpd = np.identity(NIN)
+    
+    simu.Igd[it,:,:] = currIgd
+    simu.Ipd[it,:,:] = currIpd
+    
+    &#34;&#34;&#34;
+    Group-Delay tracking
+    &#34;&#34;&#34;
+    
+    currGDerr = currGD - simu.GDref
+    
+    # Keep the GD between [-Pi, Pi]
+    # Eq. 35
+    for ib in range(NIN):
+        if currGDerr[ib] &gt; np.pi:
+            currGDerr[ib] -= 2*np.pi
+        elif currGDerr[ib] &lt; -np.pi:
+            currGDerr[ib] += 2*np.pi
+    
+    R = config.FS[&#39;R&#39;]
+    # Store residual GD for display only [radians]
+    simu.GDResidual[it] = currGDerr*R
+    
+    # Weights the GD (Eq.35)
+        
+    currGDerr = np.dot(currIgd,currGDerr)
+     
+    if FT[&#39;Threshold&#39;]:     # Threshold function (eq.36)
+        for ib in range(NIN):
+            if currGDerr[ib] &gt; np.pi/R:
+                currGDerr[ib] -= np.pi/R
+            elif currGDerr[ib] &lt; -np.pi/R:
+                currGDerr[ib] += np.pi/R
+            else:
+                currGDerr[ib] = 0
+    
+    # Integrator (Eq.37)
+    if FT[&#39;cmdOPD&#39;]:     # integrator on OPD
+        # Integrator
+        simu.GDCommand[it] = simu.GDCommand[it-1] + FT[&#39;GainGD&#39;]*currGDerr
+        
+        # From OPD to Pistons
+        uGD = np.dot(FT[&#39;OPD2Piston&#39;], simu.GDCommand[it])
+        
+    else:                       # integrator on Pistons
+        # From OPD to Piston
+        currPistonGD = np.dot(FT[&#39;OPD2Piston&#39;], currGDerr)
+        # Integrator
+        uGD = simu.PistonGDCommand[it-1] + FT[&#39;GainGD&#39;]*currPistonGD
+        
+    # simu.GDCommand[it+1] = simu.GDCommand[it] + FT[&#39;GainGD&#39;]*currGDerr
+    
+    # From OPD to Piston
+    # uGD = np.dot(FT[&#39;OPD2Piston&#39;], simu.GDCommand[it+1])
+    
+    if config.FT[&#39;roundGD&#39;]:
+        for ia in range(NA):
+            jumps = round(uGD[ia]/config.PDspectra)
+            uGD[ia] = jumps*config.PDspectra
+            
+    simu.PistonGDCommand[it] = uGD
+
+    &#34;&#34;&#34;
+    Phase-Delay command
+    &#34;&#34;&#34;
+    
+    currPDerr = currPD - simu.PDref
+ 
+    # Keep the PD between [-Pi, Pi]
+    # Eq. 35
+    for ib in range(NIN):
+        if currPDerr[ib] &gt; np.pi:
+            currPDerr[ib] -= 2*np.pi
+        elif currPDerr[ib] &lt; -np.pi:
+            currPDerr[ib] += 2*np.pi
+    
+    # Store residual PD and piston for display only
+    simu.PDResidual[it] = currPDerr
+    # simu.PistonResidual[it] = np.dot(OPD2Piston_, simu.PDResidual[it])/2/np.pi*config.PDspectra
+    
+    # Weights the PD (Eq.35)
+    currPDerr = np.dot(currIpd,currPDerr)
+    
+    # Integrator (Eq.37)
+            
+    if FT[&#39;cmdOPD&#39;]:     # integrator on OPD
+        # Integrator
+        simu.PDCommand[it] = simu.PDCommand[it-1] + FT[&#39;GainPD&#39;]*currPDerr
+        # From OPD to Pistons
+        uPD = np.dot(FT[&#39;OPD2Piston&#39;], simu.PDCommand[it])
+        
+    else:                       # integrator on Pistons
+        # From OPD to Piston
+        currPistonPD = np.dot(FT[&#39;OPD2Piston&#39;], currPDerr)
+        # Integrator
+        uPD = simu.PistonPDCommand[it-1] + FT[&#39;GainPD&#39;]*currPistonPD
+    
+    simu.PistonPDCommand[it] = uPD
+    
+    &#34;&#34;&#34;
+    FRINGE SEARCHING command
+    &#34;&#34;&#34;
+    
+    usearch = np.zeros([NA])
+    
+    # if config.mode == &#39;track&#39;:
+    #     if np.linalg.matrix_rank(currIgd) &lt; NA-1:
+    #         tsearch_ = it
+    #         config.mode == &#39;search&#39;
+            
+    # elif config.mode == &#39;search&#39;:
+    #     if np.linalg.matrix_rank(currIgd) == NA-1:
+    #         config.mode == &#39;track&#39;
+    #     else:
+    #         usaw = searchfunction(NA,Sweep_,Slope_,it-tsearch_)
+    #         usearch = Vfactors_*usaw
+        
+    
+    &#34;&#34;&#34;
+    MODULATION command
+    &#34;&#34;&#34;
+
+
+    
+    &#34;&#34;&#34;
+    ODL command
+    It is the addition of the GD, PD, SEARCH and modulation functions
+    &#34;&#34;&#34;
+    
+    CommandODL = uPD + uGD + usearch
+    
+    # if config.TELref !=-1:
+    #     CommandODL = CommandODL - CommandODL[config.TELref]
+    
+    return CommandODL</code></pre>
+</details>
+</dd>
+<dt id="cophasing.SPICA_FT_cupy.ReadCf"><code class="name flex">
+<span>def <span class="ident">ReadCf</span></span>(<span>currCfEstimated)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>From measured coherent flux, estimates GD, PD, CP, Photometry, Visibilities</p>
+<p>NAME:
+COH_ALGO - Calculates the group-delay, phase-delay, closure phase and
+visibility from the fringe sensor image.</p>
+<p>INPUT: CfEstimated [MW,NB]</p>
+<p>OUTPUT: </p>
+<h2 id="update">Update</h2>
+<ul>
+<li>simu.CfEstimated_ &ndash;&gt; should be coh_turn which do that</li>
+<li>simu.CfPD: Coherent Flux Phase-Delay
+[NT,MW,NIN]</li>
+<li>simu.CfGD: Coherent Flux GD
+[NT,MW,NIN]</li>
+<li>simu.ClosurePhasePD
+[NT,MW,NC]</li>
+<li>simu.ClosurePhaseGD
+[NT,MW,NC]</li>
+<li>simu.PhotometryEstimated
+[NT,MW,NA]</li>
+<li>simu.ComplexVisibility
+[NT,MW,NIN]*1j</li>
+<li>simu.CoherenceDegree
+[NT,MW,NIN]</li>
+</ul></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def ReadCf(currCfEstimated):
+    &#34;&#34;&#34;
+    From measured coherent flux, estimates GD, PD, CP, Photometry, Visibilities
+    
+    NAME: 
+        COH_ALGO - Calculates the group-delay, phase-delay, closure phase and 
+        visibility from the fringe sensor image.
+    
+        
+    INPUT: CfEstimated [MW,NB]
+    
+    OUTPUT: 
+        
+    UPDATE:
+        - simu.CfEstimated_ --&gt; should be coh_turn which do that
+        - simu.CfPD: Coherent Flux Phase-Delay     [NT,MW,NIN]
+        - simu.CfGD: Coherent Flux GD              [NT,MW,NIN]
+        - simu.ClosurePhasePD                       [NT,MW,NC]
+        - simu.ClosurePhaseGD                       [NT,MW,NC]
+        - simu.PhotometryEstimated                  [NT,MW,NA]
+        - simu.ComplexVisibility                    [NT,MW,NIN]*1j
+        - simu.CoherenceDegree                      [NT,MW,NIN]
+    &#34;&#34;&#34;
+    
+    from . import simu
+    
+    from .config import NA,NIN,NC
+    from .config import MW
+    
+    it = simu.it            # Time
+     
+    &#34;&#34;&#34;
+    Photometries extraction
+    [NT,MW,NA]
+    &#34;&#34;&#34;
+    PhotEst = np.zeros([MW,NA])
+    for ia in range(NA):
+        PhotEst[:,ia] = np.real(currCfEstimated[:,ia*(NA+1)])
+    
+    # Extract NIN-sized coherence vector from NB-sized one. 
+    # (eliminates photometric and conjugate terms)
+    currCfEstimatedNIN = np.zeros([MW, NIN])*1j
+    for imw in range(MW):    
+        currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
+        
+    # Save coherent flux and photometries in stack
+    simu.PhotometryEstimated[it] = PhotEst
+    
+    &#34;&#34;&#34;
+    Visibilities extraction
+    [NT,MW,NIN]
+    &#34;&#34;&#34;
+    
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)
+            Iaap = currCfEstimatedNIN[:,ib]                  # Interferometric intensity (a,a&#39;)
+            Ia = PhotEst[:,ia]                     # Photometry pupil a
+            Iap = PhotEst[:,iap]                   # Photometry pupil a&#39;
+            simu.ComplexVisibility[it,:,ib] = 2*Iaap/(Ia+Iap)          # Fringe ComplexVisibility of the base (a,a&#39;)
+            simu.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a&#39;)
+ 
+ 
+    &#34;&#34;&#34;
+    Phase-delays extraction
+    PD_ is a global stack variable [NT, NIN]
+    Eq. 10 &amp; 11
+    &#34;&#34;&#34;
+    D = 0   # Dispersion correction factor: so far, put to zero because it&#39;s a 
+            # calibration term (to define in coh_fs?)
+            
+    LmbdaTrack = config.PDspectra
+    
+    # Coherent flux corrected from dispersion
+    for imw in range(MW):
+        simu.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
+        
+        # If ClosurePhase correction before wrapping
+        # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref)
+        
+    # Current Phase-Delay
+    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))
+        
+    &#34;&#34;&#34;
+    Group-Delays extration
+    GD_ is a global stack variable [NT, NIN]
+    Eq. 15 &amp; 16
+    &#34;&#34;&#34;
+    
+    if MW &lt;= 1:
+        raise ValueError(&#39;Tracking mode = GD but no more than one wavelength. \
+                         Need several wavelengths for group delay&#39;)              # Group-delay calculation
+    
+    Ngd = config.FT[&#39;Ngd&#39;]                 # Group-delay DIT
+    Ncross = config.FT[&#39;Ncross&#39;]           # Distance between wavelengths channels for GD calculation
+    
+    if it &lt; Ngd:
+        Ngd = it+1
+    
+    # Integrates GD with Ngd last frames (from it-Ngd to it)
+    timerange = range(it+1-Ngd,it+1)
+    for iot in timerange:
+        cfgd = simu.CfPD[iot]*np.exp(-1j*simu.PDEstimated[iot])/Ngd
+        
+        # If ClosurePhase correction before wrapping
+        # cfgd = cfgd*np.exp(-1j*simu.GDref)
+        
+        simu.CfGD[it,:,:] += cfgd
+
+
+    currGD = np.zeros(NIN)
+    for ib in range(NIN):
+        cfGDlmbdas = simu.CfGD[it,:-Ncross,ib]*np.conjugate(simu.CfGD[it,Ncross:,ib])
+        cfGDmoy = np.sum(cfGDlmbdas)
+
+        currGD[ib] = np.angle(cfGDmoy)    # Group-delay on baseline (ib).
+    
+    &#34;&#34;&#34;
+    Closure phase calculation
+    cpPD_ is a global stack variable [NT, NC]
+    cpGD_ is a global stack variable [NT, NC]
+    Eq. 17 &amp; 18
+    &#34;&#34;&#34;
+    
+    Ncp = config.FT[&#39;Ncp&#39;]
+    
+    if it &lt; Ncp:
+        Ncp = it+1
+        
+    bispectrumPD = np.zeros([NC])*1j
+    bispectrumGD = np.zeros([NC])*1j
+    
+    timerange = range(it+1-Ncp,it+1)
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)      # coherent flux (ia,iap)    
+            cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
+            cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+            cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+            for iapp in range(iap+1,NA):
+                ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
+                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+                
+                ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
+                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
+                
+                # The bispectrum of one time and one triangle adds up to
+                # the Ncp last times
+                ic = poskfai(ia,iap,iapp,NA)        # 0&lt;=ic&lt;NC=(NA-2)(NA-1) 
+                
+                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
+                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+                    
+    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)
+    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)
+    
+    if config.FT[&#39;CPref&#39;] and (it == 0):                     # At time 0, we create the reference vectors
+        for ia in range(1,NA-1):
+            for iap in range(ia+1,NA):
+                k = posk(ia,iap,NA)
+                ic = poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
+                
+                if config.FT[&#39;usePDref&#39;]:
+                    simu.PDref[k] = simu.ClosurePhasePD[0,ic]
+                    simu.GDref[k] = simu.ClosurePhaseGD[0,ic]
+                else:
+                    simu.PDref[k] = 0
+                    simu.GDref[k] = 0
+                    
+    return currPD, currGD</code></pre>
+</details>
+</dd>
+<dt id="cophasing.SPICA_FT_cupy.SPICAFT"><code class="name flex">
+<span>def <span class="ident">SPICAFT</span></span>(<span>*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=1, Sweep=100, Slope=100, Vfactors=[], CPref=True, Ncp=300, ThresholdGD=2, ThresholdPD=1.5, Threshold=True, usePDref=True, useWmatrices=True, latencytime=1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Uses the measured coherent flux to calculate the new positions to send
+to the delay lines. It filters the most noisy baselines in order to
+improve the fringe tracking.</p>
+<h2 id="input">Input</h2>
+<ul>
+<li>If init: all the below parameters.</li>
+<li>If not init: CfEstimated - Measured Coherent Flux
+[MW,NB]</li>
+</ul>
+<h2 id="output">Output</h2>
+<ul>
+<li>currCmd: Piston Command to send to the ODL
+[NA]</li>
+</ul>
+<p>USED OBSERVABLES:
+- config.FT
+UPDATED OBSERVABLES:
+- simu.PDEstimated: [NT,MW,NIN] Estimated PD before subtraction of the reference
+- simu.GDEstimated: [NT,MW,NIN] Estimated GD before subtraction of the reference
+- simu.CommandODL: Piston Command to send
+[NT,NA]</p>
+<h2 id="subroutines">Subroutines</h2>
+<ul>
+<li>ReadCf</li>
+<li>CommandCalc</li>
+</ul>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>*args</code></strong> :&ensp;<code>TYPE</code></dt>
+<dd>Expect CfEstimated.</dd>
+<dt><strong><code>init</code></strong> :&ensp;<code>BOOLEAN</code>, optional</dt>
+<dd>If True, initialize the below parameters.
+Needs to be called before starting the simulation.
+The default is False.</dd>
+<dt><strong><code>GainPD</code></strong> :&ensp;<code>FLOAT</code>, optional</dt>
+<dd>Gain PD. The default is 0.</dd>
+<dt><strong><code>GainGD</code></strong> :&ensp;<code>FLOAT</code>, optional</dt>
+<dd>Gain GD. The default is 0.</dd>
+<dt><strong><code>Ngd</code></strong> :&ensp;<code>INT</code>, optional</dt>
+<dd>Frame integration GD. The default is 1.</dd>
+<dt><strong><code>Sweep</code></strong> :&ensp;<code>TYPE</code>, optional</dt>
+<dd>DESCRIPTION. The default is 100.</dd>
+<dt><strong><code>Slope</code></strong> :&ensp;<code>TYPE</code>, optional</dt>
+<dd>DESCRIPTION. The default is 100.</dd>
+<dt><strong><code>Vfactors</code></strong> :&ensp;<code>TYPE</code>, optional</dt>
+<dd>DESCRIPTION. The default is [].</dd>
+<dt><strong><code>Ncross</code></strong> :&ensp;<code>INT</code>, optional</dt>
+<dd>Separation between two spectral channels for GD calculation.
+The default is 1.</dd>
+<dt><strong><code>CPref</code></strong> :&ensp;<code>BOOLEAN</code>, optional</dt>
+<dd>If False, the Closure Phase is not subtracted for reference.
+The default is True.</dd>
+<dt><strong><code>Ncp</code></strong> :&ensp;<code>INT</code>, optional</dt>
+<dd>Frame integration CP. The default is 1.</dd>
+<dt><strong><code>roundGD</code></strong> :&ensp;<code>BOOLEAN</code>, optional</dt>
+<dd>If True, the GD command is rounded to wavelength integers.
+Advised to avoid a superposition of the PD and GD commands.
+The default is True.</dd>
+<dt><strong><code>ThresholdGD</code></strong> :&ensp;<code>FLOAT</code>, optional</dt>
+<dd>If the SNR of the estimated GD of a given baseline is lower than
+ThresholdGD, then this baseline is weighted down.
+The default is 2.</dd>
+<dt><strong><code>ThresholdPD</code></strong> :&ensp;<code>FLOAT</code>, optional</dt>
+<dd>If the SNR of the estimated GD of a given baseline is lower than
+ThresholdGD, then this baseline is weighted down.
+DESCRIPTION. The default is 1.5.</dd>
+<dt><strong><code>Threshold</code></strong> :&ensp;<code>BOOLEAN</code>, optional</dt>
+<dd>If False, the GD works also within a frange. Essentially for debugging.</dd>
+<dt><strong><code>usePDref</code></strong> :&ensp;<code>BOOLEAN</code>, optional</dt>
+<dd>If False, no reference vector</dd>
+<dt><strong><code>useWmatrices</code></strong> :&ensp;<code>BOOLEAN</code>, optional</dt>
+<dd>Wmatrices means Weighting matrices. If True, the weighting of the commands
+using the SNR of the measurements is used.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>currCmd</code></strong> :&ensp;<code>ARRAY [NA]</code></dt>
+<dd>Piston Command to send to the ODL.</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def SPICAFT(*args, init=False, GainPD=0, GainGD=0, Ngd=50, roundGD=True, Ncross=1,
+            Sweep=100, Slope=100, Vfactors = [], CPref=True, Ncp = 300,
+            ThresholdGD=2, ThresholdPD = 1.5, 
+            Threshold=True, usePDref=True, useWmatrices=True,
+            latencytime=1):
+    &#34;&#34;&#34;
+    Uses the measured coherent flux to calculate the new positions to send 
+    to the delay lines. It filters the most noisy baselines in order to 
+    improve the fringe tracking.
+    
+    INPUT:
+        - If init: all the below parameters.
+        - If not init: CfEstimated - Measured Coherent Flux   [MW,NB]
+    
+    OUTPUT:
+        - currCmd: Piston Command to send to the ODL     [NA]
+    
+    USED OBSERVABLES:
+        - config.FT
+    UPDATED OBSERVABLES:
+        - simu.PDEstimated: [NT,MW,NIN] Estimated PD before subtraction of the reference
+        - simu.GDEstimated: [NT,MW,NIN] Estimated GD before subtraction of the reference
+        - simu.CommandODL: Piston Command to send       [NT,NA]
+        
+    SUBROUTINES:
+        - ReadCf
+        - CommandCalc
+
+    Parameters
+    ----------
+    *args : TYPE
+        Expect CfEstimated.
+    init : BOOLEAN, optional
+        If True, initialize the below parameters.
+        Needs to be called before starting the simulation.
+        The default is False.
+    GainPD : FLOAT, optional
+        Gain PD. The default is 0.
+    GainGD : FLOAT, optional
+        Gain GD. The default is 0.
+    Ngd : INT, optional
+        Frame integration GD. The default is 1.
+    Sweep : TYPE, optional
+        DESCRIPTION. The default is 100.
+    Slope : TYPE, optional
+        DESCRIPTION. The default is 100.
+    Vfactors : TYPE, optional
+        DESCRIPTION. The default is [].
+    Ncross : INT, optional
+        Separation between two spectral channels for GD calculation. 
+        The default is 1.
+    CPref : BOOLEAN, optional
+        If False, the Closure Phase is not subtracted for reference. 
+        The default is True.
+    Ncp : INT, optional
+        Frame integration CP. The default is 1.
+    roundGD : BOOLEAN, optional
+        If True, the GD command is rounded to wavelength integers. 
+        Advised to avoid a superposition of the PD and GD commands.
+        The default is True.
+    ThresholdGD : FLOAT, optional
+        If the SNR of the estimated GD of a given baseline is lower than 
+        ThresholdGD, then this baseline is weighted down.
+        The default is 2.
+    ThresholdPD : FLOAT, optional
+        If the SNR of the estimated GD of a given baseline is lower than 
+        ThresholdGD, then this baseline is weighted down.
+        DESCRIPTION. The default is 1.5.
+    Threshold : BOOLEAN, optional
+        If False, the GD works also within a frange. Essentially for debugging.
+    usePDref : BOOLEAN, optional
+        If False, no reference vector
+    useWmatrices: BOOLEAN, optional
+        Wmatrices means Weighting matrices. If True, the weighting of the commands
+        using the SNR of the measurements is used.
+
+    Returns
+    -------
+    currCmd : ARRAY [NA]
+        Piston Command to send to the ODL.
+
+    &#34;&#34;&#34;
+    
+    if init:
+
+        # config.R = np.abs((config.MW-1)*config.PDspectra/(config.spectraM[-1] - config.spectraM[0]))
+        config.FT[&#39;Name&#39;] = &#39;SPICAfromGRAVITY&#39;
+        config.FT[&#39;func&#39;] = SPICAFT
+        config.FT[&#39;Ngd&#39;] = Ngd
+        config.FT[&#39;GainGD&#39;] = GainGD
+        config.FT[&#39;GainPD&#39;] = GainPD
+        config.FT[&#39;Sweep&#39;] = Sweep
+        config.FT[&#39;Slope&#39;] = Slope*config.dt*1e-3
+        config.FT[&#39;Ncross&#39;] = Ncross
+        config.FT[&#39;Ncp&#39;] = Ncp
+        config.FT[&#39;ThresholdGD&#39;] = ThresholdGD
+        config.FT[&#39;ThresholdPD&#39;] = ThresholdPD
+        config.FT[&#39;CPref&#39;] = CPref
+        config.FT[&#39;roundGD&#39;] = roundGD
+        config.FT[&#39;Threshold&#39;] = Threshold
+        config.FT[&#39;cmdOPD&#39;] = True
+        config.FT[&#39;usePDref&#39;] = usePDref
+        config.FT[&#39;useWmatrices&#39;] = useWmatrices
+        
+        if len(Vfactors) != 0:
+            config.FT[&#39;Vfactors&#39;] = Vfactors
+        else:
+            config.FT[&#39;Vfactors&#39;] = np.array([0, -10,-9,-6,2,7])/10
+            print(f&#34;Searching velocity factors are {config.FT[&#39;Vfactors&#39;]}&#34;)
+        
+        from .config import NA,NIN
+        
+        config.FT[&#39;Piston2OPD&#39;] = np.zeros([NIN,NA])    # Piston to OPD matrix
+        config.FT[&#39;OPD2Piston&#39;] = np.zeros([NA,NIN])    # OPD to Pistons matrix
+        
+        # if not config.TELref:
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = posk(ia,iap,NA)
+                config.FT[&#39;Piston2OPD&#39;][ib,ia] = 1
+                config.FT[&#39;Piston2OPD&#39;][ib,iap] = -1
+                config.FT[&#39;OPD2Piston&#39;][ia,ib] = 1
+                config.FT[&#39;OPD2Piston&#39;][iap,ib] = -1
+            # config.FT[&#39;OPD2Piston&#39;] = np.linalg.pinv(config.FT[&#39;Piston2OPD&#39;])   # OPD to pistons matrix
+        
+        config.FT[&#39;OPD2Piston&#39;] = config.FT[&#39;OPD2Piston&#39;]/NA
+        
+        if config.TELref:
+            iTELref = config.TELref - 1
+            L_ref = config.FT[&#39;OPD2Piston&#39;][iTELref,:]
+            config.FT[&#39;OPD2Piston&#39;] = config.FT[&#39;OPD2Piston&#39;] - L_ref
+        
+        return
+
+    from . import simu
+
+    it = simu.it
+    
+    currCfEstimated = args[0]
+
+    currPD, currGD = ReadCf(currCfEstimated)
+    
+    simu.PDEstimated[it] = currPD
+    simu.GDEstimated[it] = currGD*config.FS[&#39;R&#39;]
+    
+    currCmd = CommandCalc(currPD, currGD)
+    
+    return currCmd</code></pre>
+</details>
+</dd>
+<dt id="cophasing.SPICA_FT_cupy.getvar"><code class="name flex">
+<span>def <span class="ident">getvar</span></span>(<span>)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>From the image and calibrated quantities (sky), calculates the "Phase variance"
+which is in reality the inverse of the squared signal-to-noise ratio of the
+fringes.</p>
+<h2 id="parameters">Parameters</h2>
+<dl>
+<dt><strong><code>image</code></strong> :&ensp;<code>TYPE</code></dt>
+<dd>DESCRIPTION.</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<dl>
+<dt><strong><code>varPD</code></strong> :&ensp;<code>TYPE</code></dt>
+<dd>DESCRIPTION.</dd>
+</dl>
+<h2 id="global">Global</h2>
+<p>simu.CfPD : </p>
+<p>simu.varPD :</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def getvar():
+    &#34;&#34;&#34;
+    From the image and calibrated quantities (sky), calculates the &#34;Phase variance&#34;
+    which is in reality the inverse of the squared signal-to-noise ratio of the 
+    fringes.
+
+    Parameters
+    ----------
+    image : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    varPD : TYPE
+        DESCRIPTION.
+
+    GLOBAL
+    -------
+    simu.CfPD : 
+        
+    simu.varPD :
+        
+
+    &#34;&#34;&#34;
+    
+    from . import simu
+    import cupy as cp
+    
+    (NA,NB,NIN)=(config.NA,config.NB,config.NIN)
+    (NW,MW)=(config.NW,config.MW)
+    (MT,NT)=(config.MT,config.NT) 
+    
+    it = simu.it
+    
+    image = cp.array(simu.MacroImages[it,:,:])
+    
+    MW = np.shape(image)[0]
+    M = config.M            # Amplification ratio camera
+    
+    sigsky = cp.array(config.FS[&#39;sigsky&#39;])  # Background noise
+    imsky = cp.array(config.FS[&#39;imsky&#39;])    # Sky image before observation
+    Demod = cp.array(config.FS[&#39;MacroP2VM&#39;])    # Macro P2VM matrix used for demodulation
+    
+    # Flux variance calculation (eq. 12)
+    varFlux = sigsky**2 + 1*(image - imsky)
+    
+    &#34;&#34;&#34;
+    Covariance calculation (eq. 13)
+    &#34;&#34;&#34;
+    
+    covar_ = cp.zeros([NT,MW,NB,NB])*1j
+    for iw in range(MW):
+        covar_[it,iw] = cp.dot(Demod[iw], cp.dot(cp.diag(varFlux[iw]),cp.transpose(Demod[iw])))
+        
+    # Phase variance calculation (eq. 14)
+    # Put to a non-null very low value for the moment
+    varPD = cp.ones([NIN])*1e-1
+
+    Nvar = 5                # Integration time for phase variance
+    if it &lt; Nvar:
+        Nvar = it+1
+        
+    vartemp = cp.zeros([MW,NIN])
+    vartemp2 = cp.zeros([MW,NIN])*1j
+    
+    for iot in range(it+1-Nvar,it+1):
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                k = posk(ia,iap,NA)
+                kp = ia*NA+iap
+                vartemp[:,k] += (cp.abs(cp.real(covar_[iot,:,kp,kp]))+cp.abs(cp.imag(covar_[iot,:,kp,kp])))/Nvar
+                vartemp2[:,k] += cp.array(simu.CfPD[iot,:,k])/Nvar
+    
+    varPD = cp.sum(vartemp,axis=0)/(2*cp.abs(cp.sum(vartemp2,axis=0))**2)
+    
+    varPDnumpy = cp.asnumpy(varPD)
+    simu.varPD[it] = varPDnumpy
+    
+    return varPDnumpy</code></pre>
+</details>
+</dd>
+<dt id="cophasing.SPICA_FT_cupy.searchfunction"><code class="name flex">
+<span>def <span class="ident">searchfunction</span></span>(<span>NA, sweep, a, t)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def searchfunction(NA,sweep,a,t):
+    
+    usaw = np.ones([NA])
+    
+    nbtooth = t//sweep
+    tp = t%sweep + nbtooth//2*sweep
+    if nbtooth%2 == 0:
+        usaw *= a*tp
+        
+    elif nbtooth%2 == 1:
+        usaw *= -a*tp
+        
+    return usaw</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="cophasing" href="index.html">cophasing</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="cophasing.SPICA_FT_cupy.CommandCalc" href="#cophasing.SPICA_FT_cupy.CommandCalc">CommandCalc</a></code></li>
+<li><code><a title="cophasing.SPICA_FT_cupy.ReadCf" href="#cophasing.SPICA_FT_cupy.ReadCf">ReadCf</a></code></li>
+<li><code><a title="cophasing.SPICA_FT_cupy.SPICAFT" href="#cophasing.SPICA_FT_cupy.SPICAFT">SPICAFT</a></code></li>
+<li><code><a title="cophasing.SPICA_FT_cupy.getvar" href="#cophasing.SPICA_FT_cupy.getvar">getvar</a></code></li>
+<li><code><a title="cophasing.SPICA_FT_cupy.searchfunction" href="#cophasing.SPICA_FT_cupy.searchfunction">searchfunction</a></code></li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc" title="pdoc: Python API documentation generator"><cite>pdoc</cite> 0.10.0</a>.</p>
+</footer>
+</body>
+</html>

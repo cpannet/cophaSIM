@@ -1131,7 +1131,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     
     Purpose
     ---------
-        This procedure plots different results from the simulation,\
+        This procedure plots different results from the simulation.
         Available observables to display:
             - Photometries: 'phot'
             - Disturbances: 'disturbances'
@@ -1304,13 +1304,13 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     t = simu.timestamps*1e-3 # time in ms
     timerange = range(NT)
     
-    TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
     if 'TelescopeArrangement' in infos.keys():
         tels = infos['TelescopeArrangement']
     else:
+        TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
         tels = TelConventionalArrangement
         
-    Tel2Beam = np.zeros([6,6])
+    Tel2Beam = np.zeros([NA,NA])
     for ia in range(NA):
         tel = tels[ia] ; tel0 = TelConventionalArrangement[ia] 
         pos = np.argwhere(np.array(tels)==tel0)[0][0]
@@ -1323,6 +1323,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         for tel2 in tels[itel+1:]:
             baselines.append(f'{tel1}{tel2}')
         itel+=1
+    
     
     # For distribute baselines between two subplots
     NIN = len(baselines)
@@ -1435,7 +1436,17 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
     GDerr = simu.GDResidual2*R*wl/2/np.pi ; PDerr = simu.PDResidual2*wl/2/np.pi
     GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-    SquaredSNR = simu.SquaredSNRMovingAveragePD
+    
+    SNR_pd = np.sqrt(simu.SquaredSNRMovingAveragePD)
+    SNR_gd = np.sqrt(simu.SquaredSNRMovingAverageGD)
+    SNRGD = np.sqrt(simu.SquaredSNRMovingAverageGDUnbiased)
+    
+    if config.FT['whichSNR'] == 'pd':
+        SNR = SNR_pd
+    else:
+        SNR = SNR_gd
+        
+    #SquaredSNR = simu.SquaredSNRMovingAveragePD
     # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
     
     
@@ -1668,7 +1679,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax6.set_title("Second serie of baselines, from 26 to 56")
         
         for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -1676,7 +1687,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
             ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         for iBase in range(len1,NIN):   # Second serie
-            ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -1715,7 +1726,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax4.get_shared_y_axes().join(ax4,ax9)
         ax5.get_shared_y_axes().join(ax5,ax10)
         
-        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
         ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
         ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
         ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
@@ -1724,7 +1735,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax4.tick_params(labelbottom=False)
         ax9.tick_params(labelbottom=False)
         
-        ax1.set_ylabel('SNR²')
+        ax1.set_ylabel('SNR')
         ax2.set_ylabel('Group-Delays [µm]')
         ax3.set_ylabel('Phase-Delays [µm]')
         ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
@@ -1768,7 +1779,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
          GD = simu.GDEstimated2 ; PD=simu.PDEstimated2
          GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
          GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-         SquaredSNR = simu.SquaredSNRMovingAveragePD
+         
          # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
          
          GDerr = simu.GDResidual2 ; PDerr =simu.PDResidual2
@@ -1799,7 +1810,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
          ax6.set_title("Second serie of baselines, from 26 to 56")
          
          for iBase in range(len1):   # First serie
-             ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+             ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
              if 'ThresholdGD' in config.FT.keys():
                  ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
              ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -1807,7 +1818,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
              ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
              ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
          for iBase in range(len1,NIN):   # Second serie
-             ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+             ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
              if 'ThresholdGD' in config.FT.keys():
                  ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
              ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -1846,7 +1857,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
          ax4.get_shared_y_axes().join(ax4,ax9)
          ax5.get_shared_y_axes().join(ax5,ax10)
          
-         ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+         ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
          ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
          ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
          ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
@@ -1855,7 +1866,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
          ax4.tick_params(labelbottom=False)
          ax9.tick_params(labelbottom=False)
          
-         ax1.set_ylabel('SNR²')
+         ax1.set_ylabel('SNR')
          ax2.set_ylabel('Group-Delays [µm]')
          ax3.set_ylabel('Phase-Delays [µm]')
          ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
@@ -1898,7 +1909,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         GD = simu.GDResidual ; PD=simu.PDResidual
         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-        SquaredSNR = simu.SquaredSNRMovingAverage
         # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
         
         
@@ -1922,7 +1932,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax6.set_title("Second serie of baselines, from 26 to 56")
         
         for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -1930,7 +1940,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
             ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         for iBase in range(len1,NIN):   # Second serie
-            ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -1969,7 +1979,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax4.get_shared_y_axes().join(ax4,ax9)
         ax5.get_shared_y_axes().join(ax5,ax10)
         
-        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
         ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
         ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
         ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
@@ -1979,7 +1989,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax9.tick_params(labelbottom=False)
         
         
-        ax1.set_ylabel('SNR²')
+        ax1.set_ylabel('SNR')
         ax2.set_ylabel('Group-Delays [µm]')
         ax3.set_ylabel('Phase-Delays [µm]')
         ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
@@ -2024,7 +2034,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         GD = simu.GDResidual2 ; PD =simu.PDResidual2
         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-        SquaredSNR = simu.SquaredSNRMovingAverage
         # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
         
         
@@ -2048,7 +2057,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax6.set_title("Second serie of baselines, from 26 to 56")
         
         for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -2056,7 +2065,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
             ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
         for iBase in range(len1,NIN):   # Second serie
-            ax6.plot(t[timerange],SquaredSNR[timerange,iBase],color=basecolors[iBase])
+            ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
             if 'ThresholdGD' in config.FT.keys():
                 ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
@@ -2095,7 +2104,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax4.get_shared_y_axes().join(ax4,ax9)
         ax5.get_shared_y_axes().join(ax5,ax10)
         
-        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SquaredSNR,ymin=0)
+        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
         ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
         ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
         ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
@@ -2105,7 +2114,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         ax9.tick_params(labelbottom=False)
         
         
-        ax1.set_ylabel('SNR²')
+        ax1.set_ylabel('SNR')
         ax2.set_ylabel('Group-Delays [µm]')
         ax3.set_ylabel('Phase-Delays [µm]')
         ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
@@ -3068,8 +3077,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         snr_ax = fig.add_axes([0.18, 0.05, 0.72, 0.1])
         snr_ax.set_title("SNR & Thresholds")
 
-        maxSNR = np.nan_to_num(np.mean(SNR,axis=0))
-        snr_ax.bar(baselines,maxSNR, color=colors[6])
+        SNRnonan = np.nan_to_num(np.mean(SNRGD,axis=0))
+        snr_ax.bar(baselines,SNRnonan, color=colors[6])
         snr_ax.bar(baselines,config.FT['ThresholdGD'], fill=False,edgecolor='k')
 
         snr_ax.hlines(config.FT['ThresholdPD'],-0.5,NIN-0.5,color='r',linestyle='-.')
@@ -3078,7 +3087,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         #snr_ax.set_ylabel('SNR &\n Thresholds')
 
         snr_ax.set_xlabel('Baseline')
-        ct.setaxelim(snr_ax,ydata=maxSNR,ymin=0.5)
+        ct.setaxelim(snr_ax,ydata=SNRnonan,ymin=0.5)
 
         if display:
             if pause:
@@ -3087,15 +3096,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 plt.show()  
         if len(savedir):
             fig.savefig(savedir+f"Simulation{timestr}_detector.{ext}")
-            
-
-    SNR_pd = np.sqrt(simu.SquaredSNRMovingAveragePD)
-    SNR_gd = np.sqrt(simu.SquaredSNRMovingAverageGD)
-
-    if config.FT['whichSNR'] == 'pd':
-        SNR = SNR_pd
-    else:
-        SNR = SNR_gd
         
     if 'snr' in args:
         
@@ -3134,7 +3134,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         len2 = NIN//2 ; len1 = NIN-len2
         basecolors = list(colors[:len1]+colors[:len2])
         
-        SNRGD = np.sqrt(simu.SquaredSNRMovingAverageGDUnbiased)
         title = "SNR GD"
         plt.close(title)
         fig=plt.figure(title, clear=True)
@@ -3342,14 +3341,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
 
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
-        ylim=[1e-1,np.max(simu.SquaredSNRMovingAveragePD)]
+        ylim=[1e-1,np.max(SNR_pd)]
         # State-Machine and SNR
         title="State"
         fig = plt.figure(title,clear=True)
         fig.suptitle("SNR² and State-Machine")
         ax,ax2 = fig.subplots(nrows=2,ncols=1, sharex=True)
         for ib in range(NIN):
-            ax.plot(timestamps, simu.SquaredSNRMovingAveragePD[:,ib],
+            ax.plot(timestamps, SNR_pd[:,ib],
                     label=f"{ich[ib]}")
             
         ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
@@ -3366,7 +3365,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                    color='k', linestyle=':')
         ax2.vlines(config.starttracking*dt,0,NA,
                    color='k', linestyle=':')
-        ax.set_ylabel("$<SNR>²_{Ngd}$")
+        ax.set_ylabel("SNR")
         ax2.set_ylabel("Rank of Igd")
         ax2.set_xlabel('Time (ms)')
         ax2.legend()

@@ -16,7 +16,7 @@ from scipy import interpolate
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 
-from .tol_colors import tol_cset # colorblind-riendly and contrastful library
+from cophasing.tol_colors import tol_cset # colorblind-riendly and contrastful library
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 
@@ -24,7 +24,7 @@ from astropy.io import fits
 
 import matplotlib.pyplot as plt
 
-from . import config
+from cophasing import config
 import cophasing.decorators as deco
 
 global h_, c_, k_
@@ -34,7 +34,7 @@ c_ = 3.0e+8     # Light velocity
 k_ = 1.38e-23    # Boltzmann's constant
 
 
-colors = tol_cset('bright')
+colors = tol_cset('bright')*20
 
 SS = 12     # Small size
 MS = 14     # Medium size
@@ -446,7 +446,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
     ticks = np.linspace(0,Npix,Nticks)
         
     if display:            
-        fig = plt.figure(config.newfig, figsize=(16,9))
+        title = "Zernike Van-Cittert"
+        plt.close(title) ; fig = plt.figure(title, figsize=(16,9))
         (ax1,ax2,ax3) = fig.subplots(ncols=3)
         
         spaceticks = (ticks-round(Npix/2))*dtheta
@@ -488,32 +489,36 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
         ax3.set_ylabel('v [mas-1]')
         
         fig.show()
-        config.newfig+=1
+        
+        if len(savedir):
+            import time
+            timestr = time.strftime("%Y%m%d-%H%M%S")
+            plt.savefig(savedir+f"UVplane{timestr}.{ext}")
     
     """
     Projection of the interferometer on the (u,v) plane
     """
     
     # Get telescopes coordinates and names
-    InterfArray = get_array(config.Name, getcoords=True)    
+    InterfArray = get_array(Obs.Filepath, getcoords=True)    
     
     TelNames = InterfArray.TelNames
-    CHARAcoords = InterfArray.TelCoordinates
+    TelCoords = InterfArray.TelCoordinates
     basecoords = InterfArray.BaseCoordinates
     
-    CHARAcoords *= 1e6          # Convert to [µm]
+    TelCoords *= 1e6          # Convert to [µm]
     basecoords *= 1e6          # Convert to [µm]
     
-    NA = len(CHARAcoords)
+    NA = len(TelCoords)
     
-    CHARAaltaz = np.zeros([NA,2])
+    TelAltaz = np.zeros([NA,2])
     for ia in range(NA):
-        if np.linalg.norm(CHARAcoords[ia]) == 0:
-            CHARAaltaz[ia,0] = 0
-            CHARAaltaz[ia,1] = 0    
+        if np.linalg.norm(TelCoords[ia]) == 0:
+            TelAltaz[ia,0] = 0
+            TelAltaz[ia,1] = 0    
         else:
-            CHARAaltaz[ia,1] = np.arctan(CHARAcoords[ia,0]/CHARAcoords[ia,1])
-            CHARAaltaz[ia,0] = np.arcsin(CHARAcoords[ia,2]/np.linalg.norm(CHARAcoords[ia]))
+            TelAltaz[ia,1] = np.arctan(TelCoords[ia,0]/TelCoords[ia,1])
+            TelAltaz[ia,0] = np.arcsin(TelCoords[ia,2]/np.linalg.norm(TelCoords[ia]))
     
     NIN = int(NA*(NA-1)/2)
     basealtaz = np.zeros([NIN,2])       # Altazimuthal coordinates of the baselines [radians]
@@ -525,27 +530,33 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
         for iap in range(ia+1,NA):
             ib = int(ia*NA-ia*(ia+3)/2+iap-1)
             
-            basealtaz[ib] = CHARAaltaz[iap]-CHARAaltaz[ia]
+            basealtaz[ib] = TelAltaz[iap]-TelAltaz[ia]
             
             basenames.append(TelNames[ia]+TelNames[iap])
-            basecoords[ib] = CHARAcoords[iap] - CHARAcoords[ia]
+            basecoords[ib] = TelCoords[iap] - TelCoords[ia]
             basedist[ib] = np.linalg.norm(basecoords[ib])
     
     
     # First case: the name of the object has been given. We search it in Simbad
     # database and its AltAzimutal coordinates if a Date has been given.
-    if Target.Name not in ('Simple','Binary','Unresolved') and ('AltAz' not in vars(Obs)):
-        starttime = Time(Obs.DATE)
-        if verbose:
-            print(f"Observation date: {Obs.DATE}")
-    
-        starcoords = SkyCoord.from_name(Target.Name)
-        ArrayLocation=EarthLocation.of_site(Obs.ArrayName)
-        staraltaz = starcoords.transform_to(AltAz(obstime=starttime,location=ArrayLocation))
+    if 'AltAz' not in vars(Obs):
+        if Target.Name not in ('Simple','Binary','Unresolved'):
         
-        (altitude, azimuth) = (staraltaz.alt.radian,staraltaz.az.radian)
-        Obs.AltAz = (180/np.pi*altitude, 180/np.pi*azimuth)
+            starttime = Time(Obs.DATE)
+            if verbose:
+                print(f"Observation date: {Obs.DATE}")
         
+            starcoords = SkyCoord.from_name(Target.Name)
+            ArrayLocation=EarthLocation.of_site(Obs.ArrayName)
+            staraltaz = starcoords.transform_to(AltAz(obstime=starttime,location=ArrayLocation))
+            
+            (altitude, azimuth) = (staraltaz.alt.radian,staraltaz.az.radian)
+            Obs.AltAz = (180/np.pi*altitude, 180/np.pi*azimuth)
+            if verbose:
+                print(f"Object AltAz coordinates: ({round(Obs.AltAz[0],1)},{round(Obs.AltAz[1],1)})")
+        else:
+            Obs.AltAz = (90,0)
+            
     else:
         (altitude, azimuth) = (theta*np.pi/180 for theta in Obs.AltAz)
         if verbose:
@@ -559,7 +570,7 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
         the horizon and the north horizon: East = 90° Azimuth.
         - altitude: angular distance between the horizon and the target, along its meridian.
     
-    CHARA coordinates definition:
+    Coordinates definition (from CHARA convention):
         - X: toward East
         - Y: toward North
         - Z: toward Zenith
@@ -568,8 +579,8 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
     
     # Coordinates of the (u,v) plane in the (E,N,Z) referential
     u_Ep = np.array([np.cos(azimuth),np.sin(azimuth),0])
-    u_Np = np.array([np.sin(altitude)*np.sin(azimuth),np.sin(altitude)*np.cos(azimuth),np.cos(altitude)])
-    u_Zp = np.array([np.cos(altitude)*np.sin(azimuth),np.cos(altitude)*np.cos(azimuth),np.sin(altitude)])
+    u_Np = np.array([-np.sin(altitude)*np.sin(azimuth),np.sin(altitude)*np.cos(azimuth),np.cos(altitude)])
+    u_Zp = np.array([np.cos(altitude)*np.sin(azimuth),-np.cos(altitude)*np.cos(azimuth),np.sin(altitude)])
     
     
     # Projection baselines on the target's (u,v) plane
@@ -585,26 +596,35 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
     NW = len(spectra)
     
     # Projection baselines on the u,v coordinates (oriented with the star north-east)
-    chara_uv = np.zeros([NW,NIN,2])
+    interf_uv = np.zeros([NW,NIN,2])
     for iw in range(NW):
         lmbda=spectra[iw]
-        chara_uv[iw,:,0] = B_Ep/lmbda
-        chara_uv[iw,:,1] = B_Np/lmbda
+        interf_uv[iw,:,0] = B_Ep/lmbda
+        interf_uv[iw,:,1] = B_Np/lmbda
+    
+    
+    # # Matrice de projection
+    
+    # M = np.array([[np.sin(h),np.cos(h),0],
+    #               [-np.sin(delta)*np.cos(h),np.sin(delta)*np.sin(h),np.cos(delta)],
+    #               [np.cos(delta)*np.cos(h),-np.cos(delta)*np.sin(h),np.sin(delta)]])
+    
+    
     
     # Conversion functions
     mas2rad = lambda mas : 1/3600*1e-3*np.pi/180*mas
     rad2mas = lambda rad : 3600*1e3*180/np.pi*rad
 
     #Convert (u,v) plane from radian to mas
-    chara_uv_direct = 1/chara_uv
-    chara_uv_direct_mas = rad2mas(chara_uv_direct)
-    chara_uv = 1/chara_uv_direct_mas
+    interf_uv_direct = 1/interf_uv
+    interf_uv_direct_mas = rad2mas(interf_uv_direct)
+    interf_uv = 1/interf_uv_direct_mas
     
     # Return the complex visibility vector of the source
     visibilities = np.zeros([NW,NIN])*1j
     for ib in range(NIN):
         for iw in range(NW):     
-            ub=chara_uv[iw,ib,0] ; vb=chara_uv[iw,ib,1]
+            ub=interf_uv[iw,ib,0] ; vb=interf_uv[iw,ib,1]
             Nu = int(round(ub/dfreq)+Npix/2)
             Nv = int(round(vb/dfreq)+Npix/2)
             visibilities[iw,ib] = uv_plane[Nu,Nv]
@@ -631,28 +651,29 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
         PhotometricSNR = np.concatenate([PhotSNR[::-1],PhotSNR])
         
         if verbose:
-            print(f'Plot CHARA (u,v) coverage on figure {config.newfig}')    
-        chara_uv_complete = np.concatenate((chara_uv[NW//2], -chara_uv[NW//2]),axis=0)
+            print(f"Plot interferometer's (u,v) coverage on figure {config.newfig}")  
+        interf_uv_complete = np.concatenate((interf_uv[NW//2], -interf_uv[NW//2]),axis=0)
         
-        uvmax = np.max(chara_uv_complete/dfreq)+10
+        uvmax = np.max(interf_uv_complete/dfreq)+10
         
         Ndisplay = 2*int(uvmax+10)
         
         uv_crop = uv_plane[(Npix-Ndisplay)//2:(Npix+Ndisplay)//2,(Npix-Ndisplay)//2:(Npix+Ndisplay)//2]
-        chara_plot = chara_uv_complete/dfreq+Ndisplay/2
+        interf_plot = interf_uv_complete/dfreq+Ndisplay/2
         
         Nticks = 11
         ticks = np.linspace(0,Ndisplay-1,Nticks)
         freqticks = (ticks+1-round(Ndisplay/2))*dfreq
         freqticks = freqticks.round(decimals=1)
         # Display the Visibility and the interferometer baselines on the (u,v) plane
-        fig = plt.figure(config.newfig)
+        title = "UV plane - module"
+        plt.close(title); fig = plt.figure(title)
         ax = fig.subplots()
-        fig.suptitle('(u,v) coverage')
+        #fig.suptitle('(u,v) coverage')
         im=ax.imshow(np.abs(uv_crop),vmin=0,vmax=1)
         
-        ax.scatter(chara_plot[actind,0], chara_plot[actind,1], marker='x', s=50*np.sqrt(PhotometricSNR[actind]),linewidth=1, color='firebrick')
-        ax.scatter(chara_plot[actind==False,0], chara_plot[actind==False,1], marker='x', s=50, linewidth=1,color='black')
+        ax.scatter(interf_plot[actind,0], interf_plot[actind,1], marker='x', s=50*np.sqrt(PhotometricSNR[actind]),linewidth=1, color='firebrick')
+        ax.scatter(interf_plot[actind==False,0], interf_plot[actind==False,1], marker='x', s=50, linewidth=1,color='black')
         plt.xticks(ticks,freqticks)
         plt.yticks(ticks,-freqticks)
         ax.set_xlabel('u (W-E) [$mas^{-1}$]')
@@ -661,19 +682,41 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
         fig.subplots_adjust(right=0.8)
         cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         fig.colorbar(im, cax=cbar_ax)
-        
-        config.newfig += 1
-        
+
         
         if len(savedir):
             import time
             timestr = time.strftime("%Y%m%d-%H%M%S")
-            plt.savefig(savedir+f"UVplane{timestr}.{ext}")
+            plt.savefig(savedir+f"UVplane_mod{timestr}.{ext}")
+            
+        title = "UV plane - argument"
+        plt.close(title)
+        fig = plt.figure(title)
+        ax = fig.subplots()
+        #fig.suptitle('(u,v) coverage')
+        im=ax.imshow(np.angle(uv_crop),vmin=-np.pi,vmax=np.pi)
+        
+        ax.scatter(interf_plot[actind,0], interf_plot[actind,1], marker='x', s=50*np.sqrt(PhotometricSNR[actind]),linewidth=1, color='firebrick')
+        ax.scatter(interf_plot[actind==False,0], interf_plot[actind==False,1], marker='x', s=50, linewidth=1,color='black')
+        plt.xticks(ticks,freqticks)
+        plt.yticks(ticks,-freqticks)
+        ax.set_xlabel('u (W-E) [$mas^{-1}$]')
+        ax.set_ylabel('v (S-N) [$mas^{-1}$]')
+        
+        fig.subplots_adjust(right=0.8)
+        cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        fig.colorbar(im, cax=cbar_ax)
+
+        
+        if len(savedir):
+            import time
+            timestr = time.strftime("%Y%m%d-%H%M%S")
+            plt.savefig(savedir+f"UVplane_angle{timestr}.{ext}")
     
     # if NW==1:
     #     visibilities = visibilities[0]
     
-    return visibilities, chara_uv, uv_plane, UVcoords
+    return visibilities, interf_uv, uv_plane, UVcoords
 
 
 def create_obsfile(spectra, Obs, Target, savingfilepath='',
@@ -823,7 +866,9 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='',
         
     else:           # Van-Cittert theorem visibility
         visibilities,_,_,_ = VanCittert(spectra, Obs, Target,
-                                        display=display, savedir=savedir, ext=ext)
+                                        display=display, 
+                                        savedir=savedir, ext=ext,
+                                        verbose=verbose)
         
         bispectrum = np.zeros([NW,NC])*1j
         
@@ -1000,7 +1045,7 @@ def create_CfObj(spectra,Obs,Target,InterfArray,R=140):
 
     Returns
     -------
-    CoherentFluxObject : ARRAY [MW,NB]
+    CoherentFluxObject : ARRAY [dMW,NB]
         Coherent flux sorted like follows:
             - 0 ... NA: photometries
             - NA ... NA+NIN: Real(Cf)

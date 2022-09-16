@@ -26,6 +26,10 @@ colors=tc.tol_cset('muted')
 
 # Order of the telescopes: S1S2E1E2W1W2
 
+"""
+CHARA - 6 telescopes - S1S2E1E2W1W2
+"""
+
 NA=6
 d0=(np.ones([NA,NA])-np.identity(NA))/5
 
@@ -92,11 +96,89 @@ d9 = np.array([[0,1/2,1/2,0,0,0],
               [0,0,0,1,0,0],
               [0,1,0,0,0,0]])
 
+"""
+MROI - 10 telescopes - W0W1W2W3S1S2S3N1N2N3
+"""
+pw10_9_0 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+               [1/2,0,1/2,0,0,0,0,0,0,0],
+               [0,1/2,0,1/2,0,0,0,0,0,0],
+               [0,0,1,0,0,0,0,0,0,0],
+               [1/2,0,0,0,0,1/2,0,0,0,0],
+               [0,0,0,0,1/2,0,1/2,0,0,0],
+               [0,0,0,0,0,1,0,0,0,0],
+               [1/2,0,0,0,0,0,0,0,1/2,0],
+               [0,0,0,0,0,0,0,1/2,0,1/2],
+               [0,0,0,0,0,0,0,0,1,0]])
+
+# For homogeneous MROI
+pw10_12_3_1 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+               [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
+               [0,1/2,0,1/2,0,0,0,0,0,0],
+               [0,0,1,0,0,0,0,0,0,0],
+               [1/4,1/4,0,0,0,1/4,0,1/4,0,0],
+               [0,0,0,0,1/2,0,1/2,0,0,0],
+               [0,0,0,0,0,1,0,0,0,0],
+               [1/4,1/4,0,0,1/4,0,0,0,1/4,0],
+               [0,0,0,0,0,0,0,1/2,0,1/2],
+               [0,0,0,0,0,0,0,0,1,0]])
+
+# For dense MROI
+pw10_12_3_2 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+               [1/4,0,1/4,0,0,1/4,0,0,1/4,0],
+               [0,1/4,0,1/4,1/4,0,0,1/4,0,0],
+               [0,0,1,0,0,0,0,0,0,0],
+               [1/4,0,1/4,0,0,1/4,0,0,1/4,0],
+               [0,1/4,0,0,1/4,0,1/4,1/4,0,0],
+               [0,0,0,0,0,1,0,0,0,0],
+               [1/4,0,1/4,0,0,1/4,0,0,1/4,0],
+               [0,1/4,0,0,1/4,0,0,1/4,0,1/4],
+               [0,0,0,0,0,0,0,0,1,0]])
+
+pw10_15_6 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+               [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
+               [0,1/4,0,1/4,0,1/4,0,0,1/4,0],
+               [0,0,1,0,0,0,0,0,0,0],
+               [1/4,1/4,0,0,0,1/4,0,1/4,0,0],
+               [0,0,1/4,0,1/4,0,1/4,0,1/4,0],
+               [0,0,0,0,0,1,0,0,0,0],
+               [1/4,1/4,0,0,1/4,0,0,0,1/4,0],
+               [0,0,1/4,0,0,1/4,0,1/4,0,1/4],
+               [0,0,0,0,0,0,0,0,1,0]])
+
+pw10_18_9 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+               [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
+               [0,1/4,0,1/4,0,1/4,0,0,1/4,0],
+               [0,0,1/3,0,0,0,1/3,0,0,1/3],
+               [1/4,1/4,0,0,0,1/4,0,1/4,0,0],
+               [0,0,1/4,0,1/4,0,1/4,0,1/4,0],
+               [0,0,0,1/3,0,1/3,0,0,0,1/3],
+               [1/4,1/4,0,0,1/4,0,0,0,1/4,0],
+               [0,0,1/4,0,0,1/4,0,1/4,0,1/4],
+               [0,0,0,1/3,0,0,1/3,0,1/3,0]])
+
+pw10_18_9 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+               [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
+               [0,1/4,0,1/4,0,1/4,0,0,1/4,0],
+               [0,0,1/3,0,0,0,1/3,0,0,1/3],
+               [1/4,1/4,0,0,0,1/4,0,1/4,0,0],
+               [0,0,1/4,0,1/4,0,1/4,0,1/4,0],
+               [0,0,0,1/3,0,1/3,0,0,0,1/3],
+               [1/4,1/4,0,0,1/4,0,0,0,1/4,0],
+               [0,0,1/4,0,0,1/4,0,1/4,0,1/4],
+               [0,0,0,1/3,0,0,1/3,0,1/3,0]])
+
+
 descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
-               "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8, "PW6-5-0-0":d9}
+                "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8, "PW6-5-0-0":d9,
+                "PW10-9-0":pw10_9_0,"PW10-12-3-1":pw10_12_3_1,"PW10-12-3-2":pw10_12_3_2,
+                "PW10-15-6":pw10_15_6,"PW10-18-9":pw10_18_9}
 
 
 def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', description='PW6-15-10', modulation='ABCD', clean_up=False, display=False, savedir='',ext='pdf',ArrayDetails=0):
+    
+    if "which" in args:    
+        print("Available array configurations:\n",descriptions.keys())
+        return
     
     if init:
         if isinstance(description,str):
@@ -268,10 +350,18 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                         ax.plot([(x2+x1)/2,x2],[(y2+y1)/2,y2],color=colors[0],linestyle='-',linewidth=15*T2**2)
                         ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
             
-            ax.text(-150,50,name,fontsize='large')
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
-            ax.set_xlim([-210,160]) ; ax.set_ylim([-50,350])
+            
+            xwidth = np.ptp(InterfArray.TelCoordinates[:,0]) +40
+            xmin = np.min(InterfArray.TelCoordinates[:,0]) - 20
+            ywidth = np.ptp(InterfArray.TelCoordinates[:,1]) +40
+            ymin = np.min(InterfArray.TelCoordinates[:,1]) - 20
+            
+            xmax,ymax  = xmin+xwidth , ymin+ywidth
+            ax.set_xlim([xmin,xmax]) ; ax.set_ylim([ymin,ymax])
+            
+            ax.text(xmin+20,ymax-20,name,fontsize='large')
             
             
             if len(savedir):
@@ -279,6 +369,8 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', descripti
                     os.makedirs(savedir, exist_ok=True)
                 
                 ax.axis("off")
+                if not len(name):
+                    name = "test"
                 fig.savefig(f"{savedir}{name}.{ext}")
         
             plt.rcParams.update(plt.rcParamsDefault)
