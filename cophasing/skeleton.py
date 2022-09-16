@@ -8,8 +8,10 @@ import pkg_resources
 import numpy as np
 # import cupy as cp # NumPy-equivalent module accelerated with NVIDIA GPU  
 import pandas as pd
-import matplotlib
+
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
 
 from importlib import reload  # Python 3.4+ only.
 
@@ -19,6 +21,30 @@ from . import config
 from astropy.io import fits
 
 from .decorators import timer
+
+from cophasing.tol_colors import tol_cset
+colors = tol_cset('muted')
+
+SS = 12     # Small size
+MS = 14     # Medium size
+BS = 16     # Big size
+figsize = (16,8)
+rcParamsForBaselines = {"font.size":SS,
+       "axes.titlesize":SS,
+       "axes.labelsize":MS,
+       "axes.grid":True,
+       
+       "xtick.labelsize":SS,
+       "ytick.labelsize":SS,
+       "legend.fontsize":SS,
+       "figure.titlesize":BS,
+       "figure.constrained_layout.use": False,
+       "figure.figsize":figsize,
+       'figure.subplot.hspace': 0.05,
+       'figure.subplot.wspace': 0,
+       'figure.subplot.left':0.1,
+       'figure.subplot.right':0.95
+       }
 
 # Change the display font
 # plt.rc('font', **{'family' : 'serif', 'serif' : ['Computer Modern Roman']})
@@ -96,15 +122,21 @@ SOURCE:
 
     Obs, Target = ct.get_ObsInformation(ObsFile)
 
+    # Number of telescopes
     NA=InterfArray.NA
-    # Redundant number of baselines
+    
+    # Number of unknown phase and photometries
     NB = NA**2
     
-    from scipy.special import binom
-    # Number of Closure Phases
-    NC = int(binom(NA,3))
+    # Number of baselines
     NIN = int(NA*(NA-1)/2)
-    # NP = config.FS['NP']
+    
+    # Number of Closure Phases
+    from scipy.special import binom
+    NC = int(binom(NA,3))
+    
+    # Number of independant closure phases
+    ND = int((NA-1)*(NA-2)/2)
     
     # TEMPORAL PARAMETERS
     
@@ -139,7 +171,6 @@ SOURCE:
     
     dyn=0.                                  # to be updtated later by FS (for ex via coh_algo)
       
-    import time
     config.SimuTimeID=""
     
     # Observation parameters
@@ -153,6 +184,7 @@ SOURCE:
     config.NA=NA
     config.NB=NB
     config.NC=NC
+    config.ND=ND
     config.NIN=NIN
     config.MT=MT
     config.NT=NT
@@ -382,18 +414,8 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
     
     with fits.open(InterferometerFile) as hdu:
         ArrayParams = hdu[0].header
-        NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
-        # ArrayName = ArrayParams['NAME']
-        # TelData = hdu[1].data
+        NA = ArrayParams['NA']
         BaseData = hdu[2].data
-        
-        # TelNames = TelData['TelNames']
-        # TelCoordinates = TelData['TelCoordinates']
-        # BaseNames = BaseData['BaseNames']
-        BaseCoordinates = BaseData['BaseCoordinates']
-    
-    # if not RefLambda:
-    #     RefLmbda = np.mean(spectra)
     
     obstime = NT*dt                     # Observation time [ms]
     timestamps = np.arange(NT)*dt        # Time sampling [ms]
@@ -588,9 +610,7 @@ Longueur timestamps: {len(timestamps)}")
             rmsPiston = rmsOPD/np.sqrt(2)
             freq = np.fft.fftshift(np.fft.fftfreq(NT,d=dt*1e-3))
             freqfft=freq
-            # Fc = 100            # Maximal frequency of the atmosphere
-            Fmax = np.max(freq)
-            # Nc = int(Fc*NT/2/Fmax)
+
             filtre = np.zeros(NT)
     
             # Atmospheric disturbance from Conan et al 1995
@@ -742,8 +762,6 @@ Longueur timestamps: {len(timestamps)}")
                 baselines = kwargs['baselines']
             else:
                 InterfArray = ct.get_array(name=config.Name)
-                baselines = InterfArray.BaseNorms
-                coords = InterfArray.TelCoordinates
             
             V = 0.31*r0/t0*1e3              # Average wind velocity in its direction [m/s]
             L0 = L0                         # Outer scale [m]
@@ -1126,6 +1144,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
 def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             Pistondetails=False,OPDdetails=False,
             OneTelescope=True, pause=False, display=True,verbose=False,
+            start_pd_tracking = 50,
             savedir='',ext='pdf',infos={"details":''}):
     """
     
@@ -1182,14 +1201,10 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
 
     """
     
-          
-    import matplotlib.patches as mpatches
-    import matplotlib.lines as mlines
-    from cophasing.tol_colors import tol_cset
-    
     from . import simu
     
     from .simu import timestamps
+    from .config import NA,NT,NIN,NB,NC,ND,OW, SimuTimeID, InterfArray
     
     #timestr = config.timestr
     
@@ -1221,11 +1236,10 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     ind = np.argmin(np.abs(config.spectraM-WLOfTrack))
     wl = config.spectraM[ind]
     
-    from .config import NA,NT,NIN,OW, SimuTimeID
     timestr=SimuTimeID
     
     ich = config.FS['ich']
-    NC = int(config.NC/2)
+    R = config.FS['R']
     
     dt=config.dt
 
@@ -1244,27 +1258,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     else:
         if verbose:
             print("don't compute performances")
-    
-    SS = 12     # Small size
-    MS = 14     # Medium size
-    BS = 16     # Big size
-    figsize = (16,8)
-    rcParamsForBaselines = {"font.size":SS,
-           "axes.titlesize":SS,
-           "axes.labelsize":MS,
-           "axes.grid":True,
-           
-           "xtick.labelsize":SS,
-           "ytick.labelsize":SS,
-           "legend.fontsize":SS,
-           "figure.titlesize":BS,
-           "figure.constrained_layout.use": False,
-           "figure.figsize":figsize,
-           'figure.subplot.hspace': 0.05,
-           'figure.subplot.wspace': 0,
-           'figure.subplot.left':0.1,
-           'figure.subplot.right':0.95
-           }
+
     
     if verbose:
         print('Displaying observables...')
@@ -1276,21 +1270,27 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
     from matplotlib.ticker import AutoMinorLocator
     
+    # Each figure only shows 15 baselines, distributed on two subplots
+    # If there are more than 15 baselines, multiple figures will be created
+    NINdisp = 15
+    len2 = NINdisp//2 ; len1 = NINdisp-len2
+    NumberOfBaseFigures = 1+NIN//NINdisp - 1*(NIN % NINdisp==0)
+
+    basecolors = colors[:len1]+colors[:len2]
+    basecolors = np.array(basecolors*NumberOfBaseFigures)
+    
+    NAdisp = 10
+    NumberOfTelFigures = 1+NA//NAdisp - 1*(NA % NAdisp==0)
+    telcolors = colors[:NAdisp]*NumberOfTelFigures
+    
     # Define the list of baselines
     baselines = config.FS['ich']
-            
+    
     # Define the list of closures
     closures = []
     for iap in range(2,NA+1):
         for iapp in range(iap+1,NA+1):
             closures.append(f'{1}{iap}{iapp}')
-    
-    colors = tol_cset('muted')
-    telcolors = tol_cset('bright')
-    
-    beam_patches = []
-    for ia in range(NA):
-        beam_patches.append(mpatches.Patch(color=telcolors[ia+1],label=f"Telescope {ia+1}"))
     
     pis_max = 1.1*np.max([np.max(np.abs(simu.PistonDisturbance)),wl/2])
     pis_min = -pis_max
@@ -1304,18 +1304,24 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     t = simu.timestamps*1e-3 # time in ms
     timerange = range(NT)
     
+    TelConventionalArrangement = InterfArray.TelNames
     if 'TelescopeArrangement' in infos.keys():
         tels = infos['TelescopeArrangement']
     else:
-        TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
         tels = TelConventionalArrangement
         
-    Tel2Beam = np.zeros([NA,NA])
+        
+    beam_patches = []
     for ia in range(NA):
-        tel = tels[ia] ; tel0 = TelConventionalArrangement[ia] 
-        pos = np.argwhere(np.array(tels)==tel0)[0][0]
-        Tel2Beam[pos,ia]=1
-
+        beam_patches.append(mpatches.Patch(color=telcolors[ia],label=tels[ia]))
+        
+    # Tel2Beam = np.zeros([NA,NA])
+    # for ia in range(NA):
+    #     tel = tels[ia] ; tel0 = TelConventionalArrangement[ia]
+    #     pos = np.argwhere(np.array(tels)==tel0)[0][0]
+    #     Tel2Beam[pos,ia]=1
+        
+        
     
     baselines = [] ; baselinesForPDref=[0]*(NA-1)
     itel=0
@@ -1323,11 +1329,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         for tel2 in tels[itel+1:]:
             baselines.append(f'{tel1}{tel2}')
         itel+=1
-    
-    
-    # For distribute baselines between two subplots
-    NIN = len(baselines)
-    len2 = NIN//2 ; len1 = NIN-len2
+    baselines = np.array(baselines) 
     
     closures = []  ; baselinesForPDref=baselines.copy()
     tel1=tels[0] ; itel1=0 ; itel2=itel1+1 
@@ -1339,11 +1341,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             baselinesForPDref[ib] = baselinesForPDref[ib] + f"\n({tel1}{tel2}{tel3})"
             itel3+=1
         itel2+=1
+    closures = np.array(closures)
     
     PlotTel = [False]*NA ; PlotTelOrigin=[False]*NA
     PlotBaseline = [False]*NIN
     PlotClosure = [False]*NC
-    TelNameLength = 2
+    TelNameLength = len(config.InterfArray.TelNames)
     
     if 'TelsToDisplay' in infos.keys():
         TelsToDisplay = infos['TelsToDisplay']
@@ -1428,10 +1431,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     COMPUTATION RMS
     """
     
-    basecolors = colors[:len1]+colors[:len2]
-    
-    R=config.FS['R']
-    
     GD = simu.GDEstimated ; PD=simu.PDEstimated
     GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
     GDerr = simu.GDResidual2*R*wl/2/np.pi ; PDerr = simu.PDResidual2*wl/2/np.pi
@@ -1449,9 +1448,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     #SquaredSNR = simu.SquaredSNRMovingAveragePD
     # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
     
-    
-    start_pd_tracking = 100
-    
+
     RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
     RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
     
@@ -1469,7 +1466,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax1 = fig.subplots(nrows=1,ncols=1)
             for ia in range(NA):
                 # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia+1])
+                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia])
             
             ax1.set_xlabel('Time (ms)')
             ax1.set_ylabel('Piston [µm]')
@@ -1484,7 +1481,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax1 = fig.subplots(nrows=1,ncols=1)
             for ia in range(NA):
                 # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia+1])
+                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia])
             
             ax1.set_xlabel('Time (ms)')
             ax1.set_ylabel('Piston [µm]')
@@ -1528,9 +1525,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         for ia in range(NA):
             plt.plot(timestamps, np.sum(simu.PhotometryDisturbance[:,OW*ind:OW*(ind+1),ia],axis=1),
-                     color=telcolors[ia+1],linestyle='dashed')#),label='Photometry disturbances')
+                     color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
             plt.plot(timestamps, simu.PhotometryEstimated[:,ind,ia],
-                     color=telcolors[ia+1],linestyle='solid')#,label='Estimated photometries')
+                     color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
             
         plt.vlines(config.starttracking*dt,s[0],s[1],
                    color='k', linestyle=':')
@@ -1576,9 +1573,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         for ia in range(NA):
             
             ax1.plot(timestamps, simu.PistonDisturbance[:,ia]-PistonDistRef,
-                      color=telcolors[ia+1],linestyle='dashed')
+                      color=telcolors[ia],linestyle='dashed')
             ax2.plot(timestamps, simu.PistonTrue[:,ia]-PistonRef,
-                     color=telcolors[ia+1],linestyle='solid')
+                     color=telcolors[ia],linestyle='solid')
             
             axText.text(0.3,.9-ia*.05,f"$\sigma_{{{ia+1}}}={int(np.sqrt(simu.VarPiston[ia])*1e3)}$nm")
         
@@ -1657,495 +1654,481 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             plt.show()
         config.newfig+=1    
 
-
     if displayall or ('perftable' in args):
-    
+        plt.rcParams.update(rcParamsForBaselines)
+        
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
         if 'ThresholdGD' in config.FT.keys():
             linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Squared Threshold GD'))
-                    
-        # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
-        # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
+                                        linestyle='--', label='Threshold GD'))
         
-        plt.rcParams.update(rcParamsForBaselines)
-        title='GD and PD before leastsquare'
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
-        fig.suptitle(title)
-        (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-        ax1.set_title("First serie of baselines, from 12 to 25")
-        ax6.set_title("Second serie of baselines, from 26 to 56")
-        
-        for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
-            ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-            ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-            ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-            ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-        for iBase in range(len1,NIN):   # Second serie
-            ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
-            ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-            ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-            ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-            ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-        
-        
-        ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                   color='k', linestyle=':')
-        ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
-                   color='k', linestyle=':')
-        ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                   color='k', linestyle=':')
-        ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
-                   color='k', linestyle=':')
-        
-        ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
-        ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
-        ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
-        ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
-        
-        ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
-        ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
-        ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
-        ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
-        
-        ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-        ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-        ax4.get_shared_x_axes().join(ax4,ax5)
-        ax9.get_shared_x_axes().join(ax9,ax10)
-        
-        ax1.get_shared_y_axes().join(ax1,ax6)
-        ax2.get_shared_y_axes().join(ax2,ax7)
-        ax3.get_shared_y_axes().join(ax3,ax8)
-        ax4.get_shared_y_axes().join(ax4,ax9)
-        ax5.get_shared_y_axes().join(ax5,ax10)
-        
-        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-        ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-        ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-        ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
-        
-        ax4.tick_params(labelbottom=False)
-        ax9.tick_params(labelbottom=False)
-        
-        ax1.set_ylabel('SNR')
-        ax2.set_ylabel('Group-Delays [µm]')
-        ax3.set_ylabel('Phase-Delays [µm]')
-        ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        
-        ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-        
-        ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
-        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+        for iFig in range(NumberOfBaseFigures):
+            
+            iFirstBase = NumberOfBaseFigures*iFig   # Index of first baseline to display
+            iLastBase = iFirstBase + NINdisp - 1        # Index of last baseline to display
+            
+            rangeBases = f"{InterfArray.BaseNames[iFirstBase]}-{InterfArray.BaseNames[iLastBase]}"
+            title=f'GD and PD measured: {rangeBases}'
+            plt.close(title)
+            fig=plt.figure(title, clear=True)
+            fig.suptitle(title)
+            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+            ax1.set_title(f"From {InterfArray.BaseNames[iFirstBase]} \
+to {InterfArray.BaseNames[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {InterfArray.BaseNames[iFirstBase+len1]} \
+to {InterfArray.BaseNames[iLastBase]}")
+            
+            FirstSet = range(iFirstBase,iFirstBase+len1)
+            SecondSet = range(iFirstBase+len1,iLastBase)
+            for iBase in FirstSet:   # First serie
+                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+                ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            for iBase in SecondSet:   # Second serie
+                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+                ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            
+            
+            # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+            #             color='k', linestyle=':')
+            # ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+            #             color='k', linestyle=':')
+            # ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+            #             color='k', linestyle=':')
+            # ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+            #             color='k', linestyle=':')
+            
+            ax4.bar(baselines[FirstSet],RMSgdmic[FirstSet], color=basecolors[FirstSet])
+            ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            ax5.bar(baselines[FirstSet],RMSpdmic[FirstSet], color=basecolors[FirstSet])
+            ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax9.bar(baselines[SecondSet],RMSgdmic[SecondSet], color=basecolors[SecondSet])
+            ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            ax10.bar(baselines[SecondSet],RMSpdmic[SecondSet], color=basecolors[SecondSet])
+            ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+            ax4.get_shared_x_axes().join(ax4,ax5)
+            ax9.get_shared_x_axes().join(ax9,ax10)
+            
+            ax1.get_shared_y_axes().join(ax1,ax6)
+            ax2.get_shared_y_axes().join(ax2,ax7)
+            ax3.get_shared_y_axes().join(ax3,ax8)
+            ax4.get_shared_y_axes().join(ax4,ax9)
+            ax5.get_shared_y_axes().join(ax5,ax10)
+            
+            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+            
+            ax4.tick_params(labelbottom=False)
+            ax9.tick_params(labelbottom=False)
+            
+            ax1.set_ylabel('SNR')
+            ax2.set_ylabel('Group-Delays [µm]')
+            ax3.set_ylabel('Phase-Delays [µm]')
+            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+            ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
+            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+    
+            ax7.legend(handles=linestyles, loc='upper right')
+            if display:
+                fig.show()
+    
+            if len(savedir):
+                if verbose:
+                    print("Saving perftable figure.")
+                plt.savefig(savedir+f"Simulation{timestr}_perftable_{rangeBases}.{ext}")
 
-        ax7.legend(handles=linestyles, loc='upper right')
-        if display:
-            fig.show()
-
-        if len(savedir):
-            if verbose:
-                print("Saving perftable figure.")
-            plt.savefig(savedir+f"Simulation{timestr}_perftable.{ext}")
+        plt.rcParams.update(plt.rcParamsDefault)
 
 
     if displayall or ('perftable2' in args):
- 
-         linestyles=[mlines.Line2D([],[], color='black',
-                                         linestyle=':', label='Start tracking')]
-         if 'ThresholdGD' in config.FT.keys():
-             linestyles.append(mlines.Line2D([],[], color='black',
-                                         linestyle='--', label='Squared Threshold GD'))
-                     
-         
-         t = simu.timestamps ; timerange = range(NT)
-         # NA=6 ; NIN = 15 ; NC = 10
-         # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
-         len2 = NIN//2 ; len1 = NIN-len2
-         
-         basecolors = colors[:len1]+colors[:len2]
-         # basestyles = len1*['solid'] + len2*['dashed']
-         # closurecolors = colors[:NC]
-         
-         R=config.FS['R']
-         
-         GD = simu.GDEstimated2 ; PD=simu.PDEstimated2
-         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
-         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-         
-         # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
-         
-         GDerr = simu.GDResidual2 ; PDerr =simu.PDResidual2
-         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
-         
-         start_pd_tracking = 100
-         
-         
-         RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
-         RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
-         
-         RMSgderr = np.std(GDerr[start_pd_tracking:,:],axis=0)
-         RMSpderr = np.std(PDerr[start_pd_tracking:,:],axis=0)
-         
-         RMStrueOPD = np.sqrt(simu.VarOPD)
-         # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
-         # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
-         
-         
-         
-         plt.rcParams.update(rcParamsForBaselines)
-         title='GD and PD before leastsquare adn after patch'
-         plt.close(title)
-         fig=plt.figure(title, clear=True)
-         fig.suptitle(title)
-         (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-         ax1.set_title("First serie of baselines, from 12 to 25")
-         ax6.set_title("Second serie of baselines, from 26 to 56")
-         
-         for iBase in range(len1):   # First serie
-             ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-             if 'ThresholdGD' in config.FT.keys():
-                 ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
-             ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-             ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-             ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-             ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-         for iBase in range(len1,NIN):   # Second serie
-             ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-             if 'ThresholdGD' in config.FT.keys():
-                 ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
-             ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-             ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-             ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-             ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-         
-         
-         ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                    color='k', linestyle=':')
-         ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
-                    color='k', linestyle=':')
-         ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                    color='k', linestyle=':')
-         ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
-                    color='k', linestyle=':')
-         
-         ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
-         ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
-         ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
-         ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
-         
-         ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
-         ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
-         ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
-         ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
-         
-         ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-         ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-         ax4.get_shared_x_axes().join(ax4,ax5)
-         ax9.get_shared_x_axes().join(ax9,ax10)
-         
-         ax1.get_shared_y_axes().join(ax1,ax6)
-         ax2.get_shared_y_axes().join(ax2,ax7)
-         ax3.get_shared_y_axes().join(ax3,ax8)
-         ax4.get_shared_y_axes().join(ax4,ax9)
-         ax5.get_shared_y_axes().join(ax5,ax10)
-         
-         ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-         ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-         ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-         ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-         ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
-         
-         ax4.tick_params(labelbottom=False)
-         ax9.tick_params(labelbottom=False)
-         
-         ax1.set_ylabel('SNR')
-         ax2.set_ylabel('Group-Delays [µm]')
-         ax3.set_ylabel('Phase-Delays [µm]')
-         ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-         ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-         
-         ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-         
-         ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
-         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-    
-         ax7.legend(handles=linestyles, loc='upper right')
-         if display:
-             fig.show()
-    
-         if len(savedir):
-             if verbose:
-                 print("Saving perftable figure.")
-             plt.savefig(savedir+f"Simulation{timestr}_perftable2.{ext}")
-
-
-    if displayall or ('perftableres' in args):
-    
+        plt.rcParams.update(rcParamsForBaselines)
+        
         linestyles=[mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking')]
+                                         linestyle=':', label='Start tracking')]
         if 'ThresholdGD' in config.FT.keys():
             linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Squared Threshold GD'))
-        
-        t = simu.timestamps ; timerange = range(NT)
-        # NA=6 ; NIN = 15 ; NC = 10
-        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
-        len2 = NIN//2 ; len1 = NIN-len2
-        
-        basecolors = colors[:len1]+colors[:len2]
-        # basestyles = len1*['solid'] + len2*['dashed']
-        # closurecolors = colors[:NC]
-        
-        R=config.FS['R']
-        
-        GD = simu.GDResidual ; PD=simu.PDResidual
+                                            linestyle='--', label='Threshold GD'))
+            
+        GD = simu.GDEstimated2 ; PD=simu.PDEstimated2
         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
+        
         # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
         
+        GDerr = simu.GDResidual2 ; PDerr =simu.PDResidual2
+        GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
         
-        start_pd_tracking = 100
         
         RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
         RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+        
+        RMSgderr = np.std(GDerr[start_pd_tracking:,:],axis=0)
+        RMSpderr = np.std(PDerr[start_pd_tracking:,:],axis=0)
+        
         RMStrueOPD = np.sqrt(simu.VarOPD)
-        # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
-        # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
         
-        
-        
+        for iFig in range(NumberOfBaseFigures):
+            iFirstBase = NumberOfBaseFigures*iFig   # Index of first baseline to display
+            iLastBase = iFirstBase + NINdisp - 1        # Index of last baseline to display
+            
+            rangeBases = f"{InterfArray.BaseNames[iFirstBase]}-{InterfArray.BaseNames[iLastBase]}"
+            title=f'GD and PD before leastsquare and after patch: {rangeBases}'
+            plt.close(title)
+            fig=plt.figure(title, clear=True)
+            fig.suptitle(title)
+            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+            ax1.set_title(f"From {InterfArray.BaseNames[iFirstBase]} to {InterfArray.BaseNames[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {InterfArray.BaseNames[iFirstBase+len1]} to {InterfArray.BaseNames[iLastBase]}")
+            
+            FirstSet = range(iFirstBase,iFirstBase+len1)
+            SecondSet = range(iFirstBase+len1,iLastBase)
+         
+            for iBase in FirstSet:   # First serie
+                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+                ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            for iBase in SecondSet:   # Second serie
+                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+                ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            
+            
+            ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                       color='k', linestyle=':')
+            ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+                       color='k', linestyle=':')
+            ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                       color='k', linestyle=':')
+            ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+                       color='k', linestyle=':')
+            
+            ax4.bar(baselines[FirstSet],RMSgdmic[FirstSet], color=basecolors[FirstSet])
+            ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            ax5.bar(baselines[FirstSet],RMSpdmic[FirstSet], color=basecolors[FirstSet])
+            ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax9.bar(baselines[SecondSet],RMSgdmic[SecondSet], color=basecolors[SecondSet])
+            ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            ax10.bar(baselines[SecondSet],RMSpdmic[SecondSet], color=basecolors[SecondSet])
+            ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+            ax4.get_shared_x_axes().join(ax4,ax5)
+            ax9.get_shared_x_axes().join(ax9,ax10)
+            
+            ax1.get_shared_y_axes().join(ax1,ax6)
+            ax2.get_shared_y_axes().join(ax2,ax7)
+            ax3.get_shared_y_axes().join(ax3,ax8)
+            ax4.get_shared_y_axes().join(ax4,ax9)
+            ax5.get_shared_y_axes().join(ax5,ax10)
+            
+            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+            
+            ax4.tick_params(labelbottom=False)
+            ax9.tick_params(labelbottom=False)
+            
+            ax1.set_ylabel('SNR')
+            ax2.set_ylabel('Group-Delays [µm]')
+            ax3.set_ylabel('Phase-Delays [µm]')
+            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+            ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
+            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+       
+            ax7.legend(handles=linestyles, loc='upper right')
+            if display:
+                fig.show()
+       
+            if len(savedir):
+                if verbose:
+                    print("Saving perftable figure.")
+                plt.savefig(savedir+f"Simulation{timestr}_perftable2_{rangeBases}.{ext}")
+
+        plt.rcParams.update(plt.rcParamsDefault)
+
+    if displayall or ('perftableres' in args):
         plt.rcParams.update(rcParamsForBaselines)
-        title='GD and PD after threshold'
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
-        fig.suptitle(title)
-        (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-        ax1.set_title("First serie of baselines, from 12 to 25")
-        ax6.set_title("Second serie of baselines, from 26 to 56")
         
-        for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
-            ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-            ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-            ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-            ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-        for iBase in range(len1,NIN):   # Second serie
-            ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
-            ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-            ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-            ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-            ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-        
-        
-        ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                   color='k', linestyle=':')
-        ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
-                   color='k', linestyle=':')
-        ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                   color='k', linestyle=':')
-        ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
-                   color='k', linestyle=':')
-        
-        ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
-        ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
-        ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
-        ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
-        
-        ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
-        ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
-        ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
-        ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
-        
-        ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-        ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-        ax4.get_shared_x_axes().join(ax4,ax5)
-        ax9.get_shared_x_axes().join(ax9,ax10)
-        
-        ax1.get_shared_y_axes().join(ax1,ax6)
-        ax2.get_shared_y_axes().join(ax2,ax7)
-        ax3.get_shared_y_axes().join(ax3,ax8)
-        ax4.get_shared_y_axes().join(ax4,ax9)
-        ax5.get_shared_y_axes().join(ax5,ax10)
-        
-        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-        ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-        ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-        ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
-        
-        ax4.tick_params(labelbottom=False)
-        ax9.tick_params(labelbottom=False)
-        
-        
-        ax1.set_ylabel('SNR')
-        ax2.set_ylabel('Group-Delays [µm]')
-        ax3.set_ylabel('Phase-Delays [µm]')
-        ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        
-        ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-        
-        ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
-        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-    
-        ax7.legend(handles=linestyles, loc='upper right')
-        if display:
-            fig.show()
-    
-        if len(savedir):
-            if verbose:
-                print("Saving perftable figure.")
-            plt.savefig(savedir+f"Simulation{timestr}_perftableres.{ext}")
-
-
-
-
-    if displayall or ('perftableres2' in args):
-    
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
         if 'ThresholdGD' in config.FT.keys():
             linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Squared Threshold GD'))
+                                        linestyle='--', label='Threshold GD'))
         
         t = simu.timestamps ; timerange = range(NT)
-        # NA=6 ; NIN = 15 ; NC = 10
-        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
-        len2 = NIN//2 ; len1 = NIN-len2
+
+        GD = simu.GDResidual ; PD=simu.PDResidual
+        GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
+        GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
+
+        RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
+        RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+        RMStrueOPD = np.sqrt(simu.VarOPD)        
         
-        basecolors = colors[:len1]+colors[:len2]
-        # basestyles = len1*['solid'] + len2*['dashed']
-        # closurecolors = colors[:NC]
+        for iFig in range(NumberOfBaseFigures):
+            
+            iFirstBase = NumberOfBaseFigures*iFig   # Index of first baseline to display
+            iLastBase = iFirstBase + NINdisp - 1        # Index of last baseline to display
+            
+            rangeBases = f"{InterfArray.BaseNames[iFirstBase]}-{InterfArray.BaseNames[iLastBase]}"
+            title=f'GD and PD after threshold: {rangeBases}'
+            plt.close(title)
+            fig=plt.figure(title, clear=True)
+            fig.suptitle(title)
+            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+            ax1.set_title(f"From {InterfArray.BaseNames[iFirstBase]} \
+to {InterfArray.BaseNames[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {InterfArray.BaseNames[iFirstBase+len1]} \
+to {InterfArray.BaseNames[iLastBase]}")
+            
+            FirstSet = range(iFirstBase,iFirstBase+len1)
+            SecondSet = range(iFirstBase+len1,iLastBase)        
+
+            for iBase in FirstSet:   # First serie
+                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+                ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            for iBase in SecondSet:   # Second serie
+                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+                ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            
+            
+            ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                       color='k', linestyle=':')
+            ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+                       color='k', linestyle=':')
+            ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                       color='k', linestyle=':')
+            ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+                       color='k', linestyle=':')
+            
+            ax4.bar(baselines[FirstSet],RMSgdmic[FirstSet], color=basecolors[FirstSet])
+            ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            ax5.bar(baselines[FirstSet],RMSpdmic[FirstSet], color=basecolors[FirstSet])
+            ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax9.bar(baselines[SecondSet],RMSgdmic[SecondSet], color=basecolors[SecondSet])
+            ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            ax10.bar(baselines[SecondSet],RMSpdmic[SecondSet], color=basecolors[SecondSet])
+            ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+            ax4.get_shared_x_axes().join(ax4,ax5)
+            ax9.get_shared_x_axes().join(ax9,ax10)
+            
+            ax1.get_shared_y_axes().join(ax1,ax6)
+            ax2.get_shared_y_axes().join(ax2,ax7)
+            ax3.get_shared_y_axes().join(ax3,ax8)
+            ax4.get_shared_y_axes().join(ax4,ax9)
+            ax5.get_shared_y_axes().join(ax5,ax10)
+            
+            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+            
+            ax4.tick_params(labelbottom=False)
+            ax9.tick_params(labelbottom=False)
+            
+            
+            ax1.set_ylabel('SNR')
+            ax2.set_ylabel('Group-Delays [µm]')
+            ax3.set_ylabel('Phase-Delays [µm]')
+            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+            ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
+            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
         
-        R=config.FS['R']
+            ax7.legend(handles=linestyles, loc='upper right')
+            if display:
+                fig.show()
+        
+            if len(savedir):
+                if verbose:
+                    print("Saving perftable figure.")
+                plt.savefig(savedir+f"Simulation{timestr}_perftableres_{rangeBases}.{ext}")
+                
+        plt.rcParams.update(plt.rcParamsDefault)
+
+
+    if displayall or ('perftableres2' in args):
+        plt.rcParams.update(rcParamsForBaselines)
+        
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+        if 'ThresholdGD' in config.FT.keys():
+            linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle='--', label='Threshold GD'))
+        
+        t = simu.timestamps ; timerange = range(NT)
         
         GD = simu.GDResidual2 ; PD =simu.PDResidual2
         GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
         GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-        # gdClosure = simu.ClosurePhaseGD ; pdClosure = simu.ClosurePhasePD
-        
-        
-        start_pd_tracking = 100
-        
+
         RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
         RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
-        RMStrueOPD = np.sqrt(simu.VarOPD)
-        # RMSgdc = np.std(gdClosure[start_pd_tracking:,:],axis=0)
-        # RMSpdc = np.std(pdClosure[start_pd_tracking:,:],axis=0)
-        
-        
-        
-        plt.rcParams.update(rcParamsForBaselines)
-        title='GD and PD after leastsquare'
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
-        fig.suptitle(title)
-        (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-        ax1.set_title("First serie of baselines, from 12 to 25")
-        ax6.set_title("Second serie of baselines, from 26 to 56")
-        
-        for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax1.hlines(config.FT['ThresholdGD'][iBase]**2, t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
-            ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-            ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-            ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-            ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-        for iBase in range(len1,NIN):   # Second serie
-            ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax6.hlines(config.FT['ThresholdGD'][iBase]**2,t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
-            ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
-            ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-            ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
-            ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
-        
-        
-        ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                   color='k', linestyle=':')
-        ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
-                   color='k', linestyle=':')
-        ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-                   color='k', linestyle=':')
-        ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
-                   color='k', linestyle=':')
-        
-        ax4.bar(baselines[:len1],RMSgdmic[:len1], color=basecolors[:len1])
-        ax4.bar(baselines[:len1],simu.LR4[:len1],fill=False,edgecolor='black',linestyle='-')
-        ax5.bar(baselines[:len1],RMSpdmic[:len1], color=basecolors[:len1])
-        ax5.bar(baselines[:len1],RMStrueOPD[:len1],fill=False,edgecolor='black',linestyle='-')
-        
-        ax9.bar(baselines[len1:],RMSgdmic[len1:], color=basecolors[len1:])
-        ax9.bar(baselines[len1:],simu.LR4[len1:],fill=False,edgecolor='black',linestyle='-')
-        ax10.bar(baselines[len1:],RMSpdmic[len1:], color=basecolors[len1:])
-        ax10.bar(baselines[len1:],RMStrueOPD[len1:],fill=False,edgecolor='black',linestyle='-')
-        
-        ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-        ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-        ax4.get_shared_x_axes().join(ax4,ax5)
-        ax9.get_shared_x_axes().join(ax9,ax10)
-        
-        ax1.get_shared_y_axes().join(ax1,ax6)
-        ax2.get_shared_y_axes().join(ax2,ax7)
-        ax3.get_shared_y_axes().join(ax3,ax8)
-        ax4.get_shared_y_axes().join(ax4,ax9)
-        ax5.get_shared_y_axes().join(ax5,ax10)
-        
-        ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-        ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-        ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-        ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
-        
-        ax4.tick_params(labelbottom=False)
-        ax9.tick_params(labelbottom=False)
-        
-        
-        ax1.set_ylabel('SNR')
-        ax2.set_ylabel('Group-Delays [µm]')
-        ax3.set_ylabel('Phase-Delays [µm]')
-        ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        
-        ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-        
-        ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
-        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
 
-        ax7.legend(handles=linestyles, loc='upper right')
-        if display:
-            fig.show()
+        for iFig in range(NumberOfBaseFigures):
+            
+            iFirstBase = NumberOfBaseFigures*iFig   # Index of first baseline to display
+            iLastBase = iFirstBase + NINdisp - 1        # Index of last baseline to display
+            
+            rangeBases = f"{InterfArray.BaseNames[iFirstBase]}-{InterfArray.BaseNames[iLastBase]}"
+            title=f'GD and PD after leastsquare: {rangeBases}'
+            plt.close(title)
+            fig=plt.figure(title, clear=True)
+            fig.suptitle(title)
+            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+            ax1.set_title(f"From {InterfArray.BaseNames[iFirstBase]} \
+to {InterfArray.BaseNames[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {InterfArray.BaseNames[iFirstBase+len1]} \
+to {InterfArray.BaseNames[iLastBase]}")
+            
+            FirstSet = range(iFirstBase,iFirstBase+len1)
+            SecondSet = range(iFirstBase+len1,iLastBase)   
+        
+            for iBase in FirstSet:   # First serie
+                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
+                ax2.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax3.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            for iBase in SecondSet:   # Second serie
+                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+                ax7.plot(t[timerange],GDmic[timerange,iBase],color=basecolors[iBase])
+                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+                ax8.plot(t[timerange],PDmic[timerange,iBase],color=basecolors[iBase])
+                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iBase],linewidth=1, linestyle=':')
+            
+            
+            ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                       color='k', linestyle=':')
+            ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+                       color='k', linestyle=':')
+            ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+                       color='k', linestyle=':')
+            ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+                       color='k', linestyle=':')
+            
+            ax4.bar(baselines[FirstSet],RMSgdmic[FirstSet], color=basecolors[FirstSet])
+            ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            ax5.bar(baselines[FirstSet],RMSpdmic[FirstSet], color=basecolors[FirstSet])
+            ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax9.bar(baselines[SecondSet],RMSgdmic[SecondSet], color=basecolors[SecondSet])
+            ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            ax10.bar(baselines[SecondSet],RMSpdmic[SecondSet], color=basecolors[SecondSet])
+            ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+            ax4.get_shared_x_axes().join(ax4,ax5)
+            ax9.get_shared_x_axes().join(ax9,ax10)
+            
+            ax1.get_shared_y_axes().join(ax1,ax6)
+            ax2.get_shared_y_axes().join(ax2,ax7)
+            ax3.get_shared_y_axes().join(ax3,ax8)
+            ax4.get_shared_y_axes().join(ax4,ax9)
+            ax5.get_shared_y_axes().join(ax5,ax10)
+            
+            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic),np.stack(RMStrueOPD)]),ymin=0)
+            
+            ax4.tick_params(labelbottom=False)
+            ax9.tick_params(labelbottom=False)
+            
+            
+            ax1.set_ylabel('SNR')
+            ax2.set_ylabel('Group-Delays [µm]')
+            ax3.set_ylabel('Phase-Delays [µm]')
+            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+            ax3.set_xlabel('Time [ms]', labelpad=-10) ; ax8.set_xlabel('Time [ms]', labelpad=-10)
+            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+    
+            ax7.legend(handles=linestyles, loc='upper right')
+            if display:
+                fig.show()
+    
+            if len(savedir):
+                if verbose:
+                    print("Saving perftable figure.")
+                plt.savefig(savedir+f"Simulation{timestr}_perftableres2_{rangeBases}.{ext}")
 
-        if len(savedir):
-            if verbose:
-                print("Saving perftable figure.")
-            plt.savefig(savedir+f"Simulation{timestr}_perftableres2.{ext}")
-
-
+        plt.rcParams.update(plt.rcParamsDefault)
 
 
 
 
     if displayall or ('perfarray' in args):
+        plt.rcParams.update(rcParamsForBaselines)
         
-        from .config import InterfArray
         from .tol_colors import tol_cmap as tc
         import matplotlib as mpl
         
-        plt.rcParams.update(rcParamsForBaselines)
+        
         
         #visibilities, _,_,_=ct.VanCittert(WLOfScience,config.Obs,config.Target)
         #simu.VisibilityAtPerfWL = visibilities
@@ -2224,6 +2207,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             if verbose:
                 print("Saving perfarray figure.")
             plt.savefig(savedir+f"Simulation{timestr}_perfarray.{ext}")
+
+    plt.rcParams.update(plt.rcParamsDefault)
 
     # if displayall or ('opd' in args):
     #     """
@@ -2340,7 +2325,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
         len2 = NIN//2 ; len1 = NIN-len2
         
-        basecolors = colors[:len1]+colors[:len2]
         # basestyles = len1*['solid'] + len2*['dashed']
         # closurecolors = colors[:NC]
         
@@ -2423,16 +2407,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         linestyles=[mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
         
-        t = simu.timestamps ; timerange = range(NT)
-        # NA=6 ; NIN = 15 ; NC = 10
-        # nrows=int(np.sqrt(NA)) ; ncols=NA%nrows
-        len2 = NIN//2 ; len1 = NIN-len2
-        
-        basecolors = colors[:len1]+colors[:len2]
-        # basestyles = len1*['solid'] + len2*['dashed']
-        # closurecolors = colors[:NC]
-        
-        R=config.FS['R']
+        t = simu.timestamps ; timerange = range(NT)        
+
         RMStrueOPD = np.std(simu.OPDTrue,axis=0)
         
         VisObj = ct.NB2NIN(simu.VisibilityObject[ind])
@@ -3132,7 +3108,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         t = simu.timestamps ; timerange = range(NT)
         len2 = NIN//2 ; len1 = NIN-len2
-        basecolors = list(colors[:len1]+colors[:len2])
         
         title = "SNR GD"
         plt.close(title)
@@ -3257,6 +3232,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         if len(savedir):
             fig.savefig(savedir+f"Simulation{timestr}_snr.{ext}")
 
+
+
+    """
+    GD ONLY
+    """
+
     if displayall or ("GDonly" in args):
         plt.rcParams.update(rcParamsForBaselines)
         title=infos['details']
@@ -3280,7 +3261,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             basecolorstemp = basecolors[:NumberOfBaselinesToPlot]
             baselinestyles=['-']*len1 + ['--']*len2
             baselinehatches=['']*len1 + ['/']*len2
-            # barbasecolors = ['grey']*NIN
             
             k=0
             for iBase in PlotBaselineIndex:   # First serie
@@ -3388,7 +3368,6 @@ def investigate(*args):
     from . import simu
     
     from cophasing.tol_colors import tol_cset
-    colors= tol_cset('muted')
     
     if 'detail search' in args:
         fig=plt.figure('detail FS', clear=True)
@@ -4096,8 +4075,8 @@ def BodeDiagrams(Input,Output,Command,timestamps,
                 linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
                 for idel in range(len(delays)):
                     gain=gains[ig];delay=delays[idel]
-                    ftr=model(FrequencySampling,delay,gain)
-                    ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
+                    # ftr=model(FrequencySampling,delay,gain)
+                    # ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
                     if ig==len(gains)-1:
                         linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
             ax1.legend(handles=linestyles)
