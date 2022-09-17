@@ -1625,7 +1625,7 @@ def coh__GRAV2simu(gravmatrix):
             ksim = ia*(NA+1)
             simuV2PM[:,:,ksim] = gravmatrix[:,:,ia]
             for iap in range(ia+1,NA):
-                kp = ia*NA - ia*(ia+3)/2 + iap-1
+                kp = posk(ia,iap,NA)
 
                 # Real and Imaginary parts of the coherence vectors
                 k = int(NA + kp)
@@ -1651,7 +1651,7 @@ def coh__GRAV2simu(gravmatrix):
             ksim = ia*(NA+1)
             simuV2PM[:,ksim] = gravmatrix[:,ia]
             for iap in range(ia+1,NA):
-                kp = ia*NA - ia*(ia+3)/2 + iap-1
+                kp = posk(ia,iap,NA)
 
                 # Real and Imaginary parts of the coherence vectors
                 k = int(NA + kp)
@@ -1692,7 +1692,7 @@ def simu2GRAV(simumatrix, direction='v2pm'):
             ksim = ia*(NA+1)
             GRAVmatrix[:,:,ia] = np.real(simumatrix[:,:,ksim])
             for iap in range(ia+1,NA):
-                kp = ia*NA - ia*(ia+3)/2 + iap-1
+                kp = posk(ia,iap,NA)
                 
                 # Direct and Conjugate coherence vectors
                 direct = simumatrix[:,:,ia*NA+iap]
@@ -1712,7 +1712,7 @@ def simu2GRAV(simumatrix, direction='v2pm'):
             ksim = ia*(NA+1)
             GRAVmatrix[:,ia] = np.real(simumatrix[:,ksim])
             for iap in range(ia+1,NA):
-                kp = ia*NA - ia*(ia+3)/2 + iap-1
+                kp = posk(ia,iap,NA)
                 
                 # Direct and Conjugate coherence vectors
                 direct = simumatrix[:,ia*NA+iap]
@@ -2427,7 +2427,7 @@ def NB2NIN(vector):
     return ninvec
 
 
-def makeA2P(descr, modulator, verbose=False,clean_up=False):
+def makeA2P(descr, modulator, verbose=False,reducedmatrix=False):
     """Builds an A2P matrix from a high-level description descr of the FTchip.
        descr (NIN,2) gives for each baseline (order 01,02,..,12,13,...) the amplitude ratio for pups 1 & 2"""
     
@@ -2469,7 +2469,7 @@ def makeA2P(descr, modulator, verbose=False,clean_up=False):
     A2P=np.reshape(A2Pgen,(NP,NA))
     lightA2P=np.copy(A2P)
     
-    if clean_up:
+    if reducedmatrix:
         inc=0
         for ip in range(NP):
             if (A2P[ip,:] == np.zeros(NA)).all():
@@ -2490,8 +2490,69 @@ def MakeV2PfromA2P(Amat):
                 k = ia*NA+iap
                 Bmat[ip, k] = Amat[ip,ia]*np.transpose(np.conjugate(Amat[ip,iap]))
 
-    return Bmat
+    FilledColumns=np.where(np.sum(np.abs(Bmat),axis=0)!=0)[0]
+    NBmes = len(FilledColumns)  # count the number of null columns
+    NINmes = (NBmes - NA)//2
+    Bmatgrav_reduced = np.zeros([NP,NBmes])
+    Bmatgrav = np.zeros([NP,NB])
+    ib_r=0
+    for ia in range(NA):
+        Bmatgrav_reduced[:,ia] = np.abs(Bmat[:,ia*(NA+1)])
+        Bmatgrav[:,ia] = np.abs(Bmat[:,ia*(NA+1)])
+        for iap in range(ia+1,NA):
+            k = ia*NA+iap; kp = iap*NA+ia
+            ib = posk(ia,iap,NA)
+            Bmatgrav[:,NA+ib] = np.real(Bmat[:,k])
+            Bmatgrav[:,NA+NINmes+ib] = np.imag(Bmat[:,kp])
+            if k in FilledColumns:
+                Bmatgrav_reduced[:,NA+ib_r] = np.real(Bmat[:,k])
+                Bmatgrav_reduced[:,NA+NINmes+ib_r] = np.imag(Bmat[:,kp])
+                
+                ib_r+=1
 
+    return Bmat, Bmatgrav, Bmatgrav_reduced
+
+
+def ReducedVector(vec, active_ich, NA,form=''):
+    
+    NIN = len(active_ich)
+    NINmes = np.sum(active_ich)
+    NBmes = NA+2*NINmes
+    
+    if form=='NIN':
+        newvec = np.zeros([NINmes]) ; k=0
+        for ib in range(NIN):
+            if active_ich[ib]:
+                newvec[k] = vec[ib]
+                k+=1
+            
+    elif form=='NBcomplex':
+        newvec = np.zeros([NBmes]) ; ib_r=0
+        for ia in range(NA):
+            newvec[ia] = vec[ia*(NA+1)]
+            for iap in range(ia+1,NA):
+                k=ia*NA+iap ; kp=iap*NA+ia
+                ib=posk(ia,iap,NA)
+                if active_ich[ib]:
+                    newvec[NA+ib_r] = np.real(vec[k])
+                    newvec[NA+NINmes+ib_r] = np.imag(vec[k])
+                    ib_r+=1
+        
+    elif form=='NBreal':
+        newvec = np.zeros([NBmes]) ; ib_r=0
+        newvec[:NA] = vec[:NA]
+        for ib in range(NIN):
+            if active_ich[ib]:
+                newvec[NA+ib_r] = vec[NA+ib]
+                newvec[NA+NINmes+ib_r] = vec[NA+NIN+ib]
+                ib_r+=1
+                
+    else:
+        raise Exception("'form' parameter must be NIN, NBcomplex or NBreal")
+    
+    return newvec
+    
+    
 
 
 def check_nrj(A2P):
