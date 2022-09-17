@@ -1000,7 +1000,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     
     from . import simu
 
-    from .config import NT, NA, timestamps, spectra, OW, MW, checktime, checkperiod
+    from .config import NT, NA, NW,timestamps, spectra, OW, MW, checktime, checkperiod
     
     config.SimuTimeID=time.strftime("%Y%m%d-%H%M%S")
     
@@ -1071,12 +1071,15 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         currCfTrue = CfObj * simu.CfDisturbance[it,:,:] * CfODL
         simu.CfTrue[it,:,:] = currCfTrue
         
+        for iw in range(NW):
+            simu.CfTrue_r[it,iw] = ct.ReducedVector(currCfTrue[iw],config.FS['active_ich'],NA,form='NBcomplex')
+        
         """
         Fringe Sensor: From oversampled true coherences to macrosampled 
         measured coherences
         """
         fringesensor = config.FS['func']
-        currCfEstimated = fringesensor(currCfTrue)
+        currCfEstimated = fringesensor(simu.CfTrue_r[it])
         simu.CfEstimated[it,:,:] = currCfEstimated
 
         """
