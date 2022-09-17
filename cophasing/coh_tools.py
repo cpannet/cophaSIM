@@ -2451,7 +2451,7 @@ def makeA2P(descr, modulator, verbose=False,reducedmatrix=False):
     for ia in range(NA):
         for iap in range(ia+1,NA):
             for iq in range(NQ):
-                conventional_ich.append((int(f"{ia+1}{iap+1}"),alphabet[iq]))
+                conventional_ich.append(((str(ia+1),str(iap+1)),alphabet[iq]))
     
     ich = conventional_ich
 
@@ -2529,7 +2529,7 @@ def ReducedVector(vec, active_ich, NA,form=''):
     elif form=='NBcomplex':
         newvec = np.zeros([NBmes]) ; ib_r=0
         for ia in range(NA):
-            newvec[ia] = vec[ia*(NA+1)]
+            newvec[ia] = np.abs(vec[ia*(NA+1)])
             for iap in range(ia+1,NA):
                 k=ia*NA+iap ; kp=iap*NA+ia
                 ib=posk(ia,iap,NA)
