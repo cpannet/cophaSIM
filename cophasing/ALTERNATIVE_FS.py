@@ -729,6 +729,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
     from . import simu
     
     NBmes, NINmes = config.FS['NBmes'], config.FS['NINmes']
+    active_ich = config.FS['active_ich']
     
     it = simu.it
     
@@ -736,12 +737,14 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
     imw=0
     image_iw = np.zeros(FS['NP'])
     
-    currCfTrue = args[0]               # Transmission of the CHIP
-               
+    currCfTrue = args[0]
+    currCfTrue_r = np.zeros([NW,NBmes])
+    
     for iw in range(config.NW):
+        currCfTrue_r[iw] = ct.ReducedVector(currCfTrue[iw],active_ich,NA,form='NBcomplex')
         
         Modulation = FS['V2PM_r'][iw,:,:]
-        image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
+        image_iw = np.real(np.dot(Modulation,currCfTrue_r[iw,:]))
         
         simu.MacroImages[it,imw,:] += image_iw
         
