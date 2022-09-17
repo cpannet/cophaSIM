@@ -283,7 +283,7 @@ def ReadCf(currCfEstimated):
     [NT,MW,NA]
     """
     
-    PhotEst = currCfEstimated[:,:NA]
+    PhotEst = np.abs(currCfEstimated[:,:NA])
     
     currCfEstimatedNIN = np.zeros([MW, NINmes])*1j
     for ib in range(NINmes):
@@ -467,12 +467,12 @@ def CommandCalc(CfPD,CfGD):
         """
 
         Sdag = np.zeros([NA,NA])
-        reliablepistons = (S > config.FT['ThresholdPD']**2)
+        reliablepistons = (S >= config.FT['ThresholdPD']**2)
         notreliable = (reliablepistons==False)
         
         diagS = np.zeros([NA])
         diagS[reliablepistons] = 1/S[reliablepistons]
-        diagS[notreliable] = S[notreliable]/FT['ThresholdPD']**4
+        diagS[notreliable] = 0#S[notreliable]/FT['ThresholdPD']**4
         Sdag = np.diag(diagS)
         
         # Come back to the OPD-space        

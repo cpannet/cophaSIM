@@ -483,12 +483,61 @@ descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-
 
 
 def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', 
-             description='PW6-15-10', modulation='ABCD', reducedmatrix=False, 
+             description='PW6-15-10', modulation='ABCD',
              display=False, savedir='',ext='pdf',ArrayDetails=0):
+    """
     
-    if "which" in args:    
-        print("Available array configurations:\n",descriptions.keys())
-        return
+    Receive coherent fluxes and returns estimated coherent fluxes.
+    When initialised, creates the V2PM of any desired pairwise fringe-sensor.
+    
+    
+    
+    Parameters
+    ----------
+    *args : optional arguments
+        Must be the true coherent flux that receives the FS.
+    init : BOOLEAN, optional
+        DESCRIPTION. The default is False.
+    spectra : ARRAY [NW], optional
+        Micro spectral sampling. The default is [].
+    spectraM : ARRAY [MW], optional
+        Macro spectral sampling. The default is [].
+    T : FLOAT, optional
+        Transmission of the FS. The default is 1.
+    name : STRING, optional
+        Name of the FS. The default is ''.
+    description : ARRAY OR STRING, optional
+        Description of the FS. The default is 'PW6-15-10'.
+        This paramter can be the name of a type of fringe-sensor among:
+            'PW6-15-10', 'PW6-9-4-1', 'PW6-9-4-2', 'PW6-9-2', 'PW6-9-0',
+            'PW6-9-2-b', 'PW6-6-1', 'PW6-6-0', 'PW6-5-0', 'PW6-5-0-0',
+            'PW10-9-0', 'PW10-12-3-1', 'PW10-12-3-2', 'PW10-15-6', 'PW10-18-9'
+        Or be an array dimensions [NAxNA] that gives the connexions between 
+        telescopes on this logic: the element at the position (i,j) gives
+        the ratio of flux of the telescope i that is shared with the telescope j.
+    modulation : STRING, optional
+        'ABCD' or 'AC. The default is 'ABCD'.
+    display : BOOLEAN, optional
+        Display the array with its connexions. The default is False.
+    savedir : STRING, optional
+        If a string is given, it saves the figure at this string. The default is ''.
+    ext : STRING, optional
+        Extension of the figure file. The default is 'pdf'.
+    ArrayDetails : STRING, optional
+        Fitsfile that contains information on the interferometer, necessary
+        for telescope positions. The default is 0.
+
+    Raises
+    ------
+    Exception
+        DESCRIPTION.
+
+    Returns
+    -------
+    currCfEstimated : ARRAY [MW,NINmes]
+        Estimated coherent fluxes for the measured baselines.
+
+    """
     
     if init:
         if isinstance(description,str):
@@ -516,7 +565,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
             
         NMod = len(modulation)
         
-        A2P,ichdetails,active_ich=ct.makeA2P(d, modulator, reducedmatrix=reducedmatrix)
+        A2P,ichdetails,active_ich=ct.makeA2P(d, modulator, reducedmatrix=True)
         
         A2P = A2P * np.sqrt(T)          # Add the transmission loss into the matrix elements.
         
@@ -524,7 +573,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
       
         config.FS['A2P'] = A2P
           
-        ich = [str(ichdetails[NMod*k][0]) for k in range(len(ichdetails)//NMod)]
+        ich = [ichdetails[NMod*k][0] for k in range(len(ichdetails)//NMod)]
         NINmes = len(ich)  
       
         NP, NA = np.shape(A2P)
