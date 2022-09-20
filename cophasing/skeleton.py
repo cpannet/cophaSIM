@@ -470,10 +470,15 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
                 print(f"Max value: {np.max(inj)}, Moy: {np.mean(inj)}")
             NTfile = NT1*NT2
             
-            if NTfile < NT:
-                TransmissionDisturbance = repeat_sequence(inj, NT)
-            else:
-                TransmissionDisturbance = inj
+            for ia in range(NA):
+                if ia<NAfile:
+                    injtemp = inj[:,:,ia]
+                else:
+                    injtemp = inj[NTfile//3:,:,ia-NAfile]
+                if np.shape(injtemp)[0] < NT:
+                    TransmissionDisturbance[:,:,ia] = repeat_sequence(injtemp, NT)
+                else:
+                    TransmissionDisturbance[:,:,ia] = injtemp
             
             if verbose:
                 print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
@@ -1575,16 +1580,16 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         plt.suptitle('Photometries in the spectral channel containing {:.2f}µm'.format(wl))
         
         for ia in range(NA):
-            plt.plot(timestamps, np.sum(simu.PhotometryDisturbance[:,OW*WLIndex:OW*(WLIndex+1),ia],axis=1),
+            plt.plot(t[timerange], np.sum(simu.PhotometryDisturbance[:,OW*WLIndex:OW*(WLIndex+1),ia],axis=1),
                      color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
-            plt.plot(timestamps, simu.PhotometryEstimated[:,WLIndex,ia],
+            plt.plot(t[timerange], simu.PhotometryEstimated[:,WLIndex,ia],
                      color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
             
-        plt.vlines(config.starttracking*dt,s[0],s[1],
+        plt.vlines(config.starttracking*dt*ms,s[0],s[1],
                    color='k', linestyle=':')
         plt.legend(handles=beam_patches+linestyles)
         plt.grid()
-        plt.xlabel('Time (ms)')
+        plt.xlabel('Time [s]')
         plt.ylim(s[0],s[1])
         if display:
             plt.show()    
@@ -1679,13 +1684,13 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax = axes[ia]
             ax.plot(timestamps, simu.PistonDisturbance[:,ia],
                      color=colors[0])
-            ax.plot(timestamps, simu.CommandODL[:-config.latency,ia],
+            ax.plot(timestamps, simu.CommandODL[:-1,ia],
                      color=colors[1])
-            ax.plot(timestamps, simu.PistonPDCommand[:-config.latency,ia],
+            ax.plot(timestamps, simu.PistonPDCommand[:-1,ia],
                      color=colors[2])
-            ax.plot(timestamps, simu.PistonGDCommand[:-config.latency,ia],
+            ax.plot(timestamps, simu.PistonGDCommand[:-1,ia],
                      color=colors[3])
-            ax.plot(timestamps, simu.SearchCommand[:-config.latency,ia],
+            ax.plot(timestamps, simu.SearchCommand[:-1,ia],
                      color=colors[4])
             # ax2 = ax.twinx()
             # ax2.plot(timestamps, simu.PistonTrue[:,ia],
@@ -3119,164 +3124,280 @@ to {baselinesNIN[iLastBase]}")
         if len(savedir):
             fig.savefig(savedir+f"Simulation{timestr}_detector.{ext}")
         
+        
+        
+        
     if 'snr' in args:
         
-        
-        # InstantaneousSquaredSNR=np.nan_to_num(1/simu.varPD)
-        # ylim=[1e-1,np.max(InstantaneousSquaredSNR)]
-        # # State-Machine and SNR
-        # fig = plt.figure("SNR²")
-        # fig.suptitle("SNR² and State-Machine")
-        # ax = fig.subplots()
-        # for ib in range(NIN):
-        #     ax.plot(timestamps, simu.SquaredSNRMovingAverage[:,ib],#simu.SquaredSNRMovingAverage[:,ib],
-        #             label=f"{ich[ib]}")
-            
-        #     ax.hlines(config.FT['ThresholdGD'][ib]**2,0,timestamps[-1],
-        #               linestyle='--',label='Threshold GD')
-        
-        # ax.set_ylim(ylim)
-        # ax.set_yscale('log')
-        # ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-        #            color='k', linestyle=':')
-        # ax.set_ylabel("$<SNR>²_Ngd$")
-        # ax.legend()        
-        
-        
+        plt.rcParams.update(rcParamsForBaselines)
+        generaltitle = "SNR used by SPICA-FT"
         
         linestyles=[mlines.Line2D([],[], color='black',
-                                        linestyle='solid', label='Maximal SNR²'),
+                                        linestyle='solid', label='Maximal SNR'),
                     mlines.Line2D([],[], color='black',
                                         linestyle=':', label='Start tracking')]
         if 'ThresholdGD' in config.FT.keys():
             linestyles.append(mlines.Line2D([],[], color='black',
                                         linestyle='--', label='Squared Threshold GD'))
         
-        t = simu.timestamps ; timerange = range(NT)
-        len2 = NIN//2 ; len1 = NIN-len2
-        
-        title = "SNR GD"
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
-        fig.suptitle(title)
-        (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
-        ax1.set_title(f"Baselines from {config.FS['ich'][0]} to {config.FS['ich'][len1-1]}")
-        ax2.set_title(f"Baselines from {config.FS['ich'][len1]} to {config.FS['ich'][-1]}")
-        
-        for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SNRGD[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iBase], linestyle='dashed')
-
-        for iBase in range(len1,NIN):   # Second serie
-            ax2.plot(t[timerange],SNRGD[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
-
-        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNRGD),
-                   color='k', linestyle=':')
-        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNRGD),
-                   color='k', linestyle=':')
-        
-        maxSNR = np.nanmax(SNRGD,axis=0)
-        ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
-        ax3.bar(baselines[:len1],config.FT['ThresholdGD'][:len1], fill=False,edgecolor='k')
-
-        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(maxSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
-        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(config.FT['ThresholdGD'][len1:])+[0]*(len1-len2), fill=False,edgecolor='k')
-        ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
-        ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
-        
-        ax1.get_shared_x_axes().join(ax1,ax2)
-        ax1.get_shared_y_axes().join(ax1,ax2)
-        ax3.get_shared_y_axes().join(ax3,ax4)
-        
-        ax2.tick_params(labelleft=False) 
-        ax4.tick_params(labelleft=False)
-        
-        # ax1.set_yscale('log')
-        ax1.grid(True) ; ax2.grid(True)
-        ax3.grid(True) ; ax4.grid(True)
-        ax1.set_ylabel('SNR')
-        ax3.set_ylabel('max(SNR) &\n Thresholds')
-        ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
-        ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
-        ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
-        
-        if display:
-            if pause:
-                plt.pause(0.1)
-            else:
-                plt.show()
-
-
-
-        linestyles=[mlines.Line2D([],[], color='black',
-                                        linestyle='solid', label='Maximal SNR²'),
-                    mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking')]
-        if 'ThresholdGD' in config.FT.keys():
-            linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Squared Threshold GD'))
+        for iFig in range(NumberOfBaseFigures):
+            NINtodisplay=NINdisp
+            if iFig == NumberOfBaseFigures-1:
+                if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
+                    NINtodisplay = NINmes%NINdisp
                     
+            iFirstBase = NINdisp*iFig   # Index of first baseline to display
+            iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
             
-        title = "SNR PD"
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
-        fig.suptitle(title)
-        (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
-        ax1.set_title(f"Baselines from {config.FS['ich'][0]} to {config.FS['ich'][len1-1]}")
-        ax2.set_title(f"Baselines from {config.FS['ich'][len1]} to {config.FS['ich'][-1]}")
-        
-        for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax1.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+            len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
+            basecolors = colors[:len1]+colors[:len2]
+            basecolors = np.array(basecolors)
+            
+            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+            title=f'{generaltitle}: {rangeBases}'
 
-        for iBase in range(len1,NIN):   # Second serie
-            ax2.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iBase])
-            if 'ThresholdGD' in config.FT.keys():
-                ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iBase], linestyle='dashed')
+            plt.close(title)
+            fig=plt.figure(title, clear=True)
+            fig.suptitle(title)
+            (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
+            ax1.set_title(f"From {baselines[iFirstBase]} \
+to {baselines[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+to {baselines[iLastBase]}")
+            
+            FirstSet = range(iFirstBase,iFirstBase+len1)
+            SecondSet = range(iFirstBase+len1,iLastBase+1)
+            iColor = 0
+            for iBase in FirstSet:   # First serie
+                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
+                iColor+=1
+                
+            for iBase in SecondSet:   # Second serie
+                ax2.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
+                iColor+=1
+                
+            ax1.vlines(config.starttracking*dt*ms,0.5,2*np.max(SNR),
+                       color='k', linestyle=':')
+            ax2.vlines(config.starttracking*dt*ms,0.5,2*np.max(SNR),
+                       color='k', linestyle=':')
+            
+            maxSNR = np.nanmax(SNR,axis=0)
+            ax3.bar(baselines[FirstSet],maxSNR[FirstSet], color=basecolors[:len1])
+            ax3.bar(baselines[FirstSet],config.FT['ThresholdGD'][FirstSet], fill=False,edgecolor='k')
+            ax4.bar(baselines[SecondSet],maxSNR[SecondSet], color=basecolors[len1:])
+            ax4.bar(baselines[SecondSet],config.FT['ThresholdGD'][SecondSet], fill=False,edgecolor='k')
+    
+            # ax4.bar(list(baselines[SecondSet])+['']*(len1-len2),list(maxSNR[SecondSet])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
+            # ax4.bar(list(baselines[SecondSet])+['']*(len1-len2),list(config.FT['ThresholdGD'][SecondSet])+[0]*(len1-len2), fill=False,edgecolor='k')
+            ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+            ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+            
+            ax1.get_shared_x_axes().join(ax1,ax2)
+            ax1.get_shared_y_axes().join(ax1,ax2)
+            ax3.get_shared_y_axes().join(ax3,ax4)
+            
+            ax2.tick_params(labelleft=False) 
+            ax4.tick_params(labelleft=False)
+            
+            ax3.set_box_aspect(1/20)
+            ax4.set_box_aspect(1/20)
+            
+            ax1.grid(True) ; ax2.grid(True)
+            ax3.grid(True) ; ax4.grid(True)
+            ax1.set_ylabel('SNR')
+            ax3.set_ylabel('max(SNR) &\n Thresholds')
+            ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
+            ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
+            ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
+            
+            if display:
+                if pause:
+                    plt.pause(0.1)
+                else:
+                    plt.show()
 
-        if 'ThresholdPD' in config.FT.keys():
-            ax1.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
-            ax2.hlines(config.FT['ThresholdPD'],t[timerange[0]],t[timerange[-1]],color='r', linestyle='dashed')
 
-        ax1.vlines(config.starttracking*dt,0.5,2*np.max(SNR_pd),
-                   color='k', linestyle=':')
-        ax2.vlines(config.starttracking*dt,0.5,2*np.max(SNR_pd),
-                   color='k', linestyle=':')
+
+    if 'snrpd' in args:
+
+        plt.rcParams.update(rcParamsForBaselines)
+        generaltitle = "SNR PD"
         
-        maxSNR = np.nanmax(SNR_pd,axis=0)
-        ax3.bar(baselines[:len1],maxSNR[:len1], color=basecolors[:len1])
-        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(maxSNR[len1:])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
-        ax4.bar(list(baselines[len1:])+['']*(len1-len2),list(config.FT['ThresholdGD'][len1:])+[0]*(len1-len2), fill=False,edgecolor='k')
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle='solid', label='Maximal SNR'),
+                    mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+        if 'ThresholdGD' in config.FT.keys():
+            linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle='--', label='Squared Threshold GD'))
         
-        ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
-        ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+        for iFig in range(NumberOfBaseFigures):
+            NINtodisplay=NINdisp
+            if iFig == NumberOfBaseFigures-1:
+                if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
+                    NINtodisplay = NINmes%NINdisp
+                    
+            iFirstBase = NINdisp*iFig   # Index of first baseline to display
+            iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
+            
+            len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
+            basecolors = colors[:len1]+colors[:len2]
+            basecolors = np.array(basecolors)
+            
+            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+            title=f'{generaltitle}: {rangeBases}'
+
+            plt.close(title)
+            fig=plt.figure(title, clear=True)
+            fig.suptitle(title)
+            (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
+            ax1.set_title(f"From {baselines[iFirstBase]} \
+to {baselines[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+to {baselines[iLastBase]}")
+            
+            FirstSet = range(iFirstBase,iFirstBase+len1)
+            SecondSet = range(iFirstBase+len1,iLastBase+1)
+            iColor = 0
+            for iBase in FirstSet:   # First serie
+                ax1.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iColor])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
+                iColor+=1
+                
+            for iBase in SecondSet:   # Second serie
+                ax2.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iColor])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
+                iColor+=1
+                
+            ax1.vlines(config.starttracking*dt*ms,0.5,2*np.max(SNR_pd),
+                       color='k', linestyle=':')
+            ax2.vlines(config.starttracking*dt*ms,0.5,2*np.max(SNR_pd),
+                       color='k', linestyle=':')
+            
+            maxSNR = np.nanmax(SNR_pd,axis=0)
+            ax3.bar(baselines[FirstSet],maxSNR[FirstSet], color=basecolors[:len1])
+            ax3.bar(baselines[FirstSet],config.FT['ThresholdGD'][FirstSet], fill=False,edgecolor='k')
+    
+            # ax4.bar(list(baselines[SecondSet])+['']*(len1-len2),list(maxSNR[SecondSet])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
+            # ax4.bar(list(baselines[SecondSet])+['']*(len1-len2),list(config.FT['ThresholdGD'][SecondSet])+[0]*(len1-len2), fill=False,edgecolor='k')
+            ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+            ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+            
+            ax1.get_shared_x_axes().join(ax1,ax2)
+            ax1.get_shared_y_axes().join(ax1,ax2)
+            ax3.get_shared_y_axes().join(ax3,ax4)
+            
+            ax2.tick_params(labelleft=False) 
+            ax4.tick_params(labelleft=False)
+            
+            ax1.grid(True) ; ax2.grid(True)
+            ax3.grid(True) ; ax4.grid(True)
+            ax1.set_ylabel('SNR')
+            ax3.set_ylabel('max(SNR) &\n Thresholds')
+            ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
+            ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
+            ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
+            
+            if display:
+                if pause:
+                    plt.pause(0.1)
+                else:
+                    plt.show()
+
+
+    if 'snrgd' in args:
+
+        plt.rcParams.update(rcParamsForBaselines)
+        generaltitle = "SNR GD"
         
-        ax1.get_shared_x_axes().join(ax1,ax2)
-        ax1.get_shared_y_axes().join(ax1,ax2)
-        ax3.get_shared_y_axes().join(ax3,ax4)
+        linestyles=[mlines.Line2D([],[], color='black',
+                                        linestyle='solid', label='Maximal SNR'),
+                    mlines.Line2D([],[], color='black',
+                                        linestyle=':', label='Start tracking')]
+        if 'ThresholdGD' in config.FT.keys():
+            linestyles.append(mlines.Line2D([],[], color='black',
+                                        linestyle='--', label='Squared Threshold GD'))
         
-        ax2.tick_params(labelleft=False)
-        ax4.tick_params(labelleft=False)
-        
-        ax1.grid(True) ; ax2.grid(True)
-        ax3.grid(True) ; ax4.grid(True)
-        ax1.set_ylabel('SNR')
-        ax3.set_ylabel('SNR &\n Thresholds')
-        ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
-        ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
-        ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
-        
-        if display:
-            if pause:
-                plt.pause(0.1)
-            else:
-                plt.show()  
-        if len(savedir):
-            fig.savefig(savedir+f"Simulation{timestr}_snr.{ext}")
+        for iFig in range(NumberOfBaseFigures):
+            NINtodisplay=NINdisp
+            if iFig == NumberOfBaseFigures-1:
+                if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
+                    NINtodisplay = NINmes%NINdisp
+                    
+            iFirstBase = NINdisp*iFig   # Index of first baseline to display
+            iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
+            
+            len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
+            basecolors = colors[:len1]+colors[:len2]
+            basecolors = np.array(basecolors)
+            
+            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+            title=f'{generaltitle}: {rangeBases}'
+
+            plt.close(title)
+            fig=plt.figure(title, clear=True)
+            fig.suptitle(title)
+            (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
+            ax1.set_title(f"From {baselines[iFirstBase]} \
+to {baselines[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+to {baselines[iLastBase]}")
+            
+            FirstSet = range(iFirstBase,iFirstBase+len1)
+            SecondSet = range(iFirstBase+len1,iLastBase+1)
+            iColor = 0
+            for iBase in FirstSet:   # First serie
+                ax1.plot(t[timerange],SNR_gd[timerange,iBase],color=basecolors[iColor])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
+                iColor+=1
+                
+            for iBase in SecondSet:   # Second serie
+                ax2.plot(t[timerange],SNR_gd[timerange,iBase],color=basecolors[iColor])
+                if 'ThresholdGD' in config.FT.keys():
+                    ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
+                iColor+=1
+                
+            ax1.vlines(config.starttracking*dt*ms,0.5,2*np.max(SNR_gd),
+                       color='k', linestyle=':')
+            ax2.vlines(config.starttracking*dt*ms,0.5,2*np.max(SNR_gd),
+                       color='k', linestyle=':')
+            
+            maxSNR = np.nanmax(SNR_gd,axis=0)
+            ax3.bar(baselines[FirstSet],maxSNR[FirstSet], color=basecolors[:len1])
+            ax3.bar(baselines[FirstSet],config.FT['ThresholdGD'][FirstSet], fill=False,edgecolor='k')
+    
+            ax4.bar(list(baselines[SecondSet])+['']*(len1-len2),list(maxSNR[SecondSet])+[0]*(len1-len2), color=basecolors[len1:]+['k']*(len1-len2))
+            ax4.bar(list(baselines[SecondSet])+['']*(len1-len2),list(config.FT['ThresholdGD'][SecondSet])+[0]*(len1-len2), fill=False,edgecolor='k')
+            ax3.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+            ax4.hlines(config.FT['ThresholdPD'],-0.5,len1-0.5,color='r',linestyle='-.')
+            
+            ax1.get_shared_x_axes().join(ax1,ax2)
+            ax1.get_shared_y_axes().join(ax1,ax2)
+            ax3.get_shared_y_axes().join(ax3,ax4)
+            
+            ax2.tick_params(labelleft=False) 
+            ax4.tick_params(labelleft=False)
+            
+            ax1.grid(True) ; ax2.grid(True)
+            ax3.grid(True) ; ax4.grid(True)
+            ax1.set_ylabel('SNR')
+            ax3.set_ylabel('max(SNR) &\n Thresholds')
+            ax1.set_xlabel('Time [ms]') ; ax2.set_xlabel('Time [ms]')
+            ax3.set_xlabel('Baseline') ; ax4.set_xlabel('Baseline')
+            ct.setaxelim(ax3,ydata=maxSNR,ymin=0.5)
+            
+            if display:
+                if pause:
+                    plt.pause(0.1)
+                else:
+                    plt.show()
 
 
 
