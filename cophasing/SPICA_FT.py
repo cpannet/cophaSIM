@@ -472,7 +472,7 @@ def CommandCalc(CfPD,CfGD):
         
         diagS = np.zeros([NA])
         diagS[reliablepistons] = 1/S[reliablepistons]
-        diagS[notreliable] = 0#S[notreliable]/FT['ThresholdPD']**4
+        diagS[notreliable] = S[notreliable]/FT['ThresholdPD']**4
         Sdag = np.diag(diagS)
         
         # Come back to the OPD-space
@@ -1619,7 +1619,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                     if newThresholdGD[ib] ==0:
                         newThresholdGD[ib] = 10
                         
-            newThresholdPD = 1e-4#np.min(newThresholdGD)/2
+            newThresholdPD = 1.5#np.min(newThresholdGD)/2
             
             config.FT['ThresholdGD'] = newThresholdGD
             config.FT['ThresholdPD'] = newThresholdPD
