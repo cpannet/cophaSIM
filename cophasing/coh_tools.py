@@ -500,7 +500,7 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
     """
     
     # Get telescopes coordinates and names
-    InterfArray = get_array(Obs.Filepath, getcoords=True)    
+    InterfArray = get_array(config.InterferometerFile, getcoords=True)    
     
     TelNames = InterfArray.TelNames
     TelCoords = InterfArray.TelCoordinates

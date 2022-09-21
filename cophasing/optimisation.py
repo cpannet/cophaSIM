@@ -478,6 +478,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
     import pandas as pd
     
     from .config import NA, NIN, NC, NT, dt
+    NINmes = config.FS['NINmes']
         
     if not (len(GainsPD) and len(GainsPD)):
         raise Exception('Need GainsPD and GainsGD.')
@@ -627,7 +628,6 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                                 figsave.remove('perfarray')
                             sk.display(*figsave,display=display,savedir=savepath,ext='pdf',verbose=verbose2)
                         
-
                 if ComputeAllPerf:
     
                     # Load the performance observables into simu module
@@ -639,14 +639,14 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                         NDIT=len(newDITs) ; DITs = newDITs
                         
                         VarOPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])         # Phase variances
-                        VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD Phase variances after Igd dot
-                        VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD Phase variances after Ipd dot
-                        VarGDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # GD estimator variances 
-                        VarPDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # PD estimator variances
+                        VarGDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])       # GD Phase variances after Igd dot
+                        VarPDRes = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])       # PD Phase variances after Ipd dot
+                        VarGDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])       # GD estimator variances 
+                        VarPDEst = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])       # PD estimator variances
                         
                         FCArray = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])        # Contains the fringe contrasts
                         LockedRatio = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])    # Locked ratio
-                        LR2 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])            # Locked ratio
+                        LR2 = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])            # Locked ratio
                         LR3 = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])            # Central fringe ratio
                         
                         
@@ -656,23 +656,23 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
                         Vmod = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])
                         Vangle = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])
                         
-                        ThresholdGDs = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])
-                        InstVarPD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
-                        InstVarGD = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated GD variances
+                        ThresholdGDs = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])
+                        InstVarPD = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])      # Estimated PD variances
+                        InstVarGD = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])      # Estimated GD variances
                         VarPiston = np.zeros([NDIT,NgainsGD,NgainsPD,NA])       # Piston variance
                         VarPistonGD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston GD variance
                         VarPistonPD = np.zeros([NDIT,NgainsGD,NgainsPD,NA])     # Piston PD variance
                         
                         if criterias!='light':
                         
-                            InstVarGDUnbiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])      # Estimated PD variances
-                            VarPDnum = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])       # Estimated PD variances
-                            VarGDdenom = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
-                            VarGDdenomUnbiased = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
-                            VarPDdenom = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])     # Estimated PD variances
-    
+                            InstVarGDUnbiased = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])      # Estimated PD variances
+                            VarPDnum = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])       # Estimated PD variances
+                            VarGDdenom = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])     # Estimated PD variances
+                            VarGDdenomUnbiased = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])     # Estimated PD variances
+                            VarPDdenom = np.zeros([NDIT,NgainsGD,NgainsPD,NINmes])     # Estimated PD variances
+                    
                             WLockedRatio = np.zeros([NDIT,NgainsGD,NgainsPD,NIN])   # Weigthed locked ratio
-                            
+            
                     
                     # Initialise the comparison tables
                     VarOPD[:,ig,ip,:] += simu.VarOPD/Nfiles
@@ -784,19 +784,16 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
         from tabulate import tabulate
         # ich = [12,13,14,15,16,23,24,25,26,34,35,36,45,46,56]
         ichint = [int(''.join([str(int(ic[0]+1)),str(int(ic[1]+1))])) for ic in config.ich] # Convert list of tuples into list of int
+        
         telint = np.arange(1,NA+1)
         
         if criterias=='light':
-            criteriasBase = ["LR", "LR2", "LR3", "FC", "SNR(|V|²)","VarOPD [µm]",
-                             "SNRPD","SNRGD","ThresholdGDs",
+            criteriasBase = ["LR","LR3", "FC", "SNR(|V|²)","VarOPD [µm]",
                              'Vmod','Vangle']
         
         else:
-            criteriasBase = ["LR", "LR2", "LR3", "WLR", "FC", "SNR(|V|²)","VarOPD [µm]",
-                             "VarGDRes","VarPDRes","VarGDEst","VarPDEst","InstVarPD","InstVarGD","InstVarGDUnbiased",
-                             "VarPDnum", "VarPDdenom","VarGDdenom","VarGDdenomUnbiased", 
-                             "SNRPD","SNRGD","ThresholdGDs",
-                               'Vmod','Vangle']  
+            criteriasBase = ["LR", "LR3", "WLR", "FC", "SNR(|V|²)","VarOPD [µm]",
+                             'Vmod','Vangle']  
         
         Ncb = len(criteriasBase)
         # A=list(np.repeat(GainsGD, Ncb)) ; B = criteriasBase*Ngains
@@ -812,21 +809,63 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
         D = criteriasBase * NDIT * NgainsGD * NgainsPD 
         
         if criterias=='light':
-            base_5d = np.array([LockedRatio,LR2,LR3,FCArray,SNRSI,VarOPD,
-                                np.sqrt(1/InstVarPD),np.sqrt(1/InstVarGD),
-                                ThresholdGDs, Vmod,Vangle])
+            base_5d = np.array([LockedRatio,LR3,FCArray,SNRSI,VarOPD,
+                                Vmod,Vangle])
         else:
-            base_5d = np.array([LockedRatio,LR2,LR3,WLockedRatio,FCArray,SNRSI,VarOPD,
-                                VarGDRes,VarPDRes,VarGDEst,VarPDEst,InstVarPD,InstVarGD,InstVarGDUnbiased,
-                                VarPDnum, VarPDdenom,VarGDdenom,VarGDdenomUnbiased,
-                                np.sqrt(1/InstVarPD),np.sqrt(1/InstVarGD),
-                                ThresholdGDs, Vmod,Vangle])
+            base_5d = np.array([LockedRatio,LR3,WLockedRatio,FCArray,SNRSI,VarOPD,
+                                Vmod,Vangle])
             
         base_5d = np.transpose(base_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order
         
         base_2d = base_5d.reshape([NDIT*Ncb*NgainsGD*NgainsPD,NIN], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
         
         resultsBasedf = pd.DataFrame(data=base_2d, columns=[A,B,C,C2,C3,C4,D], index=ichint)
+        
+        """ Estimated baselines only"""
+        
+        
+        if criterias=='light':
+            criteriasBase = ["LR2","SNRPD","SNRGD","ThresholdGDs"]
+        
+        else:
+            criteriasBase = ["LR2","VarGDRes","VarPDRes","VarGDEst","VarPDEst",
+                             "InstVarPD","InstVarGD","InstVarGDUnbiased",
+                             "VarPDnum", "VarPDdenom","VarGDdenom","VarGDdenomUnbiased", 
+                             "SNRPD","SNRGD","ThresholdGDs"]  
+        
+        Ncb = len(criteriasBase)
+        # A=list(np.repeat(GainsGD, Ncb)) ; B = criteriasBase*Ngains
+        
+        A = list(np.repeat(DITs, NgainsGD*NgainsPD*Ncb))
+        Btemp = list(np.repeat(GainsGD,Ncb*NgainsPD))
+        B = Btemp * NDIT
+        Ctemp = list(np.repeat(GainsPD,Ncb))
+        C = Ctemp * NDIT * NgainsGD
+        C2 = list(np.repeat(IDs,Ncb)) * NDIT            # ID of the last simu
+        C3 = list(np.repeat(ThresholdGDmins,Ncb)) * NDIT   # ThresholdGD
+        C4 = list(np.repeat(ThresholdGDmaxs,Ncb)) * NDIT   # ThresholdGD
+        D = criteriasBase * NDIT * NgainsGD * NgainsPD 
+        
+        
+        
+        ichmesint = [int(''.join([str(int(ic[0])),str(int(ic[1]))])) for ic in config.FS['ich']] # Convert list of tuples into list of int
+        
+        if criterias=='light':
+            base_5d = np.array([LR2,np.sqrt(1/InstVarPD),np.sqrt(1/InstVarGD),
+                                ThresholdGDs])
+        else:
+            base_5d = np.array([LR2,VarGDRes,VarPDRes,VarGDEst,VarPDEst,
+                                InstVarPD,InstVarGD,InstVarGDUnbiased,
+                                VarPDnum, VarPDdenom,VarGDdenom,VarGDdenomUnbiased,
+                                np.sqrt(1/InstVarPD),np.sqrt(1/InstVarGD),
+                                ThresholdGDs])
+            
+        base_5d = np.transpose(base_5d, (0,3,2,1,4))      # Trick to get the levels DIT, GD and PD in this order
+        
+        base_2d = base_5d.reshape([NDIT*Ncb*NgainsGD*NgainsPD,NINmes], order='F').T  # The first index (criterias) changing fastest, then transpose for having baselines in rows
+        
+        resultsBaseMesdf = pd.DataFrame(data=base_2d, columns=[A,B,C,C2,C3,C4,D], index=ichmesint)
+
         
         CPindexint = [int(''.join([str(int(cpindex[0]+1)),str(int(cpindex[1]+1)),str(int(cpindex[2]+1))])) for cpindex in config.CPindex]
         
@@ -884,6 +923,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
         
         if not telescopes:
             Base_av = resultsBasedf.mean(axis=0).to_frame(name='Average')
+            BaseMes_av = resultsBaseMesdf.mean(axis=0).to_frame(name='Average')
             Closure_av = resultsClosuredf.mean(axis=0).to_frame(name='Average')
             Tel_av = resultsBasedf.mean(axis=0).to_frame(name='Average')
         else:
@@ -891,6 +931,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
             ib = ct.posk(itel1, itel2, config.NA)
             ia = telescopes[0]-1  # histoire de mettre un truc, mais à modifier si besoin
             Base_av = resultsBasedf.iloc[ib].to_frame(name=f"{telescopes[0]}{telescopes[1]}")
+            BaseMes_av = resultsBaseMesdf.iloc[ib].to_frame(name=f"{telescopes[0]}{telescopes[1]}")
             Closure_av = resultsClosuredf.iloc[ib].to_frame(name=f"{telescopes[0]}{telescopes[1]}")
             Tel_av = resultsTeldf.iloc[ia].to_frame(name=f"{telescopes[0]}")
             
@@ -922,15 +963,16 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
         bestDIT, bestGainGD, bestGainPD = bestCombi[:3]
         
         if verbose2:
-            print(f"Best performances OPD reached with gains\
-    (GD,PD)={(bestGainGD, bestGainPD)} and DIT={bestDIT}ms")
-            print(tabulate(resultsBasedf[bestCombi], headers="keys"))
+            pass
+    #         print(f"Best performances OPD reached with gains\
+    # (GD,PD)={(bestGainGD, bestGainPD)} and DIT={bestDIT}ms")
+    #         print(tabulate(resultsBasedf[bestCombi], headers="keys"))
             
-            print(f"Same for closure phases with gain={bestGains}")
-            print(tabulate(resultsClosuredf[bestCombi], headers="keys"))
+    #         print(f"Same for closure phases with gain={bestGains}")
+    #         print(tabulate(resultsClosuredf[bestCombi], headers="keys"))
             
-            print(f"Same for telescopes with gain={bestGains}")
-            print(tabulate(resultsTeldf[bestCombi], headers="keys"))
+    #         print(f"Same for telescopes with gain={bestGains}")
+    #         print(tabulate(resultsTeldf[bestCombi], headers="keys"))
        
         if display or len(figsave):
             if verbose2:
@@ -946,7 +988,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
             # sk.display('perfarray',WLOfScience=np.median(SpectraForScience),display=display,
             #            savedir=savepath,ext='pdf',verbose=verbose2)
     
-        return bestCombi, resultsBasedf,  resultsClosuredf, resultsTeldf
+        return bestCombi, resultsBasedf,  resultsBaseMesdf, resultsClosuredf, resultsTeldf
 
 
 

@@ -3876,7 +3876,9 @@ MeanWavelength
     
     ich = config.FS['ich']
     
-    from .config import NA,NIN,NC,dt,NT,NB
+    from .config import NA,NIN,NC,dt,NT
+    
+    NINmes = config.FS['NINmes']
     
     
     """
@@ -3979,7 +3981,7 @@ MeanWavelength
     simu.SNR_E_perSC=np.zeros([Ndit,MW,NIN])*np.nan
     simu.VarOPD=np.zeros([Ndit,NIN])
     simu.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
-    simu.LR2 = np.zeros([Ndit,NIN])          # Mode TRACK
+    simu.LR2 = np.zeros([Ndit,NINmes])          # Mode TRACK
     simu.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
     simu.LR4 = np.zeros([Ndit,NIN])          # No Fringe Jump
     simu.FringeContrast=np.zeros([Ndit,MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
@@ -3996,17 +3998,17 @@ MeanWavelength
         simu.CoupledTerms=np.zeros([Ndit,MW,NIN])*np.nan
         simu.VarCf=np.zeros([Ndit,MW,NIN])*np.nan
     
-        simu.VarGDRes=np.zeros([Ndit,NIN])
-        simu.VarPDRes=np.zeros([Ndit,NIN])
+        simu.VarGDRes=np.zeros([Ndit,NINmes])
+        simu.VarPDRes=np.zeros([Ndit,NINmes])
     
-        simu.VarPDEst=np.zeros([Ndit,NIN])
-        simu.VarGDEst=np.zeros([Ndit,NIN])
+        simu.VarPDEst=np.zeros([Ndit,NINmes])
+        simu.VarGDEst=np.zeros([Ndit,NINmes])
         
         simu.WLockedRatio = np.zeros([Ndit,NIN])
-        simu.WLR2 = np.zeros([Ndit,NIN])
+        simu.WLR2 = np.zeros([Ndit,NINmes])
     
         simu.VarCPD =np.zeros([Ndit,NC])
-        simu.VarCGD=np.zeros([Ndit,NC])
+        simu.VarCGD = np.zeros([Ndit,NC])
     
     simu.IntegrationTime=NewIntegrationTimes
 
@@ -4015,22 +4017,23 @@ MeanWavelength
     
     InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < MeanWavelength/2
     if 'ThresholdGD' in config.FT.keys():
-        TrackedBaselines = (simu.SquaredSNRMovingAveragePD >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
+        TrackedBaselines = (simu.SquaredSNRMovingAverage >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
         
     FirstFrame = InFrame
     for idit in range(Ndit):
         
         DIT=NewIntegrationTimes[idit]
         
-        # Calculation of SNR
-        _, simu.VarSquaredVis[idit], simu.SNR_E[idit], simu.SNR_E_perSC[idit] = SPICAVIS(CoherentFluxObject,simu.OPDTrue[FirstFrame:], SpectraForScience,DIT=DIT)
+        # if config.NA ==6:
+        #     # Calculation of SNR
+        #     _, simu.VarSquaredVis[idit], simu.SNR_E[idit], simu.SNR_E_perSC[idit] = SPICAVIS(CoherentFluxObject,simu.OPDTrue[FirstFrame:], SpectraForScience,DIT=DIT)
         
-        if criterias!='light':
-            simu.EnergyPicFrange[idit] = simu.SNRnum
-            simu.PhotonNoise[idit]= simu.PhNoise
-            simu.ReadNoise[idit]=simu.RNoise
-            simu.CoupledTerms[idit]=simu.CTerms
-            simu.VarCf[idit]=simu.var_cf
+        # if criterias!='light':
+        #     simu.EnergyPicFrange[idit] = simu.SNRnum
+        #     simu.PhotonNoise[idit]= simu.PhNoise
+        #     simu.ReadNoise[idit]=simu.RNoise
+        #     simu.CoupledTerms[idit]=simu.CTerms
+        #     simu.VarCf[idit]=simu.var_cf
         
         if onlySNR:
             continue
@@ -4096,7 +4099,7 @@ MeanWavelength
             
         # Don't depend on DIT but better for same treatment after.
         if criterias!='light':
-            simu.WLR2[idit] = np.mean(InCentralFringe * simu.SquaredSNRMovingAveragePD, axis=0)
+            simu.WLR2[idit] = np.mean(TrackedBaselines * simu.SquaredSNRMovingAverage, axis=0)
         
         
     if onlySNR:
@@ -5158,10 +5161,13 @@ def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, ver
     for key, array in DicoForImageHDU.items():
         
         if key=='FS.ichdetails':
-            cols.append(fits.Column(name=key+'.ich', format='I', array=np.array(array)[:,0]))
-            cols.append(fits.Column(name=key+'mod', format='A', array=np.array(array)[:,1]))
+            pass
+            # cols.append(fits.Column(name=key+'.ich', format='I', array=np.array(array)[:,0]))
+            # cols.append(fits.Column(name=key+'mod', format='A', array=np.array(array)[:,1]))
+            
             
         elif np.ndim(array) == 1:
+            if len(array):
                 if isinstance(array[0], str):
                     form='A'
                 else:
@@ -5169,8 +5175,9 @@ def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, ver
                 cols.append(fits.Column(name=key, format=form, array=array))
             
         elif np.ndim(array) == 2:
-            if not isinstance(array[0,0],complex):
-                imhdu.append(fits.ImageHDU(array, name=key))
+            if not isinstance(array,list):
+                if not isinstance(array[0,0],complex):
+                    imhdu.append(fits.ImageHDU(array, name=key))
             
     hdu = fits.BinTableHDU.from_columns(cols, name='config')
     
