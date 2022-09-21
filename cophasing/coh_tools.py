@@ -1775,7 +1775,7 @@ def sortmatrix(matrix,ich,ABCDindex,direction='v2pm'):
     for ib in range(NIN):
         # Sort the positions in the conventional order
         detectorpositions = range(ib*Nmod,(ib+1)*Nmod)
-        ia, iap = ich[ib]-1
+        ia, iap = int(ich[ib][0])-1, int(ich[ib][1])-1
         ibn = posk(ia,iap,NA)
         conventionalpositions = range(ibn*Nmod,(ibn+1)*Nmod)
         

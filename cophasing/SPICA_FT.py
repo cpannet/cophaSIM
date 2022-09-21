@@ -423,11 +423,11 @@ def CommandCalc(CfPD,CfGD):
         simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
         
         if config.FT['whichSNR'] == 'pd':
-            SquaredSNRMovingAverage = simu.SquaredSNRMovingAveragePD[it]
+            simu.SquaredSNRMovingAverage[it] = simu.SquaredSNRMovingAveragePD[it]
         else:
-            SquaredSNRMovingAverage = simu.SquaredSNRMovingAverageGD[it]
+            simu.SquaredSNRMovingAverage[it] = simu.SquaredSNRMovingAverageGD[it]
             
-        reliablebaselines = (SquaredSNRMovingAverage >= FT['ThresholdGD']**2)
+        reliablebaselines = (simu.SquaredSNRMovingAverage[it] >= FT['ThresholdGD']**2)
         
         simu.TrackedBaselines[it] = reliablebaselines
         
@@ -475,7 +475,7 @@ def CommandCalc(CfPD,CfGD):
         diagS[notreliable] = 0#S[notreliable]/FT['ThresholdPD']**4
         Sdag = np.diag(diagS)
         
-        # Come back to the OPD-space        
+        # Come back to the OPD-space
         VSdagUt = np.dot(V, np.dot(Sdag,Ut))
         
         # Calculates the weighting matrix
@@ -1550,7 +1550,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
             
             ind=np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
             
-            newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAveragePD[ind,:])])
+            newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
                     
             config.FT['ThresholdGD'] = newThresholdGD
             
@@ -1600,7 +1600,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
             
             if TypeDisturbance=='NoDisturbance':
                 ind=100
-                newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAveragePD[ind,:])])
+                newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
  
             elif TypeDisturbance == 'CophasedThenForeground':
                 CophasedInd = 50 ; ForegroundInd = 180
@@ -1609,17 +1609,17 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                 newThresholdGD = np.ones(NINmes)
 
                 for ib in range(NINmes):
-                    SNRcophased = np.mean(np.sqrt(simu.SquaredSNRMovingAveragePD[CophasedRange,ib]))
-                    SNRfg = np.mean(np.sqrt(simu.SquaredSNRMovingAveragePD[ForegroundRange,ib]))
-                    fgstd = np.std(np.sqrt(simu.SquaredSNRMovingAveragePD[ForegroundRange,ib]))
-                    cophasedstd = np.std(np.sqrt(simu.SquaredSNRMovingAveragePD[CophasedRange,ib]))
+                    SNRcophased = np.mean(np.sqrt(simu.SquaredSNRMovingAverage[CophasedRange,ib]))
+                    SNRfg = np.mean(np.sqrt(simu.SquaredSNRMovingAverage[ForegroundRange,ib]))
+                    fgstd = np.std(np.sqrt(simu.SquaredSNRMovingAverage[ForegroundRange,ib]))
+                    cophasedstd = np.std(np.sqrt(simu.SquaredSNRMovingAverage[CophasedRange,ib]))
                     
                     # Set threshold to a value between max and foreground with a lower limit defined by the std of foreground.
-                    newThresholdGD[ib] = np.max([1.5,SNRfg + 5*fgstd,SNRfg+0.2*(SNRcophased-SNRfg)])
+                    newThresholdGD[ib] = np.max([1.5,SNRfg + 5*fgstd,SNRfg+0.05*(SNRcophased-SNRfg)])
                     if newThresholdGD[ib] ==0:
                         newThresholdGD[ib] = 10
                         
-            newThresholdPD = 1#np.min(newThresholdGD)/2
+            newThresholdPD = 1e-4#np.min(newThresholdGD)/2
             
             config.FT['ThresholdGD'] = newThresholdGD
             config.FT['ThresholdPD'] = newThresholdPD
