@@ -330,7 +330,7 @@ def ReadCf(currCfEstimated):
     GD_ is a global stack variable [NT, NIN]
     Eq. 15 & 16
     """
-    print(1)
+    
     if MW <= 1:
         raise ValueError('Tracking mode = GD but no more than one wavelength. \
                          Need several wavelengths for group delay')              # Group-delay calculation
