@@ -20,6 +20,7 @@ import os
 from . import coh_tools as ct
 from . import config
 from .FS_DEFAULT import ABCDmod, realisticABCDmod
+from scipy.special import binom
 
 from . import tol_colors as tc
 colors=tc.tol_cset('muted')
@@ -111,7 +112,7 @@ pw10_9_0 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [0,0,0,0,0,0,0,0,1,0]])
 
 # For homogeneous MROI
-pw10_12_3_1 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+pw10_12_4 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
                [0,1/2,0,1/2,0,0,0,0,0,0],
                [0,0,1,0,0,0,0,0,0,0],
@@ -123,7 +124,7 @@ pw10_12_3_1 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [0,0,0,0,0,0,0,0,1,0]])
 
 # For dense MROI
-pw10_12_3_2 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+pw10_15_0 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [1/4,0,1/4,0,0,1/4,0,0,1/4,0],
                [0,1/4,0,1/4,1/4,0,0,1/4,0,0],
                [0,0,1,0,0,0,0,0,0,0],
@@ -134,7 +135,18 @@ pw10_12_3_2 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [0,1/4,0,0,1/4,0,0,1/4,0,1/4],
                [0,0,0,0,0,0,0,0,1,0]])
 
-pw10_15_6 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+pw10_18_13 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+               [1/6,0,1/6,0,1/6,1/6,0,1/6,1/6,0],
+               [0,1/4,0,1/4,1/4,0,0,1/4,0,0],
+               [0,0,1,0,0,0,0,0,0,0],
+               [1/6,1/6,1/6,0,0,1/6,0,1/6,1/6,0],
+               [0,1/4,0,0,1/4,0,1/4,1/4,0,0],
+               [0,0,0,0,0,1,0,0,0,0],
+               [1/6,1/6,1/6,0,1/6,1/6,0,0,1/6,0],
+               [0,1/4,0,0,1/4,0,0,1/4,0,1/4],
+               [0,0,0,0,0,0,0,0,1,0]])
+
+pw10_15_5 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
                [0,1/4,0,1/4,0,1/4,0,0,1/4,0],
                [0,0,1,0,0,0,0,0,0,0],
@@ -145,7 +157,18 @@ pw10_15_6 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [0,0,1/4,0,0,1/4,0,1/4,0,1/4],
                [0,0,0,0,0,0,0,0,1,0]])
 
-pw10_18_9 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
+pw10_18_11 = np.array([[0,1/6,1/6,0,1/6,1/6,0,1/6,1/6,0],
+               [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
+               [1/5,1/5,0,1/5,0,1/5,0,0,1/5,0],
+               [0,0,1,0,0,0,0,0,0,0],
+               [1/4,1/4,0,0,0,1/4,0,1/4,0,0],
+               [1/5,0,1/5,0,1/5,0,1/5,0,1/5,0],
+               [0,0,0,0,0,1,0,0,0,0],
+               [1/4,1/4,0,0,1/4,0,0,0,1/4,0],
+               [1/5,0,1/5,0,0,1/5,0,1/5,0,1/5],
+               [0,0,0,0,0,0,0,0,1,0]])
+
+pw10_18_6 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
                [0,1/4,0,1/4,0,1/4,0,0,1/4,0],
                [0,0,1/3,0,0,0,1/3,0,0,1/3],
@@ -156,6 +179,28 @@ pw10_18_9 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
                [0,0,1/4,0,0,1/4,0,1/4,0,1/4],
                [0,0,0,1/3,0,0,1/3,0,1/3,0]])
 
+pw10_21_14 = np.array([[0,1/6,1/6,0,1/6,1/6,0,1/6,1/6,0],
+               [1/5,0,1/5,1/5,1/5,0,0,1/5,0,0],
+               [1/5,1/5,0,1/5,0,1/5,0,0,1/5,0],
+               [0,1/2,1/2,0,0,0,0,0,0,0],
+               [1/5,1/5,0,0,0,1/5,1/5,1/5,0,0],
+               [1/5,0,1/5,0,1/5,0,1/5,0,1/5,0],
+               [0,0,0,0,1/2,1/2,0,0,0,0],
+               [1/5,1/5,0,0,1/5,0,0,0,1/5,1/5],
+               [1/5,0,1/5,0,0,1/5,0,1/5,0,1/5],
+               [0,0,0,0,0,0,0,1/2,1/2,0]])
+
+pw10_21_12 = np.array([[0,1/6,1/6,0,1/6,1/6,0,1/6,1/6,0],
+               [1/4,0,1/4,0,1/4,0,0,1/4,0,0],
+               [1/5,1/5,0,1/5,0,1/5,0,0,1/5,0],
+               [0,0,1/3,0,0,0,1/3,0,0,1/3],
+               [1/4,1/4,0,0,0,1/4,0,1/4,0,0],
+               [1/5,0,1/5,0,1/5,0,1/5,0,1/5,0],
+               [0,0,0,1/3,0,1/3,0,0,0,1/3],
+               [1/4,1/4,0,0,1/4,0,0,0,1/4,0],
+               [1/5,0,1/5,0,0,1/5,0,1/5,0,1/5],
+               [0,0,0,1/3,0,0,1/3,0,1/3,0]])
+
 
 NA=10
 pw10_45_36 = (np.ones([NA,NA])-np.identity(NA))/(NA-1)
@@ -163,321 +208,15 @@ pw10_45_36 = (np.ones([NA,NA])-np.identity(NA))/(NA-1)
 
 descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
                 "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8, "PW6-5-0-0":d9,
-                "PW10-9-0":pw10_9_0,"PW10-12-3-1":pw10_12_3_1,"PW10-12-3-2":pw10_12_3_2,
-                "PW10-15-6":pw10_15_6,"PW10-18-9":pw10_18_9,"PW10-45-36":pw10_45_36}
-
-
-# def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', 
-#              description='PW6-15-10', modulation='ABCD', reducedmatrix=False, 
-#              display=False, savedir='',ext='pdf',ArrayDetails=0):
-    
-#     if "which" in args:    
-#         print("Available array configurations:\n",descriptions.keys())
-#         return
-    
-#     if init:
-#         if isinstance(description,str):
-#             if not len(name):
-#                 name=description
-#             description = descriptions[description]
-        
-#         NA=np.shape(description)[0] ; NIN=NA*(NA-1)//2
-        
-#         d=np.zeros([NIN,2])     # Transmissions basewise in amplitude
-#         for ia in range(NA):
-#             for iap in range(ia+1,NA):
-#                 ib=ct.posk(ia,iap,NA)
-#                 d[ib,0]=np.sqrt(description[ia,iap])
-#                 d[ib,1]=np.sqrt(description[iap,ia])
-        
-#         if modulation == 'ABCD':
-#             modulator=ABCDmod()  # Classic balanced ABCD modulation in the right order (matrix [4x2])
-#             ModulationIndices = [0,1,2,3]
-            
-#         if modulation == 'AC':
-#             from .FS_DEFAULT import ACmod
-#             modulator=ACmod()  # Balanced AC modulation in the right order (matrix [2x2])
-#             ModulationIndices = [0,1]
-            
-#         NMod = len(modulation)
-        
-#         A2P,ichdetails,active_ich=ct.makeA2P(d, modulator, reducedmatrix=reducedmatrix)
-        
-#         A2P = A2P * np.sqrt(T)          # Add the transmission loss into the matrix elements.
-        
-#         ct.check_nrj(A2P)               # Check if A2P is the matrix of a physical system.
-      
-#         config.FS['A2P'] = A2P
-          
-#         ich = [str(ichdetails[NMod*k][0]) for k in range(len(ichdetails)//NMod)]
-#         NINmes = len(ich)  
-      
-#         NP, NA = np.shape(A2P)
-        
-#         config.FS['name'] = name
-#         config.FS['func'] = PAIRWISE
-#         config.FS['ich'] = ich
-#         config.FS['active_ich'] = active_ich
-        
-#         config.FS['description'] = description
-        
-#         if not ArrayDetails:
-#             raise Exception("No interferometric array has been given so we can't display the combination architecture.")
-        
-#         InterfArray=ct.get_array(name=ArrayDetails)
-#         PhotometricBalance = np.ones(NIN)
-#         for ia in range(NA):
-#             for iap in range(ia+1,NA):
-#                 ib=ct.posk(ia,iap,NA)
-#                 x2,y2 = InterfArray.TelCoordinates[iap,:2]
-#                 T1=d[ib][0] ; T2=d[ib][1]
-#                 if T1 or T2:
-#                     PhotometricCoherence = 2*np.sqrt(T1*T2)/(T1+T2)
-#                 else:
-#                     PhotometricCoherence=0
-#                 UncoherentPhotometry = (T1+T2)*(NA-1) # Normalised by the maximal photometry
-#                 # PhotometricBalance = N.rho où N=I1*I2 et rho = 2sqrt(I1I2)/(I1+I2)
-#                 # Et on écrit I1 = T1*(N-1) pour que si T1=1/(N-1) (cas équilibré) I1=1
-#                 # et donc SNR=1
-#                 PhotometricBalance[ib] = (T1*T2)
-        
-#         config.FS['PhotometricBalance'] = PhotometricBalance  # TV of the baselines normalised by its value in case of equal repartition on all baselines.
-#         config.FS['Modulation'] = modulation
-#         config.FS['ABCDind'] = ModulationIndices
-#         config.FS['NMod'] = NMod
-#         config.FS['NP'] = NP
-#         config.FS['T'] = T
-#         config.FS['ichdetails'] = ichdetails
-#         config.FS['NINeff'] = NINmes            # Number of measured baselines
-#         config.FS['NBeff'] = NA+2*NINmes        # phot + cos + sin
-        
-        
-#         V2PM,V2PMgrav,V2PM_r = ct.MakeV2PfromA2P(A2P)
-        
-#         P2VM = np.linalg.pinv(V2PM)
-#         P2VM[np.abs(P2VM)<1e-10]=0
-        
-#         P2VMgrav = np.linalg.pinv(V2PMgrav)
-#         P2VMgrav[np.abs(P2VMgrav)<1e-10]=0
-        
-#         P2VM_r = np.linalg.pinv(V2PM_r)
-#         P2VM_r[np.abs(P2VM_r)<1e-10]=0
-        
-#         NW, MW = len(spectra), len(spectraM)
-        
-#         # Noise maps
-#         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
-#         config.FS['sigmap']=np.zeros([MW,NP])               # Dark noise
-        
-#         # Resolution of the fringe sensor
-#         midlmbda = np.mean(spectra)
-#         deltalmbda = (np.max(spectra) - np.min(spectra))/MW
-#         config.FS['R'] = midlmbda/deltalmbda
-#         config.FS['MW'] = MW
-        
-#         config.FS['V2PM'] = np.repeat(V2PM[np.newaxis,:,:],NW,0)
-#         config.FS['P2VM'] = np.repeat(P2VM[np.newaxis,:,:],NW,0)
-#         config.FS['MacroP2VM'] = np.repeat(P2VM[np.newaxis,:,:],MW,0)
-        
-#         # GRAVITY format
-#         config.FS['V2PMgrav1'] = np.repeat(V2PMgrav[np.newaxis,:,:],NW,0)
-#         config.FS['P2VMgrav1'] = np.repeat(P2VMgrav[np.newaxis,:,:],NW,0)
-#         config.FS['MacroP2VMgrav1'] = np.repeat(P2VMgrav[np.newaxis,:,:],MW,0)
-        
-        
-#         # REDUCED GRAVITY format
-#         config.FS['V2PM_r'] = np.repeat(V2PM_r[np.newaxis,:,:],NW,0)
-#         config.FS['P2VM_r'] = np.repeat(P2VM_r[np.newaxis,:,:],NW,0)
-#         config.FS['MacroP2VM_r'] = np.repeat(P2VM_r[np.newaxis,:,:],MW,0)
-        
-        
-        
-#         # The matrix of the elements norm only for the calculation of the bias of |Cf|².
-#         # /!\ To save time, it's in [NIN,NP]
-#         config.FS['ElementsNormDemod'] = np.zeros([MW,NIN,NP])
-#         for imw in range(MW):
-#             ElementsNorm = config.FS['MacroP2VM'][imw]*np.conj(config.FS['MacroP2VM'][imw])
-#             config.FS['ElementsNormDemod'][imw] = np.real(ct.NB2NIN(ElementsNorm.T).T)
-    
-#         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
-#         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
-#         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
-        
-#         config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
-#         config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
-#         Piston2OPD_forInv = np.zeros([NIN,NA])
-        
-#         for ia in range(NA):
-#             for iap in range(ia+1,NA):
-#                 ib = ct.posk(ia,iap,NA)
-#                 config.FS['Piston2OPD'][ib,ia] = 1
-#                 config.FS['Piston2OPD'][ib,iap] = -1
-#                 if active_ich[ib]:
-#                     Piston2OPD_forInv[ib,ia] = 1
-#                     Piston2OPD_forInv[ib,iap] = -1
-            
-#         config.FS['OPD2Piston'] = np.linalg.pinv(Piston2OPD_forInv)   # OPD to pistons matrix
-#         config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
-        
-#         config.FS['OPD2Piston_moy'] = np.copy(config.FS['OPD2Piston'])
-#         if config.TELref:
-#             iTELref = config.TELref - 1
-#             L_ref = config.FS['OPD2Piston'][iTELref,:]
-#             config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
-            
-            
-#         config.FS['OPD2Piston_r'] = np.zeros([NA,NINmes])
-#         config.FS['OPD2Piston_moy_r'] = np.zeros([NA,NINmes])
-#         config.FS['Piston2OPD_r'] = np.zeros([NINmes,NA])
-        
-#         k=0
-#         for ia in range(NA):
-#             for iap in range(ia+1,NA):
-#                 ib = ct.posk(ia,iap,NA)
-#                 if active_ich[ib]:
-#                     config.FS['Piston2OPD_r'][k] = config.FS['Piston2OPD'][ib]
-#                     config.FS['OPD2Piston_r'][:,k] = config.FS['OPD2Piston'][:,ib]
-#                     config.FS['OPD2Piston_moy_r'][:,k] = config.FS['OPD2Piston_moy'][:,ib]
-#                     k+=1
-            
-        
-#         if display:
-            
-#             if len(savedir):
-#                 plt.rcParams['figure.figsize']=(16,12)
-#                 font = {'family' : 'DejaVu Sans',
-#                         'weight' : 'normal',
-#                         'size'   : 22}
-                
-#                 rcParamsFS = {"axes.grid":False,
-#                                "figure.constrained_layout.use": True,
-#                                'figure.subplot.hspace': 0,
-#                                'figure.subplot.wspace': 0,
-#                                'figure.subplot.left':0,
-#                                'figure.subplot.right':1
-#                                }
-#                 plt.rcParams.update(rcParamsFS)
-#                 plt.rc('font', **font)
-            
-#             title=name
-#             fig=plt.figure(title, clear=True)
-#             ax=fig.subplots()
-#             for ia in range(NA):
-#                 name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
-#                 ax.scatter(x1,y1,color='k',linewidth=10)
-#                 ax.annotate(name1, (x1+10,y1+1),color="k")
-#                 ax.annotate(f"({ia+1})", (x1+23,y1+1),color=colors[0])
-#                 for iap in range(ia+1,NA):
-#                     ib=ct.posk(ia,iap,NA)
-#                     x2,y2 = InterfArray.TelCoordinates[iap,:2]
-#                     T1=d[ib][0] ; T2=d[ib][1]
-#                     if T1 or T2:
-#                         PhotometricCoherence = 2*np.sqrt(T1*T2)/(T1+T2)
-#                     else:
-#                         PhotometricCoherence=0
-#                     UncoherentPhotometry = T1*T2*(NA-1) # Normalised by the maximal photometry
-#                     PhotometricBalance = UncoherentPhotometry * PhotometricCoherence
-#                     if T1*T2:
-#                         ax.plot([x1,(x2+x1)/2],[y1,(y2+y1)/2],color=colors[0],linestyle='-',linewidth=15*T1**2)
-#                         ax.plot([(x2+x1)/2,x2],[(y2+y1)/2,y2],color=colors[0],linestyle='-',linewidth=15*T2**2)
-#                         ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
-            
-#             ax.set_xlabel("X [m]")
-#             ax.set_ylabel("Y [m]")
-            
-#             xwidth = np.ptp(InterfArray.TelCoordinates[:,0]) +40
-#             xmin = np.min(InterfArray.TelCoordinates[:,0]) - 20
-#             ywidth = np.ptp(InterfArray.TelCoordinates[:,1]) +40
-#             ymin = np.min(InterfArray.TelCoordinates[:,1]) - 20
-            
-#             xmax,ymax  = xmin+xwidth , ymin+ywidth
-#             ax.set_xlim([xmin,xmax]) ; ax.set_ylim([ymin,ymax])
-            
-#             ax.text(xmin+20,ymax-20,name,fontsize='large')
-            
-            
-#             if len(savedir):
-#                 if not os.path.exists(savedir):
-#                     os.makedirs(savedir, exist_ok=True)
-                
-#                 ax.axis("off")
-#                 if not len(name):
-#                     name = "test"
-#                 fig.savefig(f"{savedir}{name}.{ext}")
-        
-#             plt.rcParams.update(plt.rcParamsDefault)
-        
-#         return
-
-
-#     from .config import NA, NB, NW, OW, FS
-#     from . import simu
-    
-#     it = simu.it
-    
-#     iow = 0
-#     imw=0
-#     image_iw = np.zeros(FS['NP'])
-    
-#     currCfTrue = args[0]               # Transmission of the CHIP
-               
-#     for iw in range(config.NW):
-        
-#         Modulation = FS['V2PM'][iw,:,:]
-#         image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
-        
-#         simu.MacroImages[it,imw,:] += image_iw
-        
-#         iow += 1
-#         if iow == OW:
-#             imw+=1
-#             iow = 0      
-
-    
-#     if config.noise:
-#         from .skeleton import addnoise
-#         if np.min(simu.MacroImages[it,:,:])<0:
-#             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
-#             simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
-            
-#         simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
-    
-#     # if np.min(simu.MacroImages[it]) < 0:
-#     #     print(f'Negative image value at t={it}')
-        
-#     if config.FS['Modulation']=='ABCD':
-#         # estimates coherences
-#         currCfEstimated = np.zeros([FS['MW'],NB])*1j
-#         for imw in range(FS['MW']):
-#             Demodulation = config.FS['MacroP2VM'][imw,:,:]
-#             currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
-            
-#         return currCfEstimated
-        
-#     elif config.FS['Modulation']=='AC':  # Necessary patch for AC demodulation
-#         # estimates coherences
-#         specialCf = np.zeros([FS['MW'],NB])*1j
-#         for imw in range(FS['MW']):
-#             Demodulation = config.FS['MacroP2VM'][imw,:,:]
-#             specialCf[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
-            
-#         currCfEstimated = np.zeros([FS['MW'],NB])*1j
-#         for ia in range(NA):
-#             currCfEstimated[:,ia*(NA+1)] = specialCf[:,ia*(NA+1)]
-#             for iap in range(ia+1,NA):
-#                 ib=ia*NA+iap
-#                 Module = np.sqrt(specialCf[:,ia*(NA+1)]*specialCf[:,iap*(NA+1)])
-#                 phase = np.imag(specialCf[:,ib]/Module)
-#                 currCfEstimated[:,ib] = Module*np.exp(1j*phase)
-#                 currCfEstimated[:,iap*NA+ia] = Module*np.exp(-1j*phase)
-                
-#         return currCfEstimated
-
+                "PW10-9-0":pw10_9_0,"PW10-12-4":pw10_12_4,"PW10-15-0":pw10_15_0,
+                "PW10-15-5":pw10_15_5,"PW10-18-13":pw10_18_13, "PW10-18-11":pw10_18_11,
+                "PW10-18-6":pw10_18_6,"PW10-21-14":pw10_21_14,"PW10-21-12":pw10_21_12,
+                "PW10-45-36":pw10_45_36}
 
 
 def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', 
              description='PW6-15-10', modulation='ABCD',
-             display=False, savedir='',ext='pdf',ArrayDetails=0):
+             display=False, savedir='',ext=['pdf'],ArrayDetails=0):
     """
     
     Receive coherent fluxes and returns estimated coherent fluxes.
@@ -539,6 +278,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
             description = descriptions[description]
         
         NA=np.shape(description)[0] ; NIN=NA*(NA-1)//2
+        NC = int(binom(NA,3))
         
         d=np.zeros([NIN,2])     # Transmissions basewise in amplitude
         for ia in range(NA):
@@ -575,6 +315,26 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         config.FS['func'] = PAIRWISE
         config.FS['ich'] = ich
         config.FS['active_ich'] = active_ich
+        
+        validcp=[]; active_cp = np.zeros([NC])
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                for iapp in range(iap+1,NA):
+                    ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
+                    valid1=active_ich[ib]
+                    ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                    valid2=active_ich[ib]
+                    ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                    valid3=active_ich[ib]
+        
+                    if valid1*valid2*valid3:
+                        validcp.append((ia+1,iap+1,iapp+1))
+                        ic = ct.poskfai(ia,iap,iapp,NA)
+                        active_cp[ic] = 1
+        
+        config.FS['validcp'] = validcp
+        config.FS['NCmes'] = len(validcp)
+        config.FS['active_cp'] = active_cp
         
         config.FS['description'] = description
         
@@ -722,8 +482,8 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
             for ia in range(NA):
                 name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
                 ax.scatter(x1,y1,color='k',linewidth=10)
-                ax.annotate(name1, (x1+10,y1+1),color="k")
-                ax.annotate(f"({ia+1})", (x1+23,y1+1),color=colors[0])
+                # ax.annotate(name1, (x1+10,y1+1),color="k")
+                # ax.annotate(f"({ia+1})", (x1+23,y1+1),color=colors[0])
                 for iap in range(ia+1,NA):
                     ib=ct.posk(ia,iap,NA)
                     x2,y2 = InterfArray.TelCoordinates[iap,:2]
@@ -737,7 +497,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                     if T1*T2:
                         ax.plot([x1,(x2+x1)/2],[y1,(y2+y1)/2],color=colors[0],linestyle='-',linewidth=15*T1**2)
                         ax.plot([(x2+x1)/2,x2],[(y2+y1)/2,y2],color=colors[0],linestyle='-',linewidth=15*T2**2)
-                        ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
+                        # ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
             
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
@@ -760,7 +520,9 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                 ax.axis("off")
                 if not len(name):
                     name = "test"
-                fig.savefig(f"{savedir}{name}.{ext}")
+                    
+                for extension in ext:
+                    fig.savefig(f"{savedir}{name}.{extension}")
         
             plt.rcParams.update(plt.rcParamsDefault)
         

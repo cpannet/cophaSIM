@@ -564,6 +564,80 @@ def CommandCalc(CfPD,CfGD):
     #                 simu.CfGDref[it,ib] = simu.BispectrumGD[it,ic]#/np.abs(simu.BispectrumGD[it,ic])
     
     
+    """ NOT WORKING BECAUSE OF NINmes
+    Ncp = config.FT['Ncp']
+    
+    if it < Ncp:
+        Ncp = it+1
+        
+    bispectrumPD = np.zeros([NC])*1j
+    bispectrumGD = np.zeros([NC])*1j
+    
+    timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC); ic=0
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            for iapp in range(iap+1,NA):
+                
+                ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
+                valid1=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+                ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                valid2=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+                ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                valid3=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+                
+                if valid1*valid2*valid3:
+                    cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
+                    cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                    cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+                    
+                    cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
+                    cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                    cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+                    
+                    cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
+                    cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                    cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
+                
+                # The bispectrum of one time and one triangle adds up to
+                # the Ncp last times
+                # ic = poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
+                validcp[ic]=valid1*valid2*valid3
+                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
+                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+                ic+=1
+    
+                
+    simu.BispectrumPD[it] = bispectrumPD*validcp+simu.BispectrumPD[it-1]*(1-validcp)
+    simu.BispectrumGD[it] = bispectrumGD*validcp+simu.BispectrumGD[it-1]*(1-validcp)
+    
+    cpPD = np.angle(simu.BispectrumPD[it])
+    cpGD = np.angle(simu.BispectrumGD[it])
+    
+    cpPD[cpPD<-np.pi+config.FT['stdCP']]=np.pi
+    cpGD[cpGD<-np.pi+config.FT['stdCP']]=np.pi
+    
+    simu.ClosurePhasePD[it] = cpPD
+    simu.ClosurePhaseGD[it] = cpPD/config.FS['R']
+    
+    BestTel=config.FT['BestTel'] ; itelbest=BestTel-1
+    if config.FT['CPref'] and (it>10):                     # At time 0, we create the reference vectors
+        for ia in range(NA-1):
+            for iap in range(ia+1,NA):
+                if not(ia==itelbest or iap==itelbest):
+                    ib = posk(ia,iap,NA)
+                    if itelbest>iap:
+                        ic = poskfai(ia,iap,itelbest,NA)   # Position of the triangle (0,ia,iap)
+                    elif itelbest>ia:
+                        ic = poskfai(ia,itelbest,iap,NA)   # Position of the triangle (0,ia,iap)
+                    else:
+                        ic = poskfai(itelbest,ia,iap,NA)
+                
+                    simu.PDref[it,ib] = simu.ClosurePhasePD[it,ic]
+                    simu.GDref[it,ib] = simu.ClosurePhaseGD[it,ic]   
+    
+                    simu.CfPDref[it,ib] = simu.BispectrumPD[it,ic]#/np.abs(simu.BispectrumPD[it,ic])
+                    simu.CfGDref[it,ib] = simu.BispectrumGD[it,ic]#/np.abs(simu.BispectrumGD[it,ic])
+ """
     
     """
     GD and PD errors calculation
@@ -1616,6 +1690,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                     
                     # Set threshold to a value between max and foreground with a lower limit defined by the std of foreground.
                     newThresholdGD[ib] = np.max([1.5,SNRfg + 5*fgstd,SNRfg+0.2*(SNRcophased-SNRfg)])
+                    print()
                     if newThresholdGD[ib] ==0:
                         newThresholdGD[ib] = 10
                         
