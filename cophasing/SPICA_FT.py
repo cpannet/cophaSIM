@@ -433,9 +433,9 @@ def CommandCalc(CfPD,CfGD):
         
         Wdiag=np.zeros(NINmes)
         if config.FT['whichSNR'] == 'pd':
-            Wdiag[reliablebaselines] = varcurrPD[reliablebaselines]
+            Wdiag[reliablebaselines] = 1/varcurrPD[reliablebaselines]
         else:
-            Wdiag[reliablebaselines] = varcurrGD[reliablebaselines]
+            Wdiag[reliablebaselines] = 1/varcurrGD[reliablebaselines]
             
         W = np.diag(Wdiag)
         # Transpose the W matrix in the Piston-space
