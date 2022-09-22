@@ -216,7 +216,7 @@ descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-
 
 def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', 
              description='PW6-15-10', modulation='ABCD',
-             display=False, savedir='',ext=['pdf'],ArrayDetails=0):
+             display=False, savedir='',ext='pdf',ArrayDetails=0):
     """
     
     Receive coherent fluxes and returns estimated coherent fluxes.
@@ -521,7 +521,10 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                 if not len(name):
                     name = "test"
                     
-                for extension in ext:
+                if isinstance(ext, list):
+                    for extension in ext:
+                        fig.savefig(f"{savedir}{name}.{extension}")
+                else:
                     fig.savefig(f"{savedir}{name}.{extension}")
         
             plt.rcParams.update(plt.rcParamsDefault)
