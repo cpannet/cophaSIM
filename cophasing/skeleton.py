@@ -5098,7 +5098,7 @@ def populate_hdr(objet, hdr, prefix="",verbose=False):
         elif isinstance(value, str):
             if len(value.encode('utf-8')) > 45:
                 
-                if ('CHARA' in value) and not ('interferometer' in value):
+                if ('CHARA' in value) and not (('interferometer' in value) or ('7T' in value)):
                     value = value.split('CHARA/')[-1].replace('µ','micro')
                 else:
                     value = value.split('/')[-1]

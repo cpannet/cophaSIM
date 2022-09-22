@@ -216,8 +216,11 @@ I set ThresholdRELOCK to the {NINmes} first values."))
             config.FT['Vfactors'] = np.array([-24.9, -23.9, -18.9, -14.9,
                                               -1.9,   1.1,   9.1,  16.1,
                                               28.1, 30.1])
-        else:
+        elif NA==6:
             config.FT['Vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])/8.75
+            
+        elif NA==7: # Fake values
+            config.FT['Vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75, 10])
             
         config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
         

@@ -98,6 +98,49 @@ d9 = np.array([[0,1/2,1/2,0,0,0],
               [0,1,0,0,0,0]])
 
 """
+CHARA 7T - 7 télescopes S1S2E1E2W1W2B0
+"""
+NA=7
+pw7_21_35 = np.ones([NA,NA])/(NA-1)
+
+pw7_6_0 = np.array([[0,1,0,0,0,0,0],
+                    [1/2,0,0,0,0,0,1/2],
+                    [0,0,0,1,0,0,0],
+                    [0,0,1/2,0,0,0,1/2],
+                    [0,0,0,0,0,1,0],
+                    [0,0,0,0,1/2,0,1/2],
+                    [0,1/3,0,1/3,0,1/3,0]])
+
+pw7_9_3 = np.array([[0,1/2,0,0,0,0,1/2],
+                    [1/2,0,0,0,0,0,1/2],
+                    [0,0,0,1/2,0,0,1/2],
+                    [0,0,1/2,0,0,0,1/2],
+                    [0,0,0,0,0,1/2,1/2],
+                    [0,0,0,0,1/2,0,1/2],
+                    [1/6,1/6,1/6,1/6,1/6,1/6,0]])
+
+# suitable for CHARA_7T_balanced
+pw7_12_6 = np.array([[0,1/2,0,0,0,0,1/2],
+                    [1/4,0,0,0,1/4,1/4,1/4],
+                    [0,0,0,1/2,0,0,1/2],
+                    [0,0,1/4,0,1/4,1/4,1/4],
+                    [0,1/3,0,1/3,0,1/3,0],
+                    [0,1/4,0,1/4,1/4,0,1/4],
+                    [1/5,1/5,1/5,1/5,0,1/5,0]])
+
+# suitable for CHARA_7T_barycenter
+pw7_12_7 = np.array([[0,1/2,0,0,0,0,1/2],
+                    [1/4,0,0,1/4,0,1/4,1/4],
+                    [0,0,0,1/2,0,0,1/2],
+                    [0,1/4,1/4,0,0,1/4,1/4],
+                    [0,0,0,0,0,1/2,1/2],
+                    [0,1/4,0,1/4,1/4,0,1/4],
+                    [1/6,1/6,1/6,1/6,1/6,1/6,0]])
+
+
+
+
+"""
 MROI - 10 telescopes - W0W1W2W3S1S2S3N1N2N3
 """
 pw10_9_0 = np.array([[0,1/3,0,0,1/3,0,0,1/3,0,0],
@@ -208,6 +251,8 @@ pw10_45_36 = (np.ones([NA,NA])-np.identity(NA))/(NA-1)
 
 descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
                 "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8, "PW6-5-0-0":d9,
+                "PW7-6-0":pw7_6_0,"PW7-9-3":pw7_9_3,"PW7-12-6":pw7_12_6,
+                "PW7-12-7":pw7_12_7,"PW7-21-35":pw7_21_35,
                 "PW10-9-0":pw10_9_0,"PW10-12-4":pw10_12_4,"PW10-15-0":pw10_15_0,
                 "PW10-15-5":pw10_15_5,"PW10-18-13":pw10_18_13, "PW10-18-11":pw10_18_11,
                 "PW10-18-6":pw10_18_6,"PW10-21-14":pw10_21_14,"PW10-21-12":pw10_21_12,
@@ -221,8 +266,6 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
     
     Receive coherent fluxes and returns estimated coherent fluxes.
     When initialised, creates the V2PM of any desired pairwise fringe-sensor.
-    
-    
     
     Parameters
     ----------
@@ -482,8 +525,8 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
             for ia in range(NA):
                 name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
                 ax.scatter(x1,y1,color='k',linewidth=10)
-                # ax.annotate(name1, (x1+10,y1+1),color="k")
-                # ax.annotate(f"({ia+1})", (x1+23,y1+1),color=colors[0])
+                ax.annotate(name1, (x1+10,y1+1),color="k")
+                ax.annotate(f"({ia+1})", (x1+23,y1+1),color=colors[0])
                 for iap in range(ia+1,NA):
                     ib=ct.posk(ia,iap,NA)
                     x2,y2 = InterfArray.TelCoordinates[iap,:2]
@@ -497,7 +540,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                     if T1*T2:
                         ax.plot([x1,(x2+x1)/2],[y1,(y2+y1)/2],color=colors[0],linestyle='-',linewidth=15*T1**2)
                         ax.plot([(x2+x1)/2,x2],[(y2+y1)/2,y2],color=colors[0],linestyle='-',linewidth=15*T2**2)
-                        # ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
+                        ax.annotate(f"{round(InterfArray.BaseNorms[ib])}m", ((x1+x2)/2,(y1+y2)/2),color=colors[1])
             
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
