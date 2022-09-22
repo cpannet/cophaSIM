@@ -6,8 +6,10 @@
 *.jpg
 
 !CHARA*.fits
+!MROI*.fits
 
 # Ignore all observation files but Unresolved, 1mas, 2mas and 3mas
 !mag*.fits
+
 *500µas
 
