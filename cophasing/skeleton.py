@@ -471,15 +471,15 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
             NTfile = NT1*NT2
             
             for ia in range(NA):
-                if ia<NAfile:
-                    injtemp = inj[:,:,ia]
-                else:
-                    injtemp = inj[NTfile//3:,:,ia-NAfile]
+                injtemp = inj[np.random.randint(NTfile//2):,:,3]
                 if np.shape(injtemp)[0] < NT:
                     TransmissionDisturbance[:,:,ia] = repeat_sequence(injtemp, NT)
                 else:
-                    TransmissionDisturbance[:,:,ia] = injtemp
-            
+                    TransmissionDisturbance[:,:,ia] = injtemp/np.mean(injtemp)
+                
+                TransmissionDisturbance[:,:,ia] = TransmissionDisturbance[:,:,ia]/np.mean(TransmissionDisturbance[:,:,ia]) # Average to 1
+                TransmissionDisturbance[:,:,ia] = TransmissionDisturbance[:,:,ia] - np.std(TransmissionDisturbance[:,:,ia]) # Average to 1
+                
             if verbose:
                 print(f"Longueur sequence: {np.shape(TransmissionDisturbance)[0]} \n\
 Longueur timestamps: {len(timestamps)}")
