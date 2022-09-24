@@ -1289,7 +1289,7 @@ def CommandCalc(CfPD,CfGD):
     Group-Delay tracking
     """
     
-    currGDerr = currGD #- simu.GDref[it]
+    currGDerr = currGD - simu.GDref[it]
     
     # Keep the GD between [-Pi, Pi]
     # Eq. 35
@@ -1368,7 +1368,7 @@ def CommandCalc(CfPD,CfGD):
     Phase-Delay command
     """
     
-    currPDerr = currPD #- simu.PDref[it]
+    currPDerr = currPD - simu.PDref[it]
  
     # Keep the PD between [-Pi, Pi]
     # Eq. 35
