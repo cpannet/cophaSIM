@@ -1693,7 +1693,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                     
                     # Set threshold to a value between max and foreground with a lower limit defined by the std of foreground.
                     newThresholdGD[ib] = np.max([1.5,SNRfg + 5*fgstd,SNRfg+0.2*(SNRcophased-SNRfg)])
-                    print()
+                    
                     if newThresholdGD[ib] ==0:
                         newThresholdGD[ib] = 10
                         

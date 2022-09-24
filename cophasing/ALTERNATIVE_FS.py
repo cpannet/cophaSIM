@@ -622,7 +622,6 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
             Demodulation = config.FS['MacroP2VM_r'][imw,:,:]
             currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
             
-        return currCfEstimated
         
     elif config.FS['Modulation']=='AC':  # Necessary patch for AC demodulation
         # estimates coherences
@@ -641,7 +640,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                 currCfEstimated[:,ib] = Module*np.exp(1j*phase)
                 currCfEstimated[:,iap*NA+ia] = Module*np.exp(-1j*phase)
                 
-        return currCfEstimated
+    return currCfEstimated
 
 
 
