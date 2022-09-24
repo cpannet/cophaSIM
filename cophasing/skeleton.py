@@ -5096,12 +5096,12 @@ def populate_hdr(objet, hdr, prefix="",verbose=False):
                 DicoForImageHDU[key] = dico_out[key]
                 
         elif isinstance(value, str):
+            if "µ" in value:
+                value.replace("µ","micro")
+                
             if len(value.encode('utf-8')) > 45:
                 
-                if ('CHARA' in value) and not (('interferometer' in value) or ('7T' in value)):
-                    value = value.split('CHARA/')[-1].replace('µ','micro')
-                else:
-                    value = value.split('/')[-1]
+                value = value.split('/')[-1]
                     
                 # subfolders=value.split('/')
                 # k=len(subfolders)

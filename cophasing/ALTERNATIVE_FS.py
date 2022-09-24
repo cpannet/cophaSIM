@@ -594,7 +594,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         currCfTrue_r[iw] = ct.ReducedVector(currCfTrue[iw],active_ich,NA,form='NBcomplex')
         
         Modulation = FS['V2PM_r'][iw,:,:]
-        image_iw = np.real(np.dot(Modulation,currCfTrue_r[iw,:]))
+        image_iw = np.real(np.dot(Modulation,currCfTrue_r[iw,:]))*config.FS['T']
         
         simu.MacroImages[it,imw,:] += image_iw
         
