@@ -642,10 +642,10 @@ def VanCittert(spectra, Obs, Target, plottrace=60, display=False,
             active_ich = config.FS['active_ich']
             PhotSNR = config.FS['PhotometricSNR']
         else:
-            active_ich=np.ones(NIN)
+            active_ich=np.arange(NIN)
             PhotSNR = np.ones(NIN)
             
-        actindNIN = np.array(active_ich)==1
+        actindNIN = np.array(active_ich)>=0
         actind = np.concatenate([actindNIN[::-1], actindNIN])
         
         PhotometricSNR = np.concatenate([PhotSNR[::-1],PhotSNR])
@@ -2456,15 +2456,16 @@ def makeA2P(descr, modulator, verbose=False,reducedmatrix=False):
     ich = conventional_ich
 
     A2Pgen=np.zeros((NIN,NQ,NA),dtype=complex) #(base_out=[ia,iap],ABCD,ia_in)
-    active_ich=[1]*NIN
-    ib=0
+    active_ich=[-1]*NIN
+    ib=0 ; ibact=0
     for ia in range(NA):
         for iap in range(ia+1,NA):
+            ib = posk(ia,iap,NA)
             A2Pgen[ib,:,ia ]=modulator[:,0]*descr[ib,0]
             A2Pgen[ib,:,iap]=modulator[:,1]*descr[ib,1]
-            if not descr[ib,0]*descr[ib,1]:
-                active_ich[ib]=0        # This baseline is not measured
-            ib+=1
+            if descr[ib,0]*descr[ib,1]:     # If non null, the baseline is measured
+                active_ich[ib]=ibact        # Position of the baseline in the NINmes vector
+                ibact+=1
             
     A2P=np.reshape(A2Pgen,(NP,NA))
     lightA2P=np.copy(A2P)
@@ -2516,13 +2517,13 @@ def MakeV2PfromA2P(Amat):
 def ReducedVector(vec, active_ich, NA,form=''):
     
     NIN = len(active_ich)
-    NINmes = np.sum(active_ich)
+    NINmes = np.sum(np.array(active_ich)>=0)
     NBmes = NA+2*NINmes
     
     if form=='NIN':
         newvec = np.zeros([NINmes]) ; k=0
         for ib in range(NIN):
-            if active_ich[ib]:
+            if active_ich[ib]>=0:
                 newvec[k] = vec[ib]
                 k+=1
             
@@ -2533,7 +2534,7 @@ def ReducedVector(vec, active_ich, NA,form=''):
             for iap in range(ia+1,NA):
                 k=ia*NA+iap ; kp=iap*NA+ia
                 ib=posk(ia,iap,NA)
-                if active_ich[ib]:
+                if active_ich[ib]>=0:
                     newvec[NA+ib_r] = np.real(vec[k])
                     newvec[NA+NINmes+ib_r] = np.imag(vec[k])
                     ib_r+=1
@@ -2542,7 +2543,7 @@ def ReducedVector(vec, active_ich, NA,form=''):
         newvec = np.zeros([NBmes]) ; ib_r=0
         newvec[:NA] = vec[:NA]
         for ib in range(NIN):
-            if active_ich[ib]:
+            if active_ich[ib]>=0:
                 newvec[NA+ib_r] = vec[NA+ib]
                 newvec[NA+NINmes+ib_r] = vec[NA+NIN+ib]
                 ib_r+=1

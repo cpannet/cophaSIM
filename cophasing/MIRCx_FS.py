@@ -128,7 +128,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         ich = ['12','13','14','15','16','23','24','25','26','34','35','36','45','46','56']
         
         ichorder = np.arange(NIN)
-        active_ich = list(np.ones(NIN))
+        active_ich = list(np.arange(NIN))
         
         config.FS['name'] = 'MIRCxFS'
         config.FS['func'] = MIRCxFS
@@ -228,7 +228,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
                 ib = ct.posk(ia,iap,NA)
                 config.FS['Piston2OPD'][ib,ia] = 1
                 config.FS['Piston2OPD'][ib,iap] = -1
-                if active_ich[ib]:
+                if active_ich[ib]>=0:
                     Piston2OPD_forInv[ib,ia] = 1
                     Piston2OPD_forInv[ib,iap] = -1
             

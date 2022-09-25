@@ -364,11 +364,11 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
             for iap in range(ia+1,NA):
                 for iapp in range(iap+1,NA):
                     ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
-                    valid1=active_ich[ib]
+                    valid1=(active_ich[ib]>=0)
                     ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-                    valid2=active_ich[ib]
+                    valid2=(active_ich[ib]>=0)
                     ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-                    valid3=active_ich[ib]
+                    valid3=(active_ich[ib]>=0)
         
                     if valid1*valid2*valid3:
                         validcp.append((ia+1,iap+1,iapp+1))
@@ -472,7 +472,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                 ib = ct.posk(ia,iap,NA)
                 config.FS['Piston2OPD'][ib,ia] = 1
                 config.FS['Piston2OPD'][ib,iap] = -1
-                if active_ich[ib]:
+                if active_ich[ib]>=0:
                     Piston2OPD_forInv[ib,ia] = 1
                     Piston2OPD_forInv[ib,iap] = -1
             
@@ -494,7 +494,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         for ia in range(NA):
             for iap in range(ia+1,NA):
                 ib = ct.posk(ia,iap,NA)
-                if active_ich[ib]:
+                if active_ich[ib]>=0:
                     config.FS['Piston2OPD_r'][k] = config.FS['Piston2OPD'][ib]
                     config.FS['OPD2Piston_r'][:,k] = config.FS['OPD2Piston'][:,ib]
                     config.FS['OPD2Piston_moy_r'][:,k] = config.FS['OPD2Piston_moy'][:,ib]
@@ -763,7 +763,7 @@ given in config ({NA}).")
         
         ich = np.array([[1,2]])
         
-        active_ich = list(np.ones(NIN))
+        active_ich = list(np.arange(NIN))
         ichorder = np.arange(NIN)
         
         config.FS['func'] = ALLINONE
@@ -855,7 +855,7 @@ given in config ({NA}).")
                 ib = ct.posk(ia,iap,NA)
                 config.FS['Piston2OPD'][ib,ia] = 1
                 config.FS['Piston2OPD'][ib,iap] = -1
-                if active_ich[ib]:
+                if active_ich[ib]>=0:
                     Piston2OPD_forInv[ib,ia] = 1
                     Piston2OPD_forInv[ib,iap] = -1
             

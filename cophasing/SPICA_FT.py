@@ -391,6 +391,7 @@ def CommandCalc(CfPD,CfGD):
     it = simu.it            # Frame number
     
     NINmes = config.FS['NINmes']
+    ich_pos = config.FS['active_ich']
     
     """
     Signal-to-noise ratio of the fringes ("Phase variance")
@@ -510,19 +511,19 @@ def CommandCalc(CfPD,CfGD):
     # for ia in range(NA):
     #     for iap in range(ia+1,NA):
     #         ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
-    #         valid1=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+    #         valid1=((ich_pos[ib]>=0) and simu.TrackedBaselines[it,ib])
     #         cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
     #         cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
     #         cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
     #         for iapp in range(iap+1,NA):
     #             ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-    #             valid2=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+    #             valid2=((ich_pos[ib]>=0) and simu.TrackedBaselines[it,ib])
     #             cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
     #             cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
     #             cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
     #             ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-    #             valid3=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+    #             valid3=((ich_pos[ib]>=0) and simu.TrackedBaselines[it,ib])
     #             cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
     #             cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
     #             cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
@@ -567,7 +568,6 @@ def CommandCalc(CfPD,CfGD):
     #                 simu.CfGDref[it,ib] = simu.BispectrumGD[it,ic]#/np.abs(simu.BispectrumGD[it,ic])
     
     
-    """ NOT WORKING BECAUSE OF NINmes
     Ncp = config.FT['Ncp']
     
     if it < Ncp:
@@ -581,32 +581,49 @@ def CommandCalc(CfPD,CfGD):
         for iap in range(ia+1,NA):
             for iapp in range(iap+1,NA):
                 
-                ib = posk(ia,iap,NA)      # coherent flux (ia,iap)  
-                valid1=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
-                ib = posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-                valid2=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
-                ib = posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-                valid3=(config.FS['active_ich'][ib] and simu.TrackedBaselines[it,ib])
+                ib = posk(ia,iap,NA); ib1=ich_pos[ib]      # coherent flux (ia,iap)  
+                measured1=(ib1>=0) and simu.TrackedBaselines[it,ib1]
+                ib = posk(iap,iapp,NA); ib2=ich_pos[ib] # coherent flux (iap,iapp)    
+                measured2=(ib2>=0) and simu.TrackedBaselines[it,ib2]
+                ib = posk(ia,iapp,NA); ib3=ich_pos[ib] # coherent flux (iapp,ia)    
+                measured3=(ib3>=0)
                 
-                if valid1*valid2*valid3:
-                    cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
-                    cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
-                    cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+                if measured1*measured2*measured3:
                     
-                    cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
-                    cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
-                    cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+                    valid1=simu.TrackedBaselines[it,ib1]
+                    valid2=simu.TrackedBaselines[it,ib2]
+                    valid3=simu.TrackedBaselines[it,ib3]
                     
-                    cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
-                    cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
-                    cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
-                
+                    if valid1*valid2*valid3:
+                        cs1 = np.sum(simu.CfPD[timerange,:,ib1], axis=1)     # Sum of coherent flux (ia,iap)
+                        cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib1]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib1])
+                        cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+                        
+                        cs2 = np.sum(simu.CfPD[timerange,:,ib2], axis=1) # Sum of coherent flux (iap,iapp)    
+                        cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib2]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib2])
+                        cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+                        
+                        cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib3]),axis=1) # Sum of 
+                        cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib3]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib3])
+                        cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
+                        
+                        validcp[ic] = 1
+                    else:
+                        validcp[ic]=0
+                else:
+                    validcp[ic]=0
+                    
+                    
                 # The bispectrum of one time and one triangle adds up to
                 # the Ncp last times
                 # ic = poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
-                validcp[ic]=valid1*valid2*valid3
-                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
-                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+                
+                if validcp[ic]:
+                    bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
+                    bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+                else:
+                    bispectrumPD[ic]=0
+                    bispectrumGD[ic]=0
                 ic+=1
     
                 
@@ -627,20 +644,20 @@ def CommandCalc(CfPD,CfGD):
         for ia in range(NA-1):
             for iap in range(ia+1,NA):
                 if not(ia==itelbest or iap==itelbest):
-                    ib = posk(ia,iap,NA)
-                    if itelbest>iap:
-                        ic = poskfai(ia,iap,itelbest,NA)   # Position of the triangle (0,ia,iap)
-                    elif itelbest>ia:
-                        ic = poskfai(ia,itelbest,iap,NA)   # Position of the triangle (0,ia,iap)
-                    else:
-                        ic = poskfai(itelbest,ia,iap,NA)
-                
-                    simu.PDref[it,ib] = simu.ClosurePhasePD[it,ic]
-                    simu.GDref[it,ib] = simu.ClosurePhaseGD[it,ic]   
-    
-                    simu.CfPDref[it,ib] = simu.BispectrumPD[it,ic]#/np.abs(simu.BispectrumPD[it,ic])
-                    simu.CfGDref[it,ib] = simu.BispectrumGD[it,ic]#/np.abs(simu.BispectrumGD[it,ic])
- """
+                    ib = posk(ia,iap,NA) ; ibmes = ich_pos[ib]
+                    if ibmes >= 0:
+                        if itelbest>iap:
+                            ic = poskfai(ia,iap,itelbest,NA)   # Position of the triangle (0,ia,iap)
+                        elif itelbest>ia:
+                            ic = poskfai(ia,itelbest,iap,NA)   # Position of the triangle (0,ia,iap)
+                        else:
+                            ic = poskfai(itelbest,ia,iap,NA)
+                    
+                        simu.PDref[it,ibmes] = simu.ClosurePhasePD[it,ic]
+                        simu.GDref[it,ibmes] = simu.ClosurePhaseGD[it,ic]   
+        
+                        simu.CfPDref[it,ibmes] = simu.BispectrumPD[it,ic]#/np.abs(simu.BispectrumPD[it,ic])
+                        simu.CfGDref[it,ibmes] = simu.BispectrumGD[it,ic]#/np.abs(simu.BispectrumGD[it,ic])
     
     """
     GD and PD errors calculation
@@ -648,7 +665,7 @@ def CommandCalc(CfPD,CfGD):
         
     # Current Phase-Delay
     currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0)*np.exp(-1j*simu.PDref[it]))
-    # currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0)*np.conj(simu.CfPDref[it]))*config.FS['active_ich']
+    # currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0)*np.conj(simu.CfPDref[it]))*ich_pos
     
     # Current Group-Delay
     currGD = np.zeros(NINmes)
@@ -657,7 +674,7 @@ def CommandCalc(CfPD,CfGD):
         cfGDmoy = np.sum(cfGDlmbdas)
         
         currGD[ib] = np.angle(cfGDmoy*np.exp(-1j*simu.GDref[it,ib]))
-        # currGD[ib] = np.angle(cfGDmoy*np.conj(simu.CfGDref[it,ib])*np.conj(simu.CfPDref[it,ib]**(1/config.FS['R'])))*config.FS['active_ich'][ib]
+        # currGD[ib] = np.angle(cfGDmoy*np.conj(simu.CfGDref[it,ib])*np.conj(simu.CfPDref[it,ib]**(1/config.FS['R'])))*ich_pos[ib]
 
     simu.PDEstimated[it] = currPD
     simu.GDEstimated[it] = currGD
@@ -1289,8 +1306,11 @@ def CommandCalc(CfPD,CfGD):
     Group-Delay tracking
     """
     
-    currGDerr = currGD - simu.GDref[it]
-    
+    if config.FT['CPref']:
+        currGDerr = currGD - simu.GDref[it]
+    else:
+        currGDerr = currGD
+        
     # Keep the GD between [-Pi, Pi]
     # Eq. 35
     # Array elements verifying the condition
@@ -1368,8 +1388,11 @@ def CommandCalc(CfPD,CfGD):
     Phase-Delay command
     """
     
-    currPDerr = currPD - simu.PDref[it]
- 
+    if config.FT['CPref']:
+        currPDerr = currPD - simu.PDref[it]
+        
+    else:
+        currPDerr = currPD
     # Keep the PD between [-Pi, Pi]
     # Eq. 35
     
@@ -1619,7 +1642,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
             
             scanned_baselines = [coh_tools.posk(ia,scanned_tel-1,config.NA) for ia in range(config.NA-1)]
             k=0;ib=scanned_baselines[k]
-            while not config.FS['active_ich'][ib]:
+            while not (ich_pos[ib]>=0):
                 k+=1
                 ib = scanned_baselines[k]
                 
