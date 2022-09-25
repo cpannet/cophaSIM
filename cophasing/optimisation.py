@@ -432,7 +432,7 @@ disturbance file to show the results.")
     return bestCombi, resultsBasedf,  resultsClosuredf, resultsTeldf
 
 
-def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20), 
+def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20), DITfiltration=False,
                         optimCriteria="FC",filedir='',Nsamples=5,
                         TimeBonds=100, WLOfTrack=1.5,SpectraForScience=np.arange(0.6,0.9,0.005),
                         FileInterferometer='',MagnitudeInScienceBand=-1,telescopes=0, 
@@ -543,24 +543,31 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
     
     ObservingTime = Period*dt
 
-    NewDITf=[]#DITf.copy()
-    kbefore=[]
-    for idit in range(Ndit):
-        k = Period//DITf[idit]
-        if k in kbefore: 
-            k=np.min(kbefore)-1  # Avoid that two DITs be the same
-        if k == -1:
-            break # Stop if we reached the unique frame.
-        r = Period%DITf[idit]
-        if r > 0.05*DITf[idit]:
-            NewDITf.append(Period//(k+1))
-        kbefore.append(k)
+    if DITfiltration:
+        newDITf=[]#DITf.copy()
+        kbefore=[]
+        for idit in range(Ndit):
+            k = Period//DITf[idit]
+            if k in kbefore: 
+                k=np.min(kbefore)-1  # Avoid that two DITs be the same
+            if k == -1:
+                break # Stop if we reached the unique frame.
+            r = Period%DITf[idit]
+            if r > 0.05*DITf[idit]:
+                newDITf.append(Period//(k+1))
+            kbefore.append(k)
+            
+        newDITf = np.array(newDITf)
+        newDITs = newDITf*dt
         
-    NewDITf = np.array(NewDITf)
-    newDITs = NewDITf*dt
-    ListNframes = Period//NewDITf
-    ThrownFrames = Period%NewDITf
+    else:
+        newDITf = DITf
+        newDITs = DITs
+        
+    ListNframes = Period//newDITf
+    ThrownFrames = Period%newDITf
     LengthOfKeptSequence = ListNframes * Period
+    
     
     if verbose:
         print(f"ObservingTimes:{ObservingTime}")
