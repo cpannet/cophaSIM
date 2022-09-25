@@ -17,7 +17,7 @@ Calculated and stored observables:
 
 import numpy as np
 from astropy.io import fits
-
+from scipy.special import binom
 
 from . import coh_tools as ct
 from . import config
@@ -110,7 +110,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
                 PSDwindow = np.min([posi_center - np.max(posp), Dsize[0]*24-posi_center]) 
         
         NA=len(posp)
-        NIN = int(NA*(NA-1)/2) ; NB=NA**2
+        NIN = int(NA*(NA-1)/2) ; NB=NA**2 ; NC = int(binom(NA,3))
         NW = len(spectra) ; MW = len(spectraM)
         NP = int(NA + 2*PSDwindow//p)  # 6 photometric beams + the interferogram
         
@@ -135,6 +135,9 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         config.FS['ich'] = ich
         config.FS['ichorder'] = ichorder
         config.FS['active_ich'] = active_ich
+        config.FS['NINmes'] = NIN
+        config.FS['NBmes'] = NB
+        config.FS['NCmes'] = NC
         config.FS['PhotometricBalance'] = np.ones(NIN)
         config.FS['NP'] = NP
         config.FS['MW'] = MW
@@ -148,6 +151,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         config.FS['Dc'] = Dc
         config.FS['PSDwindow'] = PSDwindow
         config.FS['Tphot'] = Tphot ; config.FS['Tint'] = Tint
+        
         
         # Noise maps
         config.FS['imsky']=np.zeros([MW,NP])                # Sky background (bias)
@@ -174,7 +178,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
                 for iap in range(ia+1,NA):
                     ib = ct.posk(ia,iap,NA)
                     Baselines[ib] = np.abs(posi[iap]-posi[ia])
-                    
+                
                     OPD = Baselines[ib]/F * pixel_positions*1e3
                     PhaseDelays = 2*np.pi/spectra[iw] * OPD
                     PhaseDelaysM = 2*np.pi/spectra[imw] * OPD
@@ -210,6 +214,10 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
         
+        config.FS['V2PM_r'] = config.FS['V2PMgrav']
+        config.FS['P2VM_r'] = config.FS['P2VMgrav']
+        config.FS['MacroP2VM_r'] = config.FS['MacroP2VMgrav']
+        
         
         config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
         config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
@@ -232,6 +240,10 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
             iTELref = config.TELref - 1
             L_ref = config.FS['OPD2Piston'][iTELref,:]
             config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+        
+        config.FS['Piston2OPD_r'] = config.FS['Piston2OPD']
+        config.FS['OPD2Piston_r'] = config.FS['OPD2Piston']
+        config.FS['OPD2Piston_moy_r'] = config.FS['OPD2Piston_moy']
         
         
         
