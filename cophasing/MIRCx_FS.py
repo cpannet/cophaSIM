@@ -173,8 +173,8 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         for iw in range(NW):
             wl = spectra[iw]
             for ia in range(NA):
-                V2PM[iw,ia,ia*(NA+1)] = Tphot               # Photometric beams
-                V2PM[iw,NA:,ia*(NA+1)] = np.ones(NP-NA)*EnergyDistribution     # Interferometric beams
+                V2PM[iw,ia,ia*(NA+1)] = Tphot*T                                 # Photometric beams
+                V2PM[iw,NA:,ia*(NA+1)] = np.ones(NP-NA)*EnergyDistribution*T    # Interferometric beams
                 for iap in range(ia+1,NA):
                     ib = ct.posk(ia,iap,NA)
                     Baselines[ib] = np.abs(posi[iap]-posi[ia])
@@ -183,8 +183,8 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
                     PhaseDelays = 2*np.pi/spectra[iw] * OPD
                     PhaseDelaysM = 2*np.pi/spectra[imw] * OPD
                     
-                    V2PM[iw,NA:,ia*NA+iap] = np.exp(PhaseDelays*1j)*EnergyDistribution
-                    V2PM[iw,NA:,iap*NA+ia] = np.exp(-PhaseDelays*1j)*EnergyDistribution
+                    V2PM[iw,NA:,ia*NA+iap] = np.exp(PhaseDelays*1j)*EnergyDistribution*T
+                    V2PM[iw,NA:,iap*NA+ia] = np.exp(-PhaseDelays*1j)*EnergyDistribution*T
             
             MacroV2PM[imw] += V2PM[iw]/OW
                     
