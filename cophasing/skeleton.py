@@ -3160,10 +3160,13 @@ to {baselinesNIN[iLastBase]}")
             fig=plt.figure(title, clear=True)
             fig.suptitle(title)
             (ax1,ax2),(ax3,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[4,1]})
-            ax1.set_title(f"From {baselines[iFirstBase]} \
-to {baselines[iFirstBase+len1-1]}")
-            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
-to {baselines[iLastBase]}")
+            if NINtodisplay != 1:
+                ax1.set_title(f"From {baselines[iFirstBase]} \
+    to {baselines[iFirstBase+len1-1]}")
+                ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+    to {baselines[iLastBase]}")
+            else:
+                ax1.set_title(baselines[iFirstBase])
             
             FirstSet = range(iFirstBase,iFirstBase+len1)
             SecondSet = range(iFirstBase+len1,iLastBase+1)
