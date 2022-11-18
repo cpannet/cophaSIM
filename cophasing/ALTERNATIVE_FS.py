@@ -397,7 +397,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         config.FS['A2P'] = A2P
           
         ich = [ichdetails[NMod*k][0] for k in range(len(ichdetails)//NMod)]
-        NINmes = len(ich)  
+        NINmes = len(ich)
       
         NP, NA = np.shape(A2P)
         
@@ -547,6 +547,98 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                     config.FS['OPD2Piston_moy_r'][:,k] = config.FS['OPD2Piston_moy'][:,ib]
                     k+=1
             
+        
+        """
+        FOR DARK BACKGROUND POWERPOINT --> WHITE FONT COLORS AND TRANSPARENT PNG BACKGROUND
+        
+        if display:
+            
+            if len(savedir):
+                plt.rcParams['figure.figsize']=(16,12)
+                font = {'family' : 'DejaVu Sans',
+                        'weight' : 'normal',
+                        'size'   : 22}
+                
+                rcParamsFS = {"axes.grid":False,
+                               "figure.constrained_layout.use": True,
+                               'figure.subplot.hspace': 0,
+                               'figure.subplot.wspace': 0,
+                               'figure.subplot.left':0,
+                               'figure.subplot.right':1
+                               }
+                plt.rcParams.update(rcParamsFS)
+                plt.rc('font', **font)
+            
+            title=name
+            fig=plt.figure(title, clear=True)
+            ax=fig.subplots()
+            for ia in range(NA):
+                name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+                for iap in range(ia+1,NA):
+                    ib=ct.posk(ia,iap,NA)
+                    x2,y2 = InterfArray.TelCoordinates[iap,:2]
+                    T1=d[ib][0] ; T2=d[ib][1]
+                    if T1 or T2:
+                        PhotometricCoherence = 2*np.sqrt(T1*T2)/(T1+T2)
+                    else:
+                        PhotometricCoherence=0
+                    UncoherentPhotometry = T1*T2*(NA-1) # Normalised by the maximal photometry
+                    PhotometricBalance = UncoherentPhotometry * PhotometricCoherence
+                    if T1*T2:
+                        ax.plot([x1,(x2+x1)/2],[y1,(y2+y1)/2],color=colors[0],linestyle='-',linewidth=15*T1**2,zorder=-1)
+                        ax.plot([(x2+x1)/2,x2],[(y2+y1)/2,y2],color=colors[0],linestyle='-',linewidth=15*T2**2,zorder=-1)
+                        if DisplayBaselengths:
+                            ax.annotate(f"{round(InterfArray.BaseNorms[ib])}", ((x1+x2)/2-3,(y1+y2)/2-3),color='w')
+            
+            for ia in range(NA):
+                name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+                ax.scatter(x1,y1,marker='o',edgecolor="w",facecolor='None',linewidth=15,s=8)
+                if ia not in [1,4,5,6] or (NA!=10):
+                    ax.annotate(name1, (x1-20,y1+5),color="w")
+                    ax.annotate(f"({ia+1})", (x1-10,y1+5),color=colors[3])
+                else:
+                    ax.annotate(name1, (x1-20,y1-15),color="w")
+                    ax.annotate(f"({ia+1})", (x1-10,y1-15),color=colors[3])
+                
+            ax.set_xlabel("X [m]")
+            ax.set_ylabel("Y [m]")
+            
+            xwidth = np.ptp(InterfArray.TelCoordinates[:,0]) +40
+            xmin = np.min(InterfArray.TelCoordinates[:,0]) - 20
+            ywidth = np.ptp(InterfArray.TelCoordinates[:,1]) +40
+            ymin = np.min(InterfArray.TelCoordinates[:,1]) - 20
+            
+            xmax,ymax  = xmin+xwidth , ymin+ywidth
+            ax.set_xlim([xmin,xmax]) ; ax.set_ylim([ymin,ymax])
+            
+            ax.text(xmin+50,ymax-50,name,fontsize=60,color='w')
+            
+            
+            if len(savedir):
+                if not os.path.exists(savedir):
+                    os.makedirs(savedir, exist_ok=True)
+                
+                ax.axis("off")
+                if not len(name):
+                    name = "test"
+
+                if isinstance(ext, list):
+                    for extension in ext:
+                        if extension == 'png':
+                            fig.savefig(f"{savedir}{name}.{extension}",transparent=True)
+                        else:
+                            fig.savefig(f"{savedir}{name}.{extension}")
+                else:
+                    if extension == 'png':
+                        fig.savefig(f"{savedir}{name}.{extension}",transparent=True)
+                    else:
+                        fig.savefig(f"{savedir}{name}.{extension}")
+        
+            plt.rcParams.update(plt.rcParamsDefault)
+        
+        
+        """
+        
         
         if display:
             

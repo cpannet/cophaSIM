@@ -20,6 +20,7 @@ from astropy.io import fits
 from . import coh_tools as ct
 from . import config
 from .FS_DEFAULT import ABCDmod, realisticABCDmod
+from scipy.special import binom
 
 def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
     """
@@ -71,7 +72,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
     if init:
         
         from .config import NA,NB
-        
+        NC = int(binom(NA,3))
         # Created by the user here
         # ich = np.array([12,13,23,24,14,15,25,16,26,36,34,35,45,46,56])
         ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
@@ -83,6 +84,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['name'] = 'PW6-15-10_perfect'
         config.FS['func'] = SPICAFS_PERFECT
         config.FS['ich'] = ich
+        
         config.FS['ichorder'] = ichorder
         config.FS['active_ich'] = active_ich
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
@@ -515,9 +517,12 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         config.FS['NP'] = NP
         # config.FS['ich'] = np.array([(ichraw[i]) for i in range(0,NP,NMod)])
         
-        config.FS['ich'] = [str(ichraw[i][0])+str(ichraw[i][1]) for i in range(0,NP,NMod)]
+        ich = [str(ichraw[i][0])+str(ichraw[i][1]) for i in range(0,NP,NMod)]
+        NINmes = len(ich)
         
         NIN=NP//NMod ; NA=np.max(ichraw)
+        NC = int(binom(NA,3))
+        
         ichorder=np.zeros(NIN,dtype=np.int)
         for ib in range(NIN):
             ia,iap=ichraw[ib]
@@ -528,6 +533,34 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
         active_ich = np.ones(NIN)
         config.FS['active_ich'] = active_ich
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
+        
+        
+        config.FS['ich'] = ich
+        config.FS['active_ich'] = active_ich
+        
+        validcp=[]; active_cp = np.zeros([NC])
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                for iapp in range(iap+1,NA):
+                    ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
+                    valid1=(active_ich[ib]>=0)
+                    ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                    valid2=(active_ich[ib]>=0)
+                    ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                    valid3=(active_ich[ib]>=0)
+        
+                    if valid1*valid2*valid3:
+                        validcp.append((ia+1,iap+1,iapp+1))
+                        ic = ct.poskfai(ia,iap,iapp,NA)
+                        active_cp[ic] = 1
+        
+        config.FS['validcp'] = validcp
+        config.FS['NCmes'] = len(validcp)
+        config.FS['active_cp'] = active_cp
+        config.FS['NINmes'] = NINmes            # Number of measured baselines
+        config.FS['NBmes'] = NA+2*NINmes        # phot + cos + sin
+        
+        
         
         OrderingIndex = np.zeros(NP,dtype=np.int8)
         for ib in range(NIN):
@@ -616,6 +649,11 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             config.FS['MacroP2VM'] = MacroP2VM
             config.FS['MacroP2VMgrav'] = MacroP2VMgrav
             
+            # REDUCED GRAVITY format
+            config.FS['V2PM_r'] = config.FS['V2PMgrav']
+            config.FS['P2VM_r'] = config.FS['P2VMgrav']
+            config.FS['MacroP2VM_r'] = config.FS['MacroP2VMgrav']
+            
             
             config.FS['Piston2OPD'] = np.zeros([NIN,NA])    # Piston to OPD matrix
             config.FS['OPD2Piston'] = np.zeros([NA,NIN])    # OPD to Pistons matrix
@@ -639,6 +677,10 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
                 L_ref = config.FS['OPD2Piston'][iTELref,:]
                 config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
             
+            
+            config.FS['OPD2Piston_r'] = config.FS['OPD2Piston']
+            config.FS['OPD2Piston_moy_r'] = config.FS['OPD2Piston_moy']
+            config.FS['Piston2OPD_r'] = config.FS['Piston2OPD']
             
             # The matrix of the elements norm only for the calculation of the bias of |Cf|².
             # /!\ To save time, it's in [NIN,NP]
