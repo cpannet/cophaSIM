@@ -294,6 +294,36 @@ NA=10
 pw10_45_36 = (np.ones([NA,NA])-np.identity(NA))/(NA-1)
 
 
+NA=20 # Planet Finder Imager
+
+# Each telescope linked to its closest neighbour
+pw20_20 = np.zeros([NA,NA])
+for ia in range(NA-1):
+    pw20_20[ia,ia+1] = 1/2
+    pw20_20[ia,ia-1] = 1/2
+
+pw20_20[NA-1,0] = 1/2
+pw20_20[NA-1,NA-2] = 1/2
+
+# Each telescope linked to its four closest neighbours
+pw20_40 = np.zeros([NA,NA])
+for ia in range(NA-2):
+    pw20_40[ia,ia-1] = 1/4
+    pw20_40[ia,ia-2] = 1/4
+    pw20_40[ia,ia+1] = 1/4
+    pw20_40[ia,ia+2] = 1/4
+
+pw20_40[NA-2,NA-3] = 1/4
+pw20_40[NA-2,NA-4] = 1/4
+pw20_40[NA-2,NA-1] = 1/4
+pw20_40[NA-2,0] = 1/4
+
+pw20_40[NA-1,NA-2] = 1/4
+pw20_40[NA-1,NA-3] = 1/4
+pw20_40[NA-1,0] = 1/4
+pw20_40[NA-1,1] = 1/4
+
+
 descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
                 "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8, "PW6-5-0-0":d9,
                 "PW7-6-0":pw7_6_0,"PW7-7-0":pw7_7_0,"PW7-8-2":pw7_8_2,
@@ -303,7 +333,8 @@ descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-
                 "PW10-9-0":pw10_9_0,"PW10-12-4":pw10_12_4,"PW10-15-0":pw10_15_0,
                 "PW10-15-5":pw10_15_5,"PW10-18-13":pw10_18_13, "PW10-18-11":pw10_18_11,
                 "PW10-18-6":pw10_18_6,"PW10-21-14":pw10_21_14,"PW10-21-12":pw10_21_12,
-                "PW10-45-36":pw10_45_36}
+                "PW10-45-36":pw10_45_36,
+                "PW20-20":pw20_20, "PW20-40":pw20_40}
 
 
 def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='', 
@@ -550,22 +581,22 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         
         """
         FOR DARK BACKGROUND POWERPOINT --> WHITE FONT COLORS AND TRANSPARENT PNG BACKGROUND
-        
+        """
         if display:
             
             if len(savedir):
-                plt.rcParams['figure.figsize']=(16,12)
+                plt.rcParams['figure.figsize']=(16,16)
                 font = {'family' : 'DejaVu Sans',
                         'weight' : 'normal',
                         'size'   : 22}
                 
                 rcParamsFS = {"axes.grid":False,
-                               "figure.constrained_layout.use": True,
-                               'figure.subplot.hspace': 0,
-                               'figure.subplot.wspace': 0,
-                               'figure.subplot.left':0,
-                               'figure.subplot.right':1
-                               }
+                                "figure.constrained_layout.use": True,
+                                'figure.subplot.hspace': 0,
+                                'figure.subplot.wspace': 0,
+                                'figure.subplot.left':0,
+                                'figure.subplot.right':1
+                                }
                 plt.rcParams.update(rcParamsFS)
                 plt.rc('font', **font)
             
@@ -595,24 +626,27 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                 ax.scatter(x1,y1,marker='o',edgecolor="w",facecolor='None',linewidth=15,s=8)
                 if ia not in [1,4,5,6] or (NA!=10):
                     ax.annotate(name1, (x1-20,y1+5),color="w")
-                    ax.annotate(f"({ia+1})", (x1-10,y1+5),color=colors[3])
+                    ax.annotate(f"({ia+1})", (x1-5,y1+5),color=colors[3],fontsize=35)
                 else:
                     ax.annotate(name1, (x1-20,y1-15),color="w")
-                    ax.annotate(f"({ia+1})", (x1-10,y1-15),color=colors[3])
+                    ax.annotate(f"({ia+1})", (x1-5,y1-15),color=colors[3],fontsize=35)
                 
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
             
-            xwidth = np.ptp(InterfArray.TelCoordinates[:,0]) +40
-            xmin = np.min(InterfArray.TelCoordinates[:,0]) - 20
-            ywidth = np.ptp(InterfArray.TelCoordinates[:,1]) +40
-            ymin = np.min(InterfArray.TelCoordinates[:,1]) - 20
+            xwidth = np.ptp(InterfArray.TelCoordinates[:,0])*1.2
+            minX = np.min(InterfArray.TelCoordinates[:,0])
+            xmin = minX - 0.2*np.abs(minX)
+            
+            ywidth = np.ptp(InterfArray.TelCoordinates[:,1])*1.2
+            minY = np.min(InterfArray.TelCoordinates[:,1])
+            ymin = minY - 0.2*np.abs(minY)
             
             xmax,ymax  = xmin+xwidth , ymin+ywidth
             ax.set_xlim([xmin,xmax]) ; ax.set_ylim([ymin,ymax])
             
-            ax.text(xmin+50,ymax-50,name,fontsize=60,color='w')
-            
+            #ax.text(xmin+50,ymax-50,name,fontsize=60,color='w')
+            #ax.text(0.5*xmin,0,"Planet Formation Imager",fontsize=50,color='w')
             
             if len(savedir):
                 if not os.path.exists(savedir):
@@ -643,7 +677,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         if display:
             
             if len(savedir):
-                plt.rcParams['figure.figsize']=(16,12)
+                plt.rcParams['figure.figsize']=(16,16)
                 font = {'family' : 'DejaVu Sans',
                         'weight' : 'normal',
                         'size'   : 22}
@@ -683,19 +717,22 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                 name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
                 ax.scatter(x1,y1,marker='o',edgecolor="k",facecolor='None',linewidth=15,s=8)
                 if ia not in [1,4,5,6] or (NA!=10):
-                    ax.annotate(name1, (x1-20,y1+5),color="k")
-                    ax.annotate(f"({ia+1})", (x1-10,y1+5),color=colors[3])
+                    #ax.annotate(name1, (x1-20,y1+5),color="k")
+                    ax.annotate(f"({ia+1})", (x1+10,y1+5),color=colors[3])
                 else:
-                    ax.annotate(name1, (x1-20,y1-15),color="k")
-                    ax.annotate(f"({ia+1})", (x1-10,y1-15),color=colors[3])
+                    #ax.annotate(name1, (x1-20,y1-15),color="k")
+                    ax.annotate(f"({ia+1})", (x1+10,y1-15),color=colors[3])
                 
             ax.set_xlabel("X [m]")
             ax.set_ylabel("Y [m]")
             
-            xwidth = np.ptp(InterfArray.TelCoordinates[:,0]) +40
-            xmin = np.min(InterfArray.TelCoordinates[:,0]) - 20
-            ywidth = np.ptp(InterfArray.TelCoordinates[:,1]) +40
-            ymin = np.min(InterfArray.TelCoordinates[:,1]) - 20
+            xwidth = np.ptp(InterfArray.TelCoordinates[:,0])*1.2
+            minX = np.min(InterfArray.TelCoordinates[:,0])
+            xmin = minX - 0.2*np.abs(minX)
+            
+            ywidth = np.ptp(InterfArray.TelCoordinates[:,1])*1.2
+            minY = np.min(InterfArray.TelCoordinates[:,1])
+            ymin = minY - 0.2*np.abs(minY)
             
             xmax,ymax  = xmin+xwidth , ymin+ywidth
             ax.set_xlim([xmin,xmax]) ; ax.set_ylim([ymin,ymax])
@@ -718,7 +755,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                     fig.savefig(f"{savedir}{name}.{extension}")
         
             plt.rcParams.update(plt.rcParamsDefault)
-        
+        """
         return
 
 

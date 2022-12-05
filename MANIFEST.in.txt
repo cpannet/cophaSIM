@@ -1,4 +1,2 @@
 include README.md
 include setup.py
-
-include cophasing/data/interferometers/CHARA_6T.fits
