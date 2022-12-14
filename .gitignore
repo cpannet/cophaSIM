@@ -4,6 +4,7 @@
 *.jpeg
 *.p
 *.jpg
+*.docx
 
 !CHARA*.fits
 !MROI*.fits

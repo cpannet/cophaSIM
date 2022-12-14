@@ -1,2 +1,2 @@
-# coh_lib
+# cophaSIM
  Fringe Tracking simulation

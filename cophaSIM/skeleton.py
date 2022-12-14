@@ -1,28 +1,24 @@
 # -*- coding: utf-8 -*-
-#        import pdb; pdb.set_trace()
 
 import os
 import time
-import pkg_resources
-
-import numpy as np
-# import cupy as cp # NumPy-equivalent module accelerated with NVIDIA GPU  
-import pandas as pd
-
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
+import numpy as np
+import pandas as pd
+from astropy.io import fits
 
-from importlib import reload  # Python 3.4+ only.
+from importlib import reload
 
 from . import coh_tools as ct
 from . import config
 
-from astropy.io import fits
-
 from .decorators import timer
 
-from cophasing.tol_colors import tol_cset
+import pkg_resources #Enable to load data included in this package
+
+from cophaSIM.tol_colors import tol_cset
 colors = tol_cset('muted')
 
 SS = 12     # Small size
@@ -30,40 +26,125 @@ MS = 14     # Medium size
 BS = 16     # Big size
 figsize = (16,8)
 rcParamsForBaselines = {"font.size":SS,
-       "axes.titlesize":SS,
-       "axes.labelsize":MS,
-       "axes.grid":True,
-       
-       "xtick.labelsize":SS,
-       "ytick.labelsize":SS,
-       "legend.fontsize":SS,
-       "figure.titlesize":BS,
-       "figure.constrained_layout.use": False,
-       "figure.figsize":figsize,
-       'figure.subplot.hspace': 0.05,
-       'figure.subplot.wspace': 0,
-       'figure.subplot.left':0.1,
-       'figure.subplot.right':0.95
-       }
+                        "axes.titlesize":SS,
+                        "axes.labelsize":MS,
+                        "axes.grid":True,
+                        "xtick.labelsize":SS,
+                        "ytick.labelsize":SS,
+                        "legend.fontsize":SS,
+                        "figure.titlesize":BS,
+                        "figure.constrained_layout.use": False,
+                        "figure.figsize":figsize,
+                        'figure.subplot.hspace': 0.05,
+                        'figure.subplot.wspace': 0,
+                        'figure.subplot.left':0.1,
+                        'figure.subplot.right':0.95
+                        }
 
-# Change the display font
+""" If wanted, change the display font """
 # plt.rc('font', **{'family' : 'serif', 'serif' : ['Computer Modern Roman']})
 # plt.rc('text', usetex = True)
 
-def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, ND=1, 
-             spectra = [], spectraM=[],PDspectra=0,
-             spectrum = [], mode = 'search',
-             fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigmap=[],imsky=[],
-             ft = 'integrator', state = 0,
-             noise=True,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
-             seedph=100, seedron=100, seeddist=100,
-             starttracking=50, latencytime=0,
-             piston_average=0,display=False,
-             checktime=True, checkperiod=10):
+def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, 
+               ND=1, 
+               spectra = [], spectraM=[],PDspectra=0, spectrum = [],
+               mode = 'search',
+               fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigmap=[],imsky=[],
+               ft = 'integrator', state = 0,
+               noise=True,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
+               seedph=100, seedron=100, seeddist=100,
+               starttracking=50, latencytime=0,
+               piston_average=0,display=False,
+               checktime=True, checkperiod=10):
+    """
+    
+
+    Parameters
+    ----------
+    Interferometer : TYPE
+        DESCRIPTION.
+    ObsFile : TYPE
+        DESCRIPTION.
+    DisturbanceFile : TYPE
+        DESCRIPTION.
+    NT : TYPE, optional
+        DESCRIPTION. The default is 512.
+    OT : TYPE, optional
+        DESCRIPTION. The default is 1.
+    MW : TYPE, optional
+        DESCRIPTION. The default is 5.
+    ND : TYPE, optional
+        DESCRIPTION. The default is 1.
+    spectra : TYPE, optional
+        DESCRIPTION. The default is [].
+    spectraM : TYPE, optional
+        DESCRIPTION. The default is [].
+    PDspectra : TYPE, optional
+        DESCRIPTION. The default is 0.
+    spectrum : TYPE, optional
+        DESCRIPTION. The default is [].
+    mode : TYPE, optional
+        DESCRIPTION. The default is 'search'.
+    fs : TYPE, optional
+        DESCRIPTION. The default is 'default'.
+    TELref : TYPE, optional
+        DESCRIPTION. The default is 0.
+    FSfitsfile : TYPE, optional
+        DESCRIPTION. The default is ''.
+    R : TYPE, optional
+        DESCRIPTION. The default is 0.5.
+    dt : TYPE, optional
+        DESCRIPTION. The default is 1.
+    sigmap : TYPE, optional
+        DESCRIPTION. The default is [].
+    imsky : TYPE, optional
+        DESCRIPTION. The default is [].
+    ft : TYPE, optional
+        DESCRIPTION. The default is 'integrator'.
+    state : TYPE, optional
+        DESCRIPTION. The default is 0.
+    noise : TYPE, optional
+        DESCRIPTION. The default is True.
+    ron : TYPE, optional
+        DESCRIPTION. The default is 0.
+    qe : TYPE, optional
+        DESCRIPTION. The default is 0.5.
+    phnoise : TYPE, optional
+        DESCRIPTION. The default is 0.
+    G : TYPE, optional
+        DESCRIPTION. The default is 1.
+    enf : TYPE, optional
+        DESCRIPTION. The default is 1.5.
+    M : TYPE, optional
+        DESCRIPTION. The default is 1.
+    seedph : TYPE, optional
+        DESCRIPTION. The default is 100.
+    seedron : TYPE, optional
+        DESCRIPTION. The default is 100.
+    seeddist : TYPE, optional
+        DESCRIPTION. The default is 100.
+    starttracking : TYPE, optional
+        DESCRIPTION. The default is 50.
+    latencytime : TYPE, optional
+        DESCRIPTION. The default is 0.
+    piston_average : TYPE, optional
+        DESCRIPTION. The default is 0.
+    display : TYPE, optional
+        DESCRIPTION. The default is False.
+    checktime : TYPE, optional
+        DESCRIPTION. The default is True.
+    checkperiod : TYPE, optional
+        DESCRIPTION. The default is 10.
+
+    Returns
+    -------
+    None.
+
+    """
     
     """
     NAME: initialize - Initializes a structure to simulate an interferometer by \
-        COPHASING
+        COPHASIM
     
     PURPOSE:
         This procedure creates the coh structure and intializes it with the \
@@ -3537,7 +3618,7 @@ def investigate(*args):
     from . import config
     from . import simu
     
-    from cophasing.tol_colors import tol_cset
+    from cophaSIM.tol_colors import tol_cset
     
     if 'detail search' in args:
         fig=plt.figure('detail FS', clear=True)
@@ -3561,15 +3642,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
                     verbose=False):
     """
     Processes the performance of the fringe-tracking starting at the StartingTime
-    Observables processed:
-        -VarOPD                 # Temporal Variance OPD [µm]
-        -VarPDEst              # Temporal Variance PD [rad]
-        -VarGDEst              # Temporal Variance of GD [rad]
-        -VarCPD                 # Temporal Variance of CPD [rad]
-        -VarCGD                 # Temporal Variance of CGD [rad]
-        -FringeContrast         # Fringe Contrast [0,1] at given wavelengths
-WavelengthOfInterest
-        
+
 
     Parameters
     ----------
@@ -3589,6 +3662,15 @@ WavelengthOfInterest
     R : FLOAT
         Spectral resolution of the instrument whose performance are estimated.
         By default, R=140 (minimal spectral resolution of SPICA-VIS)
+        
+    Observables processed :
+        - VarOPD                (Temporal Variance OPD [µm])
+        - VarPDEst              (Temporal Variance PD [rad])
+        - VarGDEst              Temporal Variance of GD [rad]
+        - VarCPD                Temporal Variance of CPD [rad]
+        - VarCGD                Temporal Variance of CGD [rad]
+        - FringeContrast        Fringe Contrast [0,1] at given wavelengths
+
     Returns
     -------
     None.
@@ -3655,7 +3737,7 @@ WavelengthOfInterest
             CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
         
         
-        from cophasing.SCIENTIFIC_INSTRUMENTS import SPICAVIS
+        from cophaSIM.SCIENTIFIC_INSTRUMENTS import SPICAVIS
         simu.IntegrationTime, simu.VarSquaredVis, simu.SNR_E, simu.SNR_E_perSC = SPICAVIS(CoherentFluxObject,simu.OPDTrue[InFrame:],SpectraForScience,DIT=DIT)
         
    
@@ -3834,13 +3916,14 @@ WavelengthOfInterest
     return
 
 
-
+'''
 def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
                               CoherentFluxObject=[],FileInterferometer='',
                               R=140, p=10, magSI=-1,display=True, get=[],criterias='light',
                               verbose=False, onlySNR=False,check_DITs=False, OnlyCheckDIT=False):
     """
-    Processes the performance of the fringe-tracking starting at the StartingTime
+    Process the performance of the fringe-tracking starting at the StartingTime.
+
     Observables processed:
         -VarOPD                 # Temporal Variance OPD [µm]
         -VarPDEst              # Temporal Variance PD [rad]
@@ -3848,9 +3931,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         -VarCPD                 # Temporal Variance of CPD [rad]
         -VarCGD                 # Temporal Variance of CGD [rad]
         -FringeContrast         # Fringe Contrast [0,1] at given wavelengths
-MeanWavelength
         
-
     Parameters
     ----------
     TimeBonds : INT or ARRAY [ms]
@@ -3976,7 +4057,7 @@ MeanWavelength
                                                  config.Obs,config.Target,InterfArray,R=R)
         CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
     
-    from cophasing.SCIENTIFIC_INSTRUMENTS import SPICAVIS
+    from cophaSIM.SCIENTIFIC_INSTRUMENTS import SPICAVIS
    
 
     simu.VarSquaredVis=np.zeros([Ndit,MW,NIN])*np.nan
@@ -4192,11 +4273,52 @@ MeanWavelength
         config.newfig += 1
     
     return NewIntegrationTimes
-
+'''
 
 def BodeDiagrams(Input,Output,Command,timestamps,
-                 fbonds=[], gain=0, details='', window='hanning',
+                 fbonds=[], details='', window='hanning',
                  display=True, figsave=False, figdir='',ext='pdf'):
+    """
+    Compute the Bode Diagrams of a close loop.
+    
+    Parameters
+    ----------
+    Input : ARRAY
+        Input of the close loop.
+    Output : ARRAT
+        Residues after close loop.
+    Command : ARRAY
+        Commands of the close loop.
+    timestamps : ARRAY
+        Time sampling associated with entries.
+    fbonds : LIST, optional
+        Min and max frequency to display. The default is [].
+    details : STRING, optional
+        String which appears in the figure name, to define it. The default is ''.
+    window : STRING, optional
+        Filter window to apply before FFT. The default is 'hanning' to avoid
+        aliasing. It's the only managed filter. If empty string, no filter used.
+    display : BOOLEAN, optional
+        Display or not the figures. The default is True.
+    figsave : BOOLEAN, optional
+        Save or not the figures. The default is False.
+    figdir : STRING, optional
+        Directory where saving the figures. The default is ''.
+    ext : STRING, optional
+        File extension. The default is 'pdf'.
+
+    Returns
+    -------
+    FrequencySampling : ARRAY
+        Frequencies associated with the transfert function arrays.
+    FTrej : ARRAY
+        Rejection Tranfer Function.
+    FTBO : ARRAY
+        Open Loop Transfer Function.
+    FTBF : ARRAY
+        Close Loop Transfer Function.
+
+    """
      
     nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
 
@@ -4236,23 +4358,7 @@ def BodeDiagrams(Input,Output,Command,timestamps,
         fig.suptitle(title)
         ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
         
-        ax1.plot(FrequencySampling, np.abs(FTrej))
-        
-        if gain:
-            gains = [gain] ; delays=np.arange(10,60,10)
-            styles=['-','--',':']
-            linestyles = []
-            for ig in range(len(gains)):
-                gain=gains[ig]
-                linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
-                for idel in range(len(delays)):
-                    gain=gains[ig];delay=delays[idel]
-                    # ftr=model(FrequencySampling,delay,gain)
-                    # ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
-                    if ig==len(gains)-1:
-                        linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
-            ax1.legend(handles=linestyles)
-            
+        ax1.plot(FrequencySampling, np.abs(FTrej))           
 
         # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
         ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
@@ -4394,7 +4500,7 @@ def FSdefault(NA, NW):
     """
     NEEDS TO BE UPDATE FOR BEING USED
     
-    Simplest Fringe Sensor to be run with the COPHASING
+    Simplest Fringe Sensor to be run with the COPHASIM
     This procedure implements the P2V matrix of the simplest fringe sensor for the coh library.
     The principles are that:
         - the raw image is equal to the coherence
