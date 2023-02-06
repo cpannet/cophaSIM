@@ -79,7 +79,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
                   [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
         
         ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14] ; NIN=15
-        active_ich = np.ones(NIN)
+        active_ich = np.arange(NIN)
         
         config.FS['name'] = 'PW6-15-10_perfect'
         config.FS['func'] = SPICAFS_PERFECT
@@ -145,10 +145,19 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['P2VM'] = np.repeat(P2VM[np.newaxis,:,:],NW,0)
         config.FS['MacroP2VM'] = np.repeat(P2VM[np.newaxis,:,:],MW,0)
     
-    
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        
+        # GRAVITY format
+        config.FS['V2PMgrav1'] = config.FS['V2PMgrav']
+        config.FS['P2VMgrav1'] = config.FS['P2VMgrav']
+        config.FS['MacroP2VMgrav1'] = config.FS['MacroP2VMgrav']
+        
+        # REDUCED GRAVITY format
+        config.FS['V2PM_r'] = config.FS['V2PMgrav']
+        config.FS['P2VM_r'] = config.FS['P2VMgrav']
+        config.FS['MacroP2VM_r'] = config.FS['MacroP2VMgrav']
         
         # The matrix of the elements norm only for the calculation of the bias of |Cf|².
         # /!\ To save time, it's in [NIN,NP]
@@ -166,7 +175,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
                 ib = ct.posk(ia,iap,NA)
                 config.FS['Piston2OPD'][ib,ia] = 1
                 config.FS['Piston2OPD'][ib,iap] = -1
-                if active_ich[ib]:
+                if active_ich[ib]>=0:
                     Piston2OPD_forInv[ib,ia] = 1
                     Piston2OPD_forInv[ib,iap] = -1
             
@@ -178,6 +187,10 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
             iTELref = config.TELref - 1
             L_ref = config.FS['OPD2Piston'][iTELref,:]
             config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
+        
+        config.FS['OPD2Piston_r'] = config.FS['OPD2Piston']
+        config.FS['OPD2Piston_moy_r'] = config.FS['OPD2Piston_moy']
+        config.FS['Piston2OPD_r'] = config.FS['Piston2OPD']
         
         return
     
@@ -279,7 +292,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
                '15','25','16','26','36','34','35','45','46','56'] 
 
         ichorder = [0,1,4,5,7,2,3,6,8,10,11,9,12,13,14] ; NIN=15
-        active_ich = np.ones(NIN)
+        active_ich = np.arange(NIN)
         
         config.FS['name'] = 'PW6-15-10_realistic'
         config.FS['func'] = SPICAFS_REALISTIC
@@ -352,7 +365,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
-        config.FS['active_ich'] = np.ones(NIN)
+        config.FS['active_ich'] = active_ich
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         # The matrix of the elements norm only for the calculation of the bias of |Cf|².
@@ -371,7 +384,7 @@ def SPICAFS_REALISTIC(*args,T=1, init=False, spectra=[], spectraM=[], phaseshift
                 ib = ct.posk(ia,iap,NA)
                 config.FS['Piston2OPD'][ib,ia] = 1
                 config.FS['Piston2OPD'][ib,iap] = -1
-                if active_ich[ib]:
+                if active_ich[ib]>=0:
                     Piston2OPD_forInv[ib,ia] = 1
                     Piston2OPD_forInv[ib,iap] = -1
             
@@ -530,13 +543,12 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
             ichorder[ibconventional] = ib
             
         config.FS['ichorder'] = ichorder
-        active_ich = np.ones(NIN)
+        active_ich = np.arange(NIN)
         config.FS['active_ich'] = active_ich
         config.FS['PhotometricSNR'] = np.ones(NIN)   # TV² of the baselines normalised by its value for equal repartition on all baselines.
         
         
         config.FS['ich'] = ich
-        config.FS['active_ich'] = active_ich
         
         validcp=[]; active_cp = np.zeros([NC])
         for ia in range(NA):
@@ -664,7 +676,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
                     ib = ct.posk(ia,iap,NA)
                     config.FS['Piston2OPD'][ib,ia] = 1
                     config.FS['Piston2OPD'][ib,iap] = -1
-                    if active_ich[ib]:
+                    if active_ich[ib]>=0:
                         Piston2OPD_forInv[ib,ia] = 1
                         Piston2OPD_forInv[ib,iap] = -1
                 
@@ -774,7 +786,7 @@ def SPICAFS_TRUE(*args, init=False, T=0.5, wlinfo=False, **kwargs):
                     ib = ct.posk(ia,iap,NA)
                     config.FS['Piston2OPD'][ib,ia] = 1
                     config.FS['Piston2OPD'][ib,iap] = -1
-                    if active_ich[ib]:
+                    if active_ich[ib]>=0:
                         Piston2OPD_forInv[ib,ia] = 1
                         Piston2OPD_forInv[ib,iap] = -1
                 

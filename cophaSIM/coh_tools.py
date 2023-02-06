@@ -2482,6 +2482,25 @@ def makeA2P(descr, modulator, verbose=False,reducedmatrix=False):
 
 
 def MakeV2PfromA2P(Amat):
+    """
+    
+
+    Parameters
+    ----------
+    Amat : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    Bmat : TYPE
+        DESCRIPTION.
+    Bmatgrav : TYPE
+        DESCRIPTION.
+    Bmatgrav_reduced : TYPE
+        DESCRIPTION.
+
+    """
+    
     NP,NA = Amat.shape
     NB=NA**2
     Bmat = np.zeros([NP,NB])*1j
