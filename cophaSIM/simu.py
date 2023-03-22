@@ -50,29 +50,29 @@ ClosurePhaseGD = np.zeros([NT,NC])              # GD closure phase
 
 
 # OPD-space observables [NIN]
-OPDTrue = np.zeros([NT,NIN])                    # True Optical Path Delay
-OPDDisturbance = np.zeros([NT,NIN])             # OPD-space disturbance
-PDEstimated = np.zeros([NT,NINmes])                # Estimated baselines PD [rad]
+OPDTrue = np.zeros([NT,NIN])                        # True Optical Path Delay
+OPDDisturbance = np.zeros([NT,NIN])                 # OPD-space disturbance
+PDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines PD [rad]
 PDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines PD after patch [rad]
-varPD = np.zeros([NT,NINmes])                      # Estimated "PD variance" = 1/SNR²
-varGD = np.zeros([NT,NINmes])                      # Estimated "GD variance" = 1/SNR²
-SquaredSNRMovingAverage = np.zeros([NT,NINmes])    # Estimated SNR² averaged over N dit
+varPD = np.zeros([NT,NINmes])                       # Estimated "PD variance" = 1/SNR²
+varGD = np.zeros([NT,NINmes])                       # Estimated "GD variance" = 1/SNR²
+SquaredSNRMovingAverage = np.zeros([NT,NINmes])     # Estimated SNR² averaged over N dit
 TrackedBaselines = np.zeros([NT,NINmes])
-TemporalVariancePD = np.zeros([NT,NINmes])         # Temporal Variance PD estimator
-TemporalVarianceGD = np.zeros([NT,NINmes])         # Temporal Variance GD estimator
-GDEstimated = np.zeros([NT,NINmes])                # Estimated baselines GD [rad]
+TemporalVariancePD = np.zeros([NT,NINmes])          # Temporal Variance PD estimator
+TemporalVarianceGD = np.zeros([NT,NINmes])          # Temporal Variance GD estimator
+GDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines GD [rad]
 GDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines GD after patch [rad]
-OPDCommand = np.zeros([NT+1,NIN])               # OPD-space command ODL
-PDCommand = np.zeros([NT+1,NINmes])                # OPD-space PD command
-GDCommand = np.zeros([NT+1,NINmes])                # OPD-space GD command
-EffectiveOPDMove = np.zeros([NT+latency,NIN])   # Effective move of the delay lines in OPD-space
+OPDCommand = np.zeros([NT+1,NIN])                   # OPD-space command ODL
+PDCommand = np.zeros([NT+1,NINmes])                 # OPD-space PD command
+GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
+EffectiveOPDMove = np.zeros([NT+latency,NIN])       # Effective move of the delay lines in OPD-space
 
-PDResidual = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref
+PDResidual = np.zeros([NT,NINmes])                  # Estimated residual PD = PD-PDref
 PDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref after Ipd
-GDResidual = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref
+GDResidual = np.zeros([NT,NINmes])                  # Estimated residual GD = GD-GDref
 GDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref after Igd
-GDErr = np.zeros([NT,NINmes])                      # Error that integrates GD integrator
-OPDSearchCommand = np.zeros([NT+1,NIN])           # Search command projected in the OPD-space
+GDErr = np.zeros([NT,NINmes])                       # Error that integrates GD integrator
+OPDSearchCommand = np.zeros([NT+1,NIN])             # Search command projected in the OPD-space
 
 # Piston-space observables [NA]
 PistonTrue = np.zeros([NT,NA])                  # True Pistons
