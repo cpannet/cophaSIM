@@ -1,8 +1,8 @@
 Metadata-Version: 2.1
-Name: cophaSIM
+Name: cophasim
 Version: 0.1
 Summary: Fringe tracking simulator
 Home-page: https://gitlab.oca.eu/cpannetier/cophaSIM.git
 Author: Cyril Pannetier
-Author-email: cyril@cpannetier.fr
+Author-email: contact@cpannetier.fr
 License-File: LICENSE

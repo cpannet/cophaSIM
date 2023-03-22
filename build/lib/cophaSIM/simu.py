@@ -22,104 +22,105 @@ NBmes = config.FS['NBmes']
 # Time
 it = 0
 timestamps = np.arange(NT)*dt
+TimeID="%Y%m%d-%H%M%S"
 
 
 # Coherent flux [NB] - Most general formalism: contains photometries information
-CoherentFluxObject = np.zeros([NW, NB])*1j      # Object coherent flux
-VisibilityObject = np.zeros([NW, NB])*1j        # Object Visibility
-CfDisturbance = np.zeros([NT, NW, NB])*1j       # Disturbance coherent flux
-CfTrue = np.zeros([NT, NW, NB])*1j              # True coherent flux
-CfTrue_r = np.zeros([NT, NW, NBmes])*1j              # True coherent flux reduced to measured baselines
-CfEstimated = np.zeros([NT, MW, NBmes])*1j         # Estimated coherent flux
+CoherentFluxObject = np.zeros([NW, NB])*1j          # Object coherent flux
+VisibilityObject = np.zeros([NW, NB])*1j            # Object Visibility
+CfDisturbance = np.zeros([NT, NW, NB])*1j           # Disturbance coherent flux
+CfTrue = np.zeros([NT, NW, NB])*1j                  # True coherent flux
+CfTrue_r = np.zeros([NT, NW, NBmes])*1j             # True coherent flux reduced to measured baselines
+CfEstimated = np.zeros([NT, MW, NBmes])*1j          # Estimated coherent flux
 
 
 # Coherent flux [NIN] - Only purely coherent flux
-CfPD = np.zeros([NT, MW, NINmes])*1j              # Dispersion corrected coherent flux
-CfGD = np.zeros([NT, MW, NINmes])*1j              # GD coherent flux
-SquaredCoherenceDegree = np.zeros([NT, MW, NINmes])          # Estimated coherence degree \    
-VisibilityEstimated = np.zeros([NT, MW, NINmes])*1j         # Estimated fringe visibility \    
+CfPD = np.zeros([NT, MW, NINmes])*1j                # Dispersion corrected coherent flux
+CfGD = np.zeros([NT, MW, NINmes])*1j                # GD coherent flux
+SquaredCoherenceDegree = np.zeros([NT, MW, NINmes]) # Estimated coherence degree \    
+VisibilityEstimated = np.zeros([NT, MW, NINmes])*1j # Estimated fringe visibility \    
 VisibilityTrue = np.zeros([NT, MW, NIN])*1j         # True expected fringe visibility \    
     
 
 # Closure Phases [NC]
-ClosurePhaseObject = np.zeros([NW,NC])          # Closure Phase Object
-BispectrumGD = np.ones([NT,NC])+0j              # GD bispectrum
-BispectrumPD = np.ones([NT,NC])+0j              # PD bispectrum
-ClosurePhasePD = np.zeros([NT,NC])              # PD closure phase        
-ClosurePhaseGD = np.zeros([NT,NC])              # GD closure phase
+ClosurePhaseObject = np.zeros([NW,NC])              # Closure Phase Object
+BispectrumGD = np.ones([NT,NC])+0j                  # GD bispectrum
+BispectrumPD = np.ones([NT,NC])+0j                  # PD bispectrum
+ClosurePhasePD = np.zeros([NT,NC])                  # PD closure phase        
+ClosurePhaseGD = np.zeros([NT,NC])                  # GD closure phase
 
 
 # OPD-space observables [NIN]
-OPDTrue = np.zeros([NT,NIN])                    # True Optical Path Delay
-OPDDisturbance = np.zeros([NT,NIN])             # OPD-space disturbance
-PDEstimated = np.zeros([NT,NINmes])                # Estimated baselines PD [rad]
+OPDTrue = np.zeros([NT,NIN])                        # True Optical Path Delay
+OPDDisturbance = np.zeros([NT,NIN])                 # OPD-space disturbance
+PDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines PD [rad]
 PDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines PD after patch [rad]
-varPD = np.zeros([NT,NINmes])                      # Estimated "PD variance" = 1/SNR²
-varGD = np.zeros([NT,NINmes])                      # Estimated "GD variance" = 1/SNR²
-SquaredSNRMovingAverage = np.zeros([NT,NINmes])    # Estimated SNR² averaged over N dit
+varPD = np.zeros([NT,NINmes])                       # Estimated "PD variance" = 1/SNR²
+varGD = np.zeros([NT,NINmes])                       # Estimated "GD variance" = 1/SNR²
+SquaredSNRMovingAverage = np.zeros([NT,NINmes])     # Estimated SNR² averaged over N dit
 TrackedBaselines = np.zeros([NT,NINmes])
-TemporalVariancePD = np.zeros([NT,NINmes])         # Temporal Variance PD estimator
-TemporalVarianceGD = np.zeros([NT,NINmes])         # Temporal Variance GD estimator
-GDEstimated = np.zeros([NT,NINmes])                # Estimated baselines GD [rad]
+TemporalVariancePD = np.zeros([NT,NINmes])          # Temporal Variance PD estimator
+TemporalVarianceGD = np.zeros([NT,NINmes])          # Temporal Variance GD estimator
+GDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines GD [rad]
 GDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines GD after patch [rad]
-OPDCommand = np.zeros([NT+1,NIN])               # OPD-space command ODL
-PDCommand = np.zeros([NT+1,NINmes])                # OPD-space PD command
-GDCommand = np.zeros([NT+1,NINmes])                # OPD-space GD command
-EffectiveOPDMove = np.zeros([NT+latency,NIN])   # Effective move of the delay lines in OPD-space
+OPDCommand = np.zeros([NT+1,NIN])                   # OPD-space command ODL
+PDCommand = np.zeros([NT+1,NINmes])                 # OPD-space PD command
+GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
+EffectiveOPDMove = np.zeros([NT+latency,NIN])       # Effective move of the delay lines in OPD-space
 
-PDResidual = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref
+PDResidual = np.zeros([NT,NINmes])                  # Estimated residual PD = PD-PDref
 PDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref after Ipd
-GDResidual = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref
+GDResidual = np.zeros([NT,NINmes])                  # Estimated residual GD = GD-GDref
 GDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref after Igd
-GDErr = np.zeros([NT,NINmes])                      # Error that integrates GD integrator
-OPDSearchCommand = np.zeros([NT+1,NIN])           # Search command projected in the OPD-space
+GDErr = np.zeros([NT,NINmes])                       # Error that integrates GD integrator
+OPDSearchCommand = np.zeros([NT+1,NIN])             # Search command projected in the OPD-space
 
 # Piston-space observables [NA]
-PistonTrue = np.zeros([NT,NA])                  # True Pistons
-PistonDisturbance = np.zeros([NT,NA])           # Piston disturbances
-PistonPDCommand = np.zeros([NT+1,NA])           # Piston-space PD command
-PistonGDCommand = np.zeros([NT+1,NA])           # Piston-space GD command
+PistonTrue = np.zeros([NT,NA])                      # True Pistons
+PistonDisturbance = np.zeros([NT,NA])               # Piston disturbances
+PistonPDCommand = np.zeros([NT+1,NA])               # Piston-space PD command
+PistonGDCommand = np.zeros([NT+1,NA])               # Piston-space GD command
 PistonGDCommand_beforeround = np.zeros([NT+1,NA])
-GDPistonResidual = np.zeros([NT,NA])            # GD residuals on telescopes
-PDPistonResidual = np.zeros([NT,NA])            # PD residuals on telescopes
-SearchCommand = np.zeros([NT+1,NA])             # Piston-space Search command
-CommandODL = np.zeros([NT+1,NA])                # Delay lines positionnal command calculated at time it
-EffectiveMoveODL = np.zeros([NT+latency,NA])    # Effective move of the delay lines
+GDPistonResidual = np.zeros([NT,NA])                # GD residuals on telescopes
+PDPistonResidual = np.zeros([NT,NA])                # PD residuals on telescopes
+SearchCommand = np.zeros([NT+1,NA])                 # Piston-space Search command
+CommandODL = np.zeros([NT+1,NA])                    # Delay lines positionnal command calculated at time it
+EffectiveMoveODL = np.zeros([NT+latency,NA])        # Effective move of the delay lines
 
-TransmissionDisturbance = np.ones([NT,NW,NA])   # Transmission disturbance of the telescopes
-PhotometryDisturbance = np.zeros([NT,NW,NA])    # Resulting photometry disturbances (scaled by the object photometry)
-PhotometryEstimated = np.zeros([NT,MW,NA])      # Estimated photometries
+TransmissionDisturbance = np.ones([NT,NW,NA])       # Transmission disturbance of the telescopes
+PhotometryDisturbance = np.zeros([NT,NW,NA])        # Resulting photometry disturbances (scaled by the object photometry)
+PhotometryEstimated = np.zeros([NT,MW,NA])          # Estimated photometries
 
 # Other observables
-# DisturbancePSD = np.zeros([NT])                 # Power-Spectral Distribution of
-#                                                 # one disturbance
-# FreqSampling = np.zeros([])                     # Frequency sampling           
-# DisturbanceFilter = np.zeros([])                # Disturbance PSD filter
+# DisturbancePSD = np.zeros([NT])                   # Power-Spectral Distribution of
+#                                                   # one disturbance
+# FreqSampling = np.zeros([])                       # Frequency sampling           
+# DisturbanceFilter = np.zeros([])                  # Disturbance PSD filter
 
-MacroImages = np.zeros([NT,MW,FS['NP']])        # Contains microtime images sumed up on macro-wl 
-CovarianceReal = np.zeros([NT,MW,NBmes])           # Covariances of the real part of the coherent flux
-CovarianceImag = np.zeros([NT,MW,NBmes])           # Covariances of the imaginary part of the coherent flux
-Covariance = np.zeros([NT,MW,NBmes,NBmes])            # Covariances of the real and imaginary parts of the coherent flux
-BiasModCf = np.zeros([NT,MW,NINmes])               # Bias on the estimator of the module of the coherent flux.
-varFlux = np.zeros([NT,MW,FS['NP']])            # Variance Flux
-SNRPhotometry = np.zeros([NT,NA])               # SNR of the photometry estimation
+MacroImages = np.zeros([NT,MW,FS['NP']])            # Contains microtime images sumed up on macro-wl 
+CovarianceReal = np.zeros([NT,MW,NBmes])            # Covariances of the real part of the coherent flux
+CovarianceImag = np.zeros([NT,MW,NBmes])            # Covariances of the imaginary part of the coherent flux
+Covariance = np.zeros([NT,MW,NBmes,NBmes])          # Covariances of the real and imaginary parts of the coherent flux
+BiasModCf = np.zeros([NT,MW,NINmes])                # Bias on the estimator of the module of the coherent flux.
+varFlux = np.zeros([NT,MW,FS['NP']])                # Variance Flux
+SNRPhotometry = np.zeros([NT,NA])                   # SNR of the photometry estimation
 
-PDref = np.zeros([NT,NINmes])                      # PD reference vector
-GDref = np.zeros([NT,NINmes])                      # GD reference vector
-OPDrefObject = np.zeros([NIN])                  # PD reference of the Object (only for analysis)
+PDref = np.zeros([NT,NINmes])                       # PD reference vector
+GDref = np.zeros([NT,NINmes])                       # GD reference vector
+OPDrefObject = np.zeros([NIN])                      # PD reference of the Object (only for analysis)
 
 CfPDref = np.ones([NT,NINmes])+0j
 CfGDref = np.ones([NT,NINmes])+0j
 
-FTmode = np.ones([NT])                          # Save mode of the Fringe Tracker
-                                                # 0: off, 1: Search, 2: Track
+FTmode = np.ones([NT])                              # State mode of the Fringe Tracker
+                                                    # 0: off, 1: SEARCH, 2: TRACK, 3: RELOCK
 
-Ipd = np.ones([NT,NINmes,NINmes])                         # Weighting matrix PD command
-Igd = np.ones([NT,NINmes,NINmes])                         # Weighting matrix GD command
+Ipd = np.ones([NT,NINmes,NINmes])                   # Weighting matrix PD command
+Igd = np.ones([NT,NINmes,NINmes])                   # Weighting matrix GD command
 Igdna = np.ones([NT,NA,NA])
-IgdRank =np.ones([NT])                      # Rank of the weighting matrix GD
-time_since_loss=np.zeros(NT)                    # Time since the loss of one telescope
-NoPhotometryFiltration = np.zeros([NT,NA,NA])  # Matrix that filters telescopes which have no photometry
+IgdRank =np.ones([NT])                              # Rank of the weighting matrix GD
+time_since_loss=np.zeros(NT)                        # Time since the loss of one telescope
+NoPhotometryFiltration = np.zeros([NT,NA,NA])       # Matrix that filters telescopes which have no photometry
 LostTelescopes = np.zeros([NT,NA])
 noSignal_on_T = np.zeros([NT,NA])
 

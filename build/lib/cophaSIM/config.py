@@ -21,6 +21,8 @@ Classes truly used classes in the algorithm:
 """
 
 import numpy as np
+import os,pkg_resources
+from astropy.io import fits
 
 
 # class FringeTracker:
@@ -100,19 +102,7 @@ import numpy as np
 
 
 
-# class Interferometer:
-#     """
-#     Interferometer parameters
-#     """
-    
-#     def __init__(self):
-#         self.Name = 'CHARA'
-#         self.NA = 2
-#         self.NB=NA**2                # total number of baselines
-#         self.NIN=int(NA*(NA-1)*2)    # Number of independant interferometric coherences
-#         self.NC = int((NA-2)*(NA-1))   # Number of independant closure phases
-
-
+        
 # class Source:
 #     """
 #     Source parameters
@@ -273,3 +263,52 @@ timestamps = np.arange(NT)*dt       # Timestamps in [ms]
 
 verbose,vebose2=False,False
 
+
+class Interferometer():
+    """
+    Interferometer parameters
+    """
+    
+    def __init__(self,name='chara'):
+        
+        self.get_array(name=name)
+        
+    def get_array(self,name=''):
+        
+        if "fits" in name:
+            filepath = name
+            if not os.path.exists(filepath):
+                try:
+                    if verbose:
+                        print("Looking for the interferometer file into the package's data")
+                    filepath = pkg_resources.resource_stream(__name__,filepath)
+                except:
+                    raise Exception(f"{filepath} doesn't exist.")
+        
+        elif name == 'chara':
+            if verbose:
+                print("Take CHARA 6T information")
+            
+            filepath = pkg_resources.resource_stream(__name__,'data/interferometers/CHARA_6T.fits')
+                       
+        else:
+            raise Exception("For defining the array, you must give a file \
+    or a name (currently only the name CHARA is available).")
+
+        with fits.open(filepath) as hdu:
+            ArrayParams = hdu[0].header
+            NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
+            self.Name = 
+            self.NA = NA
+            self.NIN = NIN
+            TelData = hdu[1].data
+            BaseData = hdu[2].data
+        
+            self.TelNames = TelData['TelNames']
+            self.TelCoordinates = TelData['TelCoordinates']
+            self.TelTransmissions = TelData['TelTransmissions']
+            self.TelSurfaces = TelData['TelSurfaces']
+            self.BaseNames = BaseData['BaseNames']
+            self.BaseCoordinates = BaseData['BaseCoordinates']
+            
+        self.BaseNorms = np.linalg.norm(self.BaseCoordinates[:,:2],axis=1)

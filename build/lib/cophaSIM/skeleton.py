@@ -251,8 +251,6 @@ SOURCE:
     # CONFIG PARAMETERS
     
     dyn=0.                                  # to be updtated later by FS (for ex via coh_algo)
-      
-    config.SimuTimeID=""
     
     # Observation parameters
     config.ObservationFile = ObsFile
@@ -1107,7 +1105,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
 
     from .config import NT, NA, NW,timestamps, spectra, OW, MW, checktime, checkperiod
     
-    config.SimuTimeID=time.strftime("%Y%m%d-%H%M%S")
+    simu.TimeID=time.strftime("%Y%m%d-%H%M%S")
     
     # Reload simu module for initialising the observables with their shape
     if verbose:
@@ -1240,7 +1238,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
                 simu.VisibilityTrue[:,iow,ib] = Iaap/np.sqrt(Ia*Iap)*np.abs(GammaObject)*np.sinc(simu.OPDTrue[:,ib]/Lc)*np.exp(1j*2*np.pi*simu.OPDTrue[:,ib]/spectra[iow*OW])
     
     if len(args):
-        filepath = args[0]+f"results_{config.SimuTimeID}.fits"
+        filepath = args[0]+f"results_{simu.TimeID}.fits"
         save_data(simu, config, filepath, LightSave=LightSave, overwrite=overwrite, verbose=verbose)
     
     return
@@ -1309,7 +1307,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     from . import simu
     
     from .simu import timestamps
-    from .config import NA,NT,NIN,NC,OW, SimuTimeID, InterfArray
+    from .config import NA,NT,NIN,NC,OW,InterfArray
     
     NINmes = config.FS['NINmes']
     
@@ -1343,7 +1341,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
     wl = config.spectraM[WLIndex]
     
-    timestr=SimuTimeID
+    timestr=simu.TimeID
     
     ich = config.FS['ich']
     R = config.FS['R']

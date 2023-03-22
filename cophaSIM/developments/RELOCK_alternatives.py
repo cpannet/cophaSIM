@@ -432,3 +432,107 @@ IMPLEMENTATIONS ALTERNATIVES DE LA FONCTION RELOCK
 # usearch = simu.SearchCommand[it] + Increment
 # # The command is sent at the next time, that's why we note it+1
 # simu.SearchCommand[it+1] = usearch
+
+
+""" Implementation RELOCK incremental 11/05/2022"""
+""" usearch est maintenant un delta à ajouter à la position actuelle des LAR """
+
+# IgdRank = np.linalg.matrix_rank(simu.Igd[it])
+# NotCophased = (IgdRank < NA-1)
+# simu.IgdRank[it] = IgdRank
+
+# if NotCophased:
+#     simu.time_since_loss[it]=simu.time_since_loss[it-1]+config.dt
+    
+#     # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_rank(simu.Igd[it-1]))
+#     # This situation could pose a problem but we don't manage it yet        
+#     if (simu.time_since_loss[it] > config.FT['SMdelay']):
+        
+#         Igdna = np.dot(config.FS['OPD2Piston'],
+#                        np.dot(simu.Igd[it],config.FS['Piston2OPD']))
+        
+#         CophasedBaselines=np.where(np.diag(simu.Igd[it])>0.5)[0]
+#         CophasedPairs=[]
+#         for ib in CophasedBaselines:
+#             ia,iap = config.FS['ich'][ib][0], config.FS['ich'][ib][1]
+#             CophasedPairs.append([ia,iap])
+            
+#         CophasedGroups = JoinOnCommonElements(CophasedPairs)
+        
+#         # Fringe loss
+#         simu.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
+#         # WeLostANewTelescope = (sum(newLostTelescopes) > 0)
+        
+#         # Photometry loss
+#         simu.noSignal_on_T[it] = 1*(simu.SNRPhotometry[it] < config.FT['ThresholdPhot'])
+            
+#         comparison = (simu.noSignal_on_T[it] == simu.LostTelescopes[it])
+#         simu.LossDueToInjection[it] = (comparison.all() and sum(simu.noSignal_on_T[it])>1)       # Evaluates if the two arrays are the same
+        
+#         if not simu.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
+#             ### On entre dans le mode RELOCK
+            
+#             config.FT['state'][it] = 1          # Variable de suivi d'état du FT
+
+#             ### On regarde si de nouveaux télescopes viennent juste d'être perdus.
+#             newLostTelescopes = (simu.LostTelescopes[it] - simu.LostTelescopes[it-1] == 1)
+#             TelescopesThatGotBackPhotometry = (simu.noSignal_on_T[it-1] - simu.noSignal_on_T[it] == 1)
+#             # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
+            
+#             TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
+#             print(TelescopesThatNeedARestart)
+        
+#             ### Pour chaque télescope nouvellement perdu, on réinitialise la fonction usaw
+#             for ia in range(NA):
+#                 if (ia in TelescopesThatNeedARestart) or (config.FT['state'][it-1]!=1):
+#                     config.FT['it0'] = it; config.FT['it_last'][ia]=it;
+#                     config.FT['eps'] = 1
+#                     config.FT['LastPosition'][ia] = 0
+
+#             usaw,change = searchfunction_inc_basical(it)
+
+#             #config.FT['usaw'][it]= usaw
+
+#             Kernel = np.identity(NA) - Igdna
+#             usearch = np.dot(Kernel,usaw*config.FT['Velocities'])
+            
+
+#             #usearch = usearch/np.ptp(usearch) * config.FT['maxVelocity']
+            
+#             # if change:  # Change direction of scan
+#             #     # Fais en sorte que les sauts de pistons de télescopes cophasés 
+#             #     # entre eux maintiennent l'OPD constante: si 1 et 2 sont cophasés
+#             #     # avec OPD=p2-p1, au prochain saut le télescope 2 va à la position
+#             #     # du T1 + OPD et pas à la position qu'il avait avant le précédent saut.
+#             #     for group in CophasedGroups:    
+#             #         for ig in range(1,len(group)):
+#             #             ia = int(float(group[ig])-1) ; i0 = int(float(group[0])-1)
+#             #             LastPosition[ia] = LastPosition[i0] + simu.SearchCommand[it,ia]-simu.SearchCommand[it,i0]
+#             #     usearch = LastPosition + Increment
+#             #     LastPosition = simu.SearchCommand[it]
+                
+#             # else:
+#             #     usearch = simu.SearchCommand[it]+Increment
+                
+#             # config.FT['LastPosition'][it+1] = LastPosition
+            
+#             # You should send command only on telescope with flux
+#             simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
+#             usearch = np.dot(simu.NoPhotometryFiltration[it],usearch)
+        
+        
+#         else:
+#             usearch = 0#simu.SearchCommand[it]
+    
+#     else:
+#         usearch = 0#simu.SearchCommand[it]
+        
+# else:
+#     simu.time_since_loss[it] = 0
+#     usearch = 0#simu.SearchCommand[it]
+    
+    
+# usearch = config.FT['search']*usearch
+# # The command is sent at the next time, that's why we note it+1
+# simu.SearchCommand[it+1] = simu.SearchCommand[it]+usearch
+
