@@ -18,7 +18,7 @@ from .decorators import timer
 
 import pkg_resources #Enable to load data included in this package
 
-from cophaSIM.tol_colors import tol_cset
+from cophasim.tol_colors import tol_cset
 colors = tol_cset('muted')
 
 SS = 12     # Small size
@@ -3634,7 +3634,7 @@ def investigate(*args):
     from . import config
     from . import simu
     
-    from cophaSIM.tol_colors import tol_cset
+    from cophasim.tol_colors import tol_cset
     
     if 'detail search' in args:
         fig=plt.figure('detail FS', clear=True)
@@ -3753,7 +3753,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
             CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
         
         
-        from cophaSIM.SCIENTIFIC_INSTRUMENTS import SPICAVIS
+        from cophasim.SCIENTIFIC_INSTRUMENTS import SPICAVIS
         simu.IntegrationTime, simu.VarSquaredVis, simu.SNR_E, simu.SNR_E_perSC = SPICAVIS(CoherentFluxObject,simu.OPDTrue[InFrame:],SpectraForScience,DIT=DIT)
         
    
@@ -4073,7 +4073,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
                                                  config.Obs,config.Target,InterfArray,R=R)
         CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
     
-    from cophaSIM.SCIENTIFIC_INSTRUMENTS import SPICAVIS
+    from cophasim.SCIENTIFIC_INSTRUMENTS import SPICAVIS
    
 
     simu.VarSquaredVis=np.zeros([Ndit,MW,NIN])*np.nan

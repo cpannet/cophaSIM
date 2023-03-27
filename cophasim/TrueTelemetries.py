@@ -34,6 +34,8 @@ colors=['blue','red','green','brown','yellow','orange','pink','grey','cyan','bla
 colors = tol_cset('muted')
 telcolors = tol_cset('bright')
 
+
+
 """
 Parameters of the script
 """
@@ -437,12 +439,25 @@ def readDump(file, version='current'):
     return data
 
 def ReadFits(file):
+    global PistonPDCommand, PistonGDCommand
+    
+    """ global variable analog to simu module """
 
     with fits.open(file) as hduL:
         header = hduL[0]
         
-        simu.PistonPDCommand = hduL[1].data["pdDlCmdMicrons"] # microns
-        simu.PistonGDCommand = hduL[1].data["gdDlCmdMicrons"] # microns
+        NT, NA = hduL[1].data["pdDlCmdMicrons"].shape # microns
+        print(NT,NA)
+        
+        PistonPDCommand = np.zeros([NT,NA])               # Piston-space PD command
+        PistonGDCommand = np.zeros([NT,NA])               # Piston-space GD command
+        
+        PistonPDCommand = hduL[1].data["pdDlCmdMicrons"] # microns
+        PistonGDCommand = hduL[1].data["gdDlCmdMicrons"] # microns
+    
+    print("Load telemetries into simu module:\n\
+          - pdDlCmdMicrons\n\
+          - gdDlCmdMicrons")
     
     return
         

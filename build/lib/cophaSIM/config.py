@@ -17,12 +17,261 @@ Defined classes so far:
 Classes truly used classes in the algorithm:
     - Observation
     - ScienceObject
-    
+
 """
 
+import matplotlib.pyplot as plt
 import numpy as np
 import os,pkg_resources
+from scipy.special import binom
 from astropy.io import fits
+from . import coh_tools as ct
+from . import tol_colors as tc
+
+colors=tc.tol_cset('muted')
+
+"""
+ALL THESE VALUES ARE BY DEFAULT AND WILL BE UPDATED WITH THE FUNCTION INITIALISE
+"""
+
+"""Basic parameters"""
+Name = 'CHARA'
+NA=6                            # number of apertures
+NB=NA**2                        # Number of unknown photometries and phases 
+NIN=int(NA*(NA-1)/2)            # Number of independant OPDs
+NC = int(binom(NA,3))           # Number of closure phases
+ND = int((NA-1)*(NA-2)/2)       # Number of independant closure phases
+NT=512
+MT=NT
+NW=5
+OW=1
+dt = 3                              # Frame time
+timestamps = np.arange(NT)*dt       # Timestamps in [ms]
+
+"""Source"""
+spectra=np.linspace(1.45,1.75,NW)       # Micro-sampling wavelength
+spectraM=spectra                        # Macro-sampling wavelength
+PDspectra=np.mean(spectra)              # Mean wavelength
+spectrum=np.ones_like(spectra)          # Source distribution spectral power
+
+
+"""Fringe Sensor dictionnary"""
+# will be completed by the fringesensor method.
+FS = {'NP':4*NIN, 'MW':NW, 'NINmes':NIN,'NBmes':NB, 'NCmes':NC}
+
+"""Noises"""
+noise=True      # No noise by default [0 if noise]
+qe = 0.7        # Quantum efficiency
+ron = 2         # Readout noise
+phnoise=0       # No photon noise by default [1 if ph noise]
+enf=1.5         # Excess Noise Factor defined as enf=<M²>/<M>² where M is the avalanche gain distrib
+M = 1           # Average Amplification factor eAPD
+
+"""Random state Seeds"""
+seedph=42   
+seedron=43
+seeddist=44
+latency = 1                 # Latency in number of frames
+
+"""Fringe-tracker dictionnary"""
+# will be completed by the fringe-tracker method.
+FT = {}
+    
+
+"""Other parameters"""
+TELref=0            # For display only: reference delay line
+newfig=0
+
+verbose,vebose2=False,False
+
+
+class Interferometer():
+    """
+    Interferometer parameters
+    """
+    
+    def __init__(self,name='chara'):
+        
+        self.get_array(name=name)
+        
+    def get_array(self,name=''):
+        
+        if "fits" in name:
+            filepath = name
+            if not os.path.exists(filepath):
+                try:
+                    if verbose:
+                        print("Looking for the interferometer file into the package's data")
+                    filepath = pkg_resources.resource_stream(__name__,filepath)
+                except:
+                    raise Exception(f"{filepath} doesn't exist.")
+        
+        elif name == 'chara':
+            if verbose:
+                print("Take CHARA 6T information")
+            
+            filepath = pkg_resources.resource_stream(__name__,'data/interferometers/CHARA_6T.fits')
+                       
+        else:
+            raise Exception("For defining the array, you must give a file \
+    or a name (currently only the name CHARA is available).")
+
+        with fits.open(filepath) as hdu:
+            ArrayParams = hdu[0].header
+            NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
+            self.name = ArrayParams['NAME']
+            self.NA = NA
+            self.NIN = NIN
+            TelData = hdu[1].data
+            BaseData = hdu[2].data
+        
+            self.TelNames = TelData['TelNames']
+            self.TelCoordinates = TelData['TelCoordinates']
+            self.TelTransmissions = TelData['TelTransmissions']
+            self.TelSurfaces = TelData['TelSurfaces']
+            self.BaseNames = BaseData['BaseNames']
+            self.BaseCoordinates = BaseData['BaseCoordinates']
+            
+        self.BaseNorms = np.linalg.norm(self.BaseCoordinates[:,:2],axis=1)
+        
+        
+    def plot(self):
+        
+        plt.rcParams['figure.figsize']=(8,8)
+        font = {'family' : 'DejaVu Sans',
+                'weight' : 'normal',
+                'size'   : 15}
+        
+        rcParamsFS = {"axes.grid":False,
+                        "figure.constrained_layout.use": True,
+                        'figure.subplot.hspace': 0,
+                        'figure.subplot.wspace': 0,
+                        'figure.subplot.left':0,
+                        'figure.subplot.right':1
+                        }
+        plt.rcParams.update(rcParamsFS)
+        plt.rc('font', **font)
+        
+        title=self.name
+        fig=plt.figure(title, clear=True)
+        ax=fig.subplots()
+        for ia in range(NA):
+            name1,(x1,y1) = self.TelNames[ia],self.TelCoordinates[ia,:2]
+            for iap in range(ia+1,NA):
+                ib=ct.posk(ia,iap,NA)
+                x2,y2 = self.TelCoordinates[iap,:2]
+                ax.plot([x1,(x2+x1)/2],[y1,(y2+y1)/2],color=colors[0],linestyle='-',linewidth=10,zorder=-1)
+                ax.plot([(x2+x1)/2,x2],[(y2+y1)/2,y2],color=colors[0],linestyle='-',linewidth=10,zorder=-1)
+                ax.annotate(f"{round(self.BaseNorms[ib])}", ((x1+x2)/2-3,(y1+y2)/2-3),color=colors[1])
+        
+        for ia in range(NA):
+            name1,(x1,y1) = self.TelNames[ia],self.TelCoordinates[ia,:2]
+            ax.scatter(x1,y1,marker='o',edgecolor="k",facecolor='None',linewidth=15,s=8)
+            ax.annotate(name1, (x1-20,y1-15),color="k")
+            ax.annotate(f"({ia+1})", (x1+5,y1-10),color=colors[3])
+            
+        ax.set_xlabel("X [m]")
+        ax.set_ylabel("Y [m]")
+        
+        xwidth = np.ptp(self.TelCoordinates[:,0])*1.2
+        minX = np.min(self.TelCoordinates[:,0])
+        xmin = minX - 0.1*xwidth
+        
+        ywidth = np.ptp(self.TelCoordinates[:,1])*1.2
+        minY = np.min(self.TelCoordinates[:,1])
+        ymin = minY - 0.1*ywidth
+        
+        xmax,ymax  = xmin+xwidth , ymin+ywidth
+        ax.set_xlim([xmin,xmax]) ; ax.set_ylim([ymin,ymax])
+        
+        #ax.text(xmin+50,ymax-50,name,fontsize=60,color='w')
+        #ax.text(0.5*xmin,0,"Planet Formation Imager",fontsize=50,color='w')
+        
+        # if len(savedir):
+        #     if not os.path.exists(savedir):
+        #         os.makedirs(savedir, exist_ok=True)
+            
+        #     ax.axis("off")
+        #     if not len(self.name):
+        #         name = "test"
+
+        #     if isinstance(ext, list):
+        #         for exttemp in ext:
+        #             if exttemp == 'png':
+        #                 fig.savefig(f"{savedir}{name}.{exttemp}",transparent=True)
+        #             else:
+        #                 fig.savefig(f"{savedir}{name}.{exttemp}")
+        #     else:
+        #         if ext == 'png':
+        #             fig.savefig(f"{savedir}{name}.{ext}",transparent=True)
+        #         else:
+        #             fig.savefig(f"{savedir}{name}.{ext}")
+    
+        plt.rcParams.update(plt.rcParamsDefault)
+
+class Observation():
+    """
+    Informations about the observation we want to simulate.
+    Attributes:
+        - ArrayName: STRING
+            Array name
+            Init: 'CHARA'
+        - Date:
+            Date of the observation
+            Init: '2020-01-01 00:00:00'
+        - AltAz: TUPLE
+            Star Coordinates at the observation date.
+            Init: (90,0) -> Zenith
+        - UsedTelescopes:
+            Names of the used telescopes during the observation.
+            Init: ['S1','S2','E1','E2','W1','W2']
+        
+    """
+    def __init__(self,Filepath='', ArrayName='CHARA', Date='2020-01-01 00:00:00',
+                 AltAz=(90,0),
+                 UsedTelescopes = ['S1','S2','E1','E2','W1','W2'],
+                 **kwargs):
+        
+        self.Filepath = Filepath
+        self.ArrayName = ArrayName
+        if AltAz != 'no':
+            self.AltAz = AltAz
+        self.DATE = Date
+        self.UsedTelescopes = UsedTelescopes
+        
+        
+class ScienceObject():
+    """
+    Store every parameters relative to the object.
+    Attributes:
+        - Name: STRING
+            If existing star, the name of the star.
+            If not existing star, the name of the type (for information):
+                Binary
+                Simple
+        - Filename: STRING
+            If a filename already gets the visibilities, it saves time.
+        - Coordinates: Astropy.SkyCoord
+            In degrees, store the right ascension and declination of the object.
+        - Star1: DICTIONARY
+            - Angular diameter: of the star in arcsec
+            - Position: of the star in the (alpha,beta) plane
+            - Hmag: FLOAT
+                Magnitude in H band.
+            - SpectralType: STRING
+            - T: FLOAT
+                Temperature of the star
+            Init:{'AngDiameter':0.01, 'Position':[0,0],'Hmag':0}
+                
+        - Star2: DICTIONARY
+            Possibility to define a second star on the same model as StarOne
+            
+    """
+    
+    def __init__(self, Name='Simple'):
+        
+        self.Name = Name
+        self.Star1 = {'AngDiameter':0.01, 'Position':(0,0),'Hmag':0}
 
 
 # class FringeTracker:
@@ -116,199 +365,5 @@ from astropy.io import fits
 #         self.CfObj=np.ones(4)
 
 
-class Observation():
-    """
-    Informations about the observation we want to simulate.
-    Attributes:
-        - ArrayName: STRING
-            Array name
-            Init: 'CHARA'
-        - Date:
-            Date of the observation
-            Init: '2020-01-01 00:00:00'
-        - AltAz: TUPLE
-            Star Coordinates at the observation date.
-            Init: (90,0) -> Zenith
-        - UsedTelescopes:
-            Names of the used telescopes during the observation.
-            Init: ['S1','S2','E1','E2','W1','W2']
-        
-    """
-    def __init__(self,Filepath='', ArrayName='CHARA', Date='2020-01-01 00:00:00',
-                 AltAz=(90,0),
-                 UsedTelescopes = ['S1','S2','E1','E2','W1','W2'],
-                 **kwargs):
-        
-        self.Filepath = Filepath
-        self.ArrayName = ArrayName
-        if AltAz != 'no':
-            self.AltAz = AltAz
-        self.DATE = Date
-        self.UsedTelescopes = UsedTelescopes
-        
-        
-class ScienceObject():
-    """
-    Store every parameters relative to the object.
-    Attributes:
-        - Name: STRING
-            If existing star, the name of the star.
-            If not existing star, the name of the type (for information):
-                Binary
-                Simple
-        - Filename: STRING
-            If a filename already gets the visibilities, it saves time.
-        - Coordinates: Astropy.SkyCoord
-            In degrees, store the right ascension and declination of the object.
-        - Star1: DICTIONARY
-            - Angular diameter: of the star in arcsec
-            - Position: of the star in the (alpha,beta) plane
-            - Hmag: FLOAT
-                Magnitude in H band.
-            - SpectralType: STRING
-            - T: FLOAT
-                Temperature of the star
-            Init:{'AngDiameter':0.01, 'Position':[0,0],'Hmag':0}
-                
-        - Star2: DICTIONARY
-            Possibility to define a second star on the same model as StarOne
-            
-    """
-    
-    def __init__(self, Name='Simple'):
-        
-        self.Name = Name
-        self.Star1 = {'AngDiameter':0.01, 'Position':(0,0),'Hmag':0}
-
-from scipy.special import binom
-
-"""
-ALL THESE VALUES ARE BY DEFAULT AND WILL BE UPDATED WITH THE FUNCTION INITIALISE
-"""
 
 
-# Interferometer
-Name = 'CHARA'
-NA=6                            # number of apertures
-NB=NA**2                        # Number of unknown photometries and phases 
-NIN=int(NA*(NA-1)/2)            # Number of independant OPDs
-NC = int(binom(NA,3))           # Number of closure phases
-ND = int((NA-1)*(NA-2)/2)       # Number of independant closure phases
-NT=512
-MT=NT
-NW=5
-OW=1
-
-# Source
-spectra=np.linspace(1.45,1.75,NW)       # Micro-sampling wavelength
-spectraM=spectra                        # Macro-sampling wavelength
-PDspectra=np.mean(spectra)              # Mean wavelength
-spectrum=np.ones_like(spectra)          # Source distribution spectral power
-# CfObj=np.ones(4)
-
-
-# Fringe sensor
-fs='default'                # Default fringe sensor (one coherence = 2 pixels)
-
-# V2PM=np.ones([NW,NP,NB])   # Matrix Visibility to Pixel, will be created by the FS chosen above
-# P2VM=np.ones([NW,NB,NP])   # Matrix Pixel to Visibility, will be created by the FS chosen above
-# MacroP2VM=np.ones([MW,NB,NP])
-dt = 3                      # Frame time
-# R = np.abs((MW-1)*PDspectra/(spectraM[-1] - spectraM[0]))
-
-# Create the dictionnary of the Fringe Sensor: will be completed by the fringesensor
-# Expected keys: NP, V2PM, P2VM, MacroP2VM, R
-FS = {'NP':4, 'MW':NW, 'NINmes':NIN,'NBmes':NB, 'NCmes':NC}                 
-# FS={}
-
-# Noises
-noise=True   # No noise by default [0 if noise]
-qe = 0.7    # Quantum efficiency
-ron = 2     # Readout noise
-phnoise=0       # No photon noise by default [1 if ph noise]
-enf=1.5     # Excess Noise Factor defined as enf=<M²>/<M>² where M is the avalanche gain distrib
-M = 1           # Average Amplification factor eAPD
-
-# Random state Seeds
-seedph=42   
-seedron=43
-seeddist=44
-latency = 1                 # Latency in number of frames
-
-# Piston Calculator
-# pc='integrator'     # Default command calculator (integrator PD and GD without statemachine)
-# state=0              # Statemachine starting mode (0=idle,1=search,2=track)
-
-# GainGD = 0.7
-# GainPD = 0.3
-# Ngd = 40
-# Ncp = 150
-# Sweep = 100
-# Slope = Sweep*dt*1e-3
-# Vfactor = np.array([0, -10,-9,-6,2,7])/10    # Non redundant SPICA
-# Ncross = 1
-# usePDref = True
-
-# Piston Calculator dictionnary
-FT = {'Name':'integrator',
-      'GainPD':0,'GainGD':0,'search':False}              # Distance between spectral channels for GD calc
-    
-
-# Simulation parameters
-# filename='cohdefault'
-# ich=np.array([NP,2])        # For display only: bases correspondances on pixels
-TELref=0            # For display only: reference delay line
-newfig=0
-timestamps = np.arange(NT)*dt       # Timestamps in [ms]
-
-verbose,vebose2=False,False
-
-
-class Interferometer():
-    """
-    Interferometer parameters
-    """
-    
-    def __init__(self,name='chara'):
-        
-        self.get_array(name=name)
-        
-    def get_array(self,name=''):
-        
-        if "fits" in name:
-            filepath = name
-            if not os.path.exists(filepath):
-                try:
-                    if verbose:
-                        print("Looking for the interferometer file into the package's data")
-                    filepath = pkg_resources.resource_stream(__name__,filepath)
-                except:
-                    raise Exception(f"{filepath} doesn't exist.")
-        
-        elif name == 'chara':
-            if verbose:
-                print("Take CHARA 6T information")
-            
-            filepath = pkg_resources.resource_stream(__name__,'data/interferometers/CHARA_6T.fits')
-                       
-        else:
-            raise Exception("For defining the array, you must give a file \
-    or a name (currently only the name CHARA is available).")
-
-        with fits.open(filepath) as hdu:
-            ArrayParams = hdu[0].header
-            NA, NIN = ArrayParams['NA'], ArrayParams['NIN']
-            self.Name = 
-            self.NA = NA
-            self.NIN = NIN
-            TelData = hdu[1].data
-            BaseData = hdu[2].data
-        
-            self.TelNames = TelData['TelNames']
-            self.TelCoordinates = TelData['TelCoordinates']
-            self.TelTransmissions = TelData['TelTransmissions']
-            self.TelSurfaces = TelData['TelSurfaces']
-            self.BaseNames = BaseData['BaseNames']
-            self.BaseCoordinates = BaseData['BaseCoordinates']
-            
-        self.BaseNorms = np.linalg.norm(self.BaseCoordinates[:,:2],axis=1)

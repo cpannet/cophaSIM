@@ -16,7 +16,7 @@ from scipy import interpolate
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz
 
-from cophaSIM.tol_colors import tol_cset # colorblind-riendly and contrastful library
+from cophasim.tol_colors import tol_cset # colorblind-riendly and contrastful library
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 
@@ -24,8 +24,8 @@ from astropy.io import fits
 
 import matplotlib.pyplot as plt
 
-from cophaSIM import config
-import cophaSIM.decorators as deco
+from cophasim import config
+import cophasim.decorators as deco
 
 global h_, c_, k_
 
@@ -1355,7 +1355,7 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=False):
         PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance, axis=0)
         
     CfDisturbance = np.zeros([NT,NW,NB])*1j
-    from cophaSIM import skeleton
+    from cophasim import skeleton
     for it in range(NT):
         CfDisturbance[it,:,:] = skeleton.coh__pis2coh(PistonDisturbance[it,:], 1/spectra, ampl=np.sqrt(TransmissionDisturbance[it,:]))
 
