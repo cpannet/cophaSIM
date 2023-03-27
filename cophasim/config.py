@@ -47,6 +47,7 @@ NW=5
 OW=1
 dt = 3                              # Frame time
 timestamps = np.arange(NT)*dt       # Timestamps in [ms]
+starttracking = 0
 
 """Source"""
 spectra=np.linspace(1.45,1.75,NW)       # Micro-sampling wavelength
@@ -73,7 +74,7 @@ seedron=43
 seeddist=44
 latency = 1                 # Latency in number of frames
 
-"""Fringe-tracker dictionnary"""
+"""Fringe-tracker"""
 # will be completed by the fringe-tracker method.
 FT = {}
     

@@ -5,10 +5,10 @@ cophasim/ALTERNATIVE_FS.py
 cophasim/FS_DEFAULT.py
 cophasim/HIERARCHICALFRINGETRACKER.py
 cophasim/MIRCx_FS.py
-cophasim/ReadTrueData.py
 cophasim/SCIENTIFIC_INSTRUMENTS.py
 cophasim/SPICA_FS.py
 cophasim/SPICA_FT.py
+cophasim/TrueTelemetries.py
 cophasim/__init__.py
 cophasim/coh_tools.py
 cophasim/config.py

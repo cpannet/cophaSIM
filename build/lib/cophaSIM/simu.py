@@ -67,14 +67,12 @@ OPDrefObject = np.zeros([NIN])                      # PD reference of the Object
 # Estimations
 PDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines PD [rad]
 PDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines PD after patch [rad]
-varPD = np.zeros([NT,NINmes])                       # Estimated "PD variance" = 1/SNR²
-varGD = np.zeros([NT,NINmes])                       # Estimated "GD variance" = 1/SNR²
 GDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines GD [rad]
 GDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines GD after patch [rad]
 PDResidual = np.zeros([NT,NINmes])                  # Estimated residual PD = PD-PDref
-PDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref after Ipd
+PDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref after Ipd (eq.35)
 GDResidual = np.zeros([NT,NINmes])                  # Estimated residual GD = GD-GDref
-GDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref after Igd
+GDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref after Igd (eq.35)
 GDErr = np.zeros([NT,NINmes])                       # Error that integrates GD integrator
 PDref = np.zeros([NT,NINmes])                       # PD reference vector
 GDref = np.zeros([NT,NINmes])                       # GD reference vector
@@ -82,6 +80,8 @@ CfPDref = np.ones([NT,NINmes])+0j                   # Phasor of the PDref vector
 CfGDref = np.ones([NT,NINmes])+0j                   # Phasor of the GDref vector, not used currently
 
 # Noise estimations
+varPD = np.zeros([NT,NINmes])                       # Estimated "PD variance" = 1/SNR²
+varGD = np.zeros([NT,NINmes])                       # Estimated "GD variance" = 1/SNR²
 SquaredSNRMovingAverage = np.zeros([NT,NINmes])     # Estimated SNR² averaged over N dit
 TrackedBaselines = np.zeros([NT,NINmes])
 TemporalVariancePD = np.zeros([NT,NINmes])          # Temporal Variance PD estimator
@@ -99,7 +99,6 @@ EffectiveMoveODL = np.zeros([NT+latency,NA])        # Effective move of the dela
 PistonTrue = np.zeros([NT,NA])                      # True Pistons
 
 # Estimations
-PistonGDCommand_beforeround = np.zeros([NT+1,NA])
 GDPistonResidual = np.zeros([NT,NA])                # GD residuals on telescopes
 PDPistonResidual = np.zeros([NT,NA])                # PD residuals on telescopes
 
@@ -107,6 +106,7 @@ PDPistonResidual = np.zeros([NT,NA])                # PD residuals on telescopes
 SNRPhotometry = np.zeros([NT,NA])                   # SNR of the photometry estimation
 
 # Commands
+PistonGDCommand_beforeround = np.zeros([NT+1,NA])
 PistonPDCommand = np.zeros([NT+1,NA])               # Piston-space PD command
 PistonGDCommand = np.zeros([NT+1,NA])               # Piston-space GD command
 SearchCommand = np.zeros([NT+1,NA])                 # Piston-space Search command

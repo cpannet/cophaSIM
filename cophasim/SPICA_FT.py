@@ -981,8 +981,8 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
         The user can choose the value to return regarding the SNR evolution.
 
     """
-    from cophaSIM import skeleton as sk
-    from cophaSIM import config
+    from cophasim import skeleton as sk
+    from cophasim import config
 
     NINmes = config.FS['NINmes']
 
@@ -1004,7 +1004,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
         sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT,verbose=verbose)
         
         # Initialize the fringe tracker with the gain
-        # from cophaSIM.SPICA_FT_r import SPICAFT, updateFTparams
+        # from cophasim.SPICA_FT_r import SPICAFT, updateFTparams
         #SPICAFT(init=True, GainPD=0, GainGD=0,search=False)
         gainPD,gainGD,search=config.FT['GainPD'],config.FT['GainGD'],config.FT['search']
         updateFTparams(GainPD=0, GainGD=0, search=False, verbose=verbose)
@@ -1026,7 +1026,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                 raise ValueError("Please answer by 'y','yes','n' or 'no'")
             
         else:
-            from cophaSIM import simu,coh_tools
+            from cophasim import simu,coh_tools
             
             scanned_baselines = [coh_tools.posk(ia,scanned_tel-1,config.NA) for ia in range(config.NA-1)]
             k=0;ib=scanned_baselines[k]
@@ -1062,7 +1062,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
         sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT, verbose=verbose)
         
         # Initialize the fringe tracker with the gain
-        from cophaSIM.SPICA_FT import SPICAFT, updateFTparams
+        from cophasim.SPICA_FT import SPICAFT, updateFTparams
         #SPICAFT(init=True, GainPD=0, GainGD=0,search=False)
         gainPD,gainGD,search=config.FT['GainPD'],config.FT['GainGD'],config.FT['search']
         updateFTparams(GainPD=0, GainGD=0, search=False, verbose=verbose)
@@ -1084,7 +1084,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                 
                 
         else:
-            from cophaSIM import simu,coh_tools
+            from cophasim import simu,coh_tools
             
             if TypeDisturbance=='NoDisturbance':
                 ind=100

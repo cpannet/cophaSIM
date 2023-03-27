@@ -1112,13 +1112,12 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         print('Reloading simu for reinitialising the observables.')
     reload(simu)
     
-    # Importation of the object 
+    # Importation of the object
     if NA>=3:
         CfObj, VisObj, CPObj = ct.get_CfObj(config.ObservationFile,spectra)
     else:
         CfObj, VisObj = ct.get_CfObj(config.ObservationFile,spectra)
         
-    
     #scaling it to the spectral sampling  and integration time dt
     delta_wav = np.abs(spectra[1]-spectra[2])
     
@@ -1247,7 +1246,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
 def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             Pistondetails=False,OPDdetails=False,
             OneTelescope=True, pause=False, display=True,verbose=False,
-            start_pd_tracking = 50,
+            start_pd_tracking = 50,UsedTelemetries='simu',
             savedir='',ext='pdf',infos={"details":''}):
     """
     
@@ -1305,13 +1304,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     """
     
     from . import simu
-    
-    from .simu import timestamps
-    from .config import NA,NT,NIN,NC,OW,InterfArray
+    from . import TrueTelemetries as TT
+
+    from .config import NA,NT,NIN,NC,OW
     
     NINmes = config.FS['NINmes']
-    
-    #timestr = config.timestr
     
     if 'which' in args:
         print(f"Available observables to display:\n\
@@ -1338,24 +1335,53 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     if (len(savedir)) and (not os.path.exists(savedir)):
         os.makedirs(savedir)
     
-    WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
-    wl = config.spectraM[WLIndex]
-    
-    timestr=simu.TimeID
-    
-    ich = config.FS['ich']
-    R = config.FS['R']
-    
-    dt=config.dt
-    ms=1e-3
+    ms=1e3
+    if UsedTelemetries == 'simu':
+        from .simu import timestamps, TimeID
+        
+        WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
+        wl = config.spectraM[WLIndex]
+        
+        ich = config.FS['ich']
+        R = config.FS['R']
+        
+        dt=config.dt
+        
+        InterfArray = config.InterfArray
+        
+        VisObj = ct.NB2NIN(simu.VisibilityObject[WLIndex])
+        VisibilityPhase = np.angle(simu.VisibilityEstimated[:,WLIndex,:])
+        
+        whichSNR = config.FT['whichSNR']
+            
+    else:
+        from .TrueTelemetries import timestamps, TimeID
 
-    stationaryregim_start = config.starttracking+(config.NT-config.starttracking)*2//3
+        #WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
+        wl = TT.lmbda
+        
+        ich = TT.ich
+        R = TT.R
+        
+        dt=TT.dt
+        
+        InterfArray = config.Interferometer(name='chara')
+        
+        VisObj = np.ones([NIN])#ct.NB2NIN(simu.VisibilityObject[WLIndex])
+        VisibilityPhase = np.zeros([NIN])#np.angle(simu.VisibilityEstimated[:,WLIndex,:])
+
+        whichSNR = TT.whichSNR
+
+    t = timestamps*ms # time in ms
+    timerange = range(NT)
+
+    stationaryregim_start = config.starttracking+(config.NT-config.starttracking)*1//3
     if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
     stationaryregim = np.arange(stationaryregim_start,NT)
     
     effDIT = min(DIT, config.NT - config.starttracking -1)
     
-    if not ('opdcontrol' in args):
+    if (not ('opdcontrol' in args)) and (UsedTelemetries=='simu'):
         ShowPerformance(float(timestamps[stationaryregim_start]), WLOfScience, effDIT, display=False)
     else:
         if verbose:
@@ -1382,17 +1408,10 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     NumberOfTelFigures = 1+NA//NAdisp - 1*(NA % NAdisp==0)
     telcolors = colors[:NAdisp]*NumberOfTelFigures
     
-    pis_max = 1.1*np.max([np.max(np.abs(simu.PistonDisturbance)),wl/2])
-    pis_min = -pis_max
-    ylim = [pis_min,pis_max]
-    
-    
     """
     HANDLE THE POSSILIBITY TO SHOW ONLY A PART OF THE TELESCOPES/BASELINES/CLOSURES
     """
-    
-    t = simu.timestamps*1e-3 # time in ms
-    timerange = range(NT)
+
     
     TelConventionalArrangement = InterfArray.TelNames
     if 'TelescopeArrangement' in infos.keys():
@@ -1447,7 +1466,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     PlotBaselineNIN = [False]*NIN
     PlotBaseline = [False]*NINmes
     PlotClosure = [False]*NC
-    TelNameLength = len(config.InterfArray.TelNames)
+    TelNameLength = len(InterfArray.TelNames)
     
     if 'TelsToDisplay' in infos.keys():
         TelsToDisplay = infos['TelsToDisplay']
@@ -1552,27 +1571,42 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     COMPUTATION RMS
     """
     
-    # Estimated, before patch (priority 1)
-    GD = simu.GDEstimated ; PD=simu.PDEstimated 
+    if UsedTelemetries == 'simu':
+        # Estimated, before patch (priority 1)
+        GD = simu.GDEstimated ; PD=simu.PDEstimated 
+        
+        # Estimated, after patch
+        GD2 = simu.GDEstimated2 ; PD2 = simu.PDEstimated2   
+        
+        # Residual, after subtraction of reference vectors (priority 2)
+        GDerr = simu.GDResidual ; PDerr = simu.PDResidual
+        
+        # Residual, after Igd and Ipd
+        GDerr2 = simu.GDResidual2 ; PDerr2 = simu.PDResidual2
+        
+        # Reference vectors
+        GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
     
-    # Estimated, after patch
-    GD2 = simu.GDEstimated2 ; PD2 = simu.PDEstimated2   
-    
-    # Residual, after subtraction of reference vectors (priority 2)
-    GDerr = simu.GDResidual ; PDerr = simu.PDResidual
-    
-    # Residual, after Igd and Ipd
-    GDerr2 = simu.GDResidual2 ; PDerr2 = simu.PDResidual2
-    
-    # Reference vectors
-    GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
-    
+    else:
+        # Estimated, before patch (priority 1)
+        GD = TT.GDEstimated ; PD=TT.PDEstimated
+        
+        # Estimated, after patch
+        GD2 = np.zeros_like(GD) ; PD2 = np.zeros_like(GD)
+        
+        # Residual, after Igd and Ipd
+        GDerr2 = TT.GDResidual2/R/wl*2*np.pi ; PDerr2 = TT.PDResidual2/wl*2*np.pi
+        
+        # Residual, after subtraction of reference vectors (priority 2)
+        GDerr = np.zeros_like(GDerr2) ; PDerr = np.zeros_like(PDerr2)
+        
+        # Reference vectors
+        GDrefmic = TT.GDref ; PDrefmic = TT.PDref
     
     GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
     GDmic2 = GD2*R*wl/2/np.pi ; PDmic2 = PD2*wl/2/np.pi
     GDerrmic = GDerr*R*wl/2/np.pi ; PDerrmic = PDerr*wl/2/np.pi
     GDerrmic2 = GDerr2*R*wl/2/np.pi ; PDerrmic2 = PDerr2*wl/2/np.pi
-    
     
     # GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
     # GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
@@ -1588,30 +1622,29 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     
     RMStrueOPD = np.sqrt(simu.VarOPD)
     
-    VisObj = ct.NB2NIN(simu.VisibilityObject[WLIndex])
-    VisibilityPhase = np.angle(simu.VisibilityEstimated[:,WLIndex,:])
     
     """
     SIGNAL TO NOISE RATIOS
     """
     
-    
     SNR_pd = np.sqrt(simu.SquaredSNRMovingAveragePD)
     SNR_gd = np.sqrt(simu.SquaredSNRMovingAverageGD)
     SNRGD = np.sqrt(simu.SquaredSNRMovingAverageGDUnbiased)
     
-    if config.FT['whichSNR'] == 'pd':
+    if whichSNR == 'pd':
         SNR = SNR_pd
     else:
         SNR = SNR_gd
-    
     
     """
     NOW YOU CAN DISPLAY
     """
     
-    
     if displayall or ('disturbances' in args):
+        
+        pis_max = 1.1*np.max([np.max(np.abs(simu.PistonDisturbance)),wl/2])
+        pis_min = -pis_max
+        ylim = [pis_min,pis_max]
         
         fig = plt.figure("Disturbances")
         
@@ -1697,6 +1730,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         """
         PISTONS
         """
+        
         linestyles=[]
         linestyles.append(mlines.Line2D([], [], color='black',
                                         linestyle='solid',label='Estimated'))    
@@ -1748,7 +1782,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         config.newfig+=1
     
         if len(savedir):
-            fig.savefig(savedir+f"Simulation{timestr}_piston.{ext}")
+            fig.savefig(savedir+f"Simulation{TimeID}_piston.{ext}")
     
     
     if displayall or ('Pistondetails' in args):
@@ -1929,7 +1963,7 @@ to {baselines[iLastBase]}")
             if len(savedir):
                 if verbose:
                     print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{timestr}_{typeobs}_{rangeBases}.{ext}")
+                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
 
         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -2053,7 +2087,7 @@ to {baselines[iLastBase]}")
             if len(savedir):
                 if verbose:
                     print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{timestr}_{typeobs}_{rangeBases}.{ext}")
+                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
 
         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -2178,7 +2212,7 @@ to {baselines[iLastBase]}")
             if len(savedir):
                 if verbose:
                     print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{timestr}_{typeobs}_{rangeBases}.{ext}")
+                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
 
         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -2295,7 +2329,7 @@ to {baselines[iLastBase]}")
             if len(savedir):
                 if verbose:
                     print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{timestr}_{typeobs}_{rangeBases}.{ext}")
+                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
 
         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -2384,7 +2418,7 @@ to {baselines[iLastBase]}")
         if len(savedir):
             if verbose:
                 print("Saving perfarray figure.")
-            plt.savefig(savedir+f"Simulation{timestr}_perfarray.{ext}")
+            plt.savefig(savedir+f"Simulation{TimeID}_perfarray.{ext}")
 
     plt.rcParams.update(plt.rcParamsDefault)
 
@@ -2478,7 +2512,7 @@ to {baselinesNIN[iLastBase]}")
             if len(savedir):
                 if verbose:
                     print("Saving opd figure.")
-                plt.savefig(savedir+f"Simulation{timestr}_opd_{rangeBases}.{ext}")
+                plt.savefig(savedir+f"Simulation{TimeID}_opd_{rangeBases}.{ext}")
             
     """
     OPD
@@ -2554,7 +2588,7 @@ to {baselinesNIN[iLastBase]}")
             else:
                 plt.show()  
         if len(savedir):
-            fig.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
+            fig.savefig(savedir+f"Simulation{TimeID}_opd.{ext}")
 
     
     if displayall or ('opdcontrol' in args):
@@ -2623,7 +2657,7 @@ to {baselinesNIN[iLastBase]}")
         if len(savedir):
             if verbose:
                 print("Saving opdcontrol figure.")
-            plt.savefig(savedir+f"Simulation{timestr}_opdcontrol.{ext}")
+            plt.savefig(savedir+f"Simulation{TimeID}_opdcontrol.{ext}")
     
     
     
@@ -2758,7 +2792,7 @@ to {baselinesNIN[iLastBase]}")
         if len(savedir):
             if verbose:
                 print("Saving opd figure.")
-            plt.savefig(savedir+f"Simulation{timestr}_opd.{ext}")
+            plt.savefig(savedir+f"Simulation{TimeID}_opd.{ext}")
 
     
     if 'OPDcmd' in args:
@@ -3048,7 +3082,7 @@ to {baselinesNIN[iLastBase]}")
         config.newfig+=1
         
         if len(savedir):
-            fig.savefig(savedir+f"Simulation{timestr}_cp.{ext}")
+            fig.savefig(savedir+f"Simulation{TimeID}_cp.{ext}")
 
     if displayall or ('vis' in args):
         """
@@ -3219,7 +3253,7 @@ to {baselinesNIN[iLastBase]}")
             else:
                 plt.show()  
         if len(savedir):
-            fig.savefig(savedir+f"Simulation{timestr}_detector.{ext}")
+            fig.savefig(savedir+f"Simulation{TimeID}_detector.{ext}")
         
         
         
@@ -3577,7 +3611,7 @@ to {baselines[iLastBase]}")
             else:
                 plt.show()  
         if len(savedir):
-            fig.savefig(savedir+f"Simulation{timestr}_GDonly.{ext}")
+            fig.savefig(savedir+f"Simulation{TimeID}_GDonly.{ext}")
 
 
 
@@ -3742,14 +3776,14 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
         if not len(CoherentFluxObject):
             # The interferometer is "not the same" as for simulation, because not the same band.
             # In the future, both bands could be integrated in the same Interf class object.
-            InterfArray = ct.get_array(name=FileInterferometer)
+            InterfArraySI = config.Interferometer(name=FileInterferometer)
             
             if MultiWavelength:
                 CoherentFluxObject = ct.create_CfObj(SpectraForScience,
-                                                     config.Obs,config.Target,InterfArray)
+                                                     config.Obs,config.Target,InterfArraySI)
             else:
                 CoherentFluxObject = ct.create_CfObj(MeanWavelength,
-                                                     config.Obs,config.Target,InterfArray,R=R)
+                                                     config.Obs,config.Target,InterfArraySI,R=R)
             CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
         
         
