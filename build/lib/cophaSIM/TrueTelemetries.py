@@ -21,6 +21,7 @@ import time
 from .tol_colors import tol_cset
 from . import coh_tools as ct
 from mypackage.plot_tools import setaxelim, addtext
+from scipy.special import binom
 
 import matplotlib.lines as mlines
 from astropy.io import fits
@@ -439,74 +440,82 @@ def readDump(file, version='current'):
     return data
 
 def ReadFits(file):
-    globals1 = list(globals())
-    global TimeID, dt, timestamps,ich,whichSNR,GainPD,GainGD,\
-        PDEstimated,GDEstimated,PDResidual2, GDResidual2,\
-            PhotometryEstimated,ClosurePhasePD, ClosurePhaseGD,PDref,GDref,\
-                PistonPDCommand,PistonGDCommand,SearchCommand, CommandODL,\
-                    varPD, SquaredSNRMovingAverage, VisibilityEstimated
-                     
-    
-    with fits.open(file) as hduL:
+    from cophasim import outputs
+    global NT, NA, NINmes, TimeID, dt, timestamps,ich,whichSNR
+    # GainPD,GainGD,\
+    #     PDEstimated,GDEstimated,PDResidual2, GDResidual2,\
+    #         PhotometryEstimated,ClosurePhasePD, ClosurePhaseGD,PDref,GDref,\
+    #             PistonPDCommand,PistonGDCommand,SearchCommand, CommandODL,\
+    #                 varPD, SquaredSNRMovingAverage, VisibilityEstimated
+        
+    with fits.open(file) as hduL:       
+
         NT, NA = hduL[1].data["pdDlCmdMicrons"].shape # microns
         _, NINmes = hduL[1].data["gD"].shape # microns
         
-    with fits.open(file) as hduL:       
-        NT, NA = hduL[1].data["pdDlCmdMicrons"].shape # microns
-        print(NT,NA)
         
-        AnalogVariables = ["KgdKpd","PD","GD","curPdErrBaseMicrons",
+        config.NT = NT ; config.NA=NA; config.OW = 1
+        config.NIN = int(NA*(NA-1)/2) ; config.NINmes=NINmes
+        config.NB = int(NA**2) 
+        config.NC = int(binom(NA,3))           # Number of closure phases
+        config.ND = int((NA-1)*(NA-2)/2)       # Number of independant closure phases
+        
+        config.FT['whichSNR'] = 'pd'
+        
+        config.FS['R'] = 50
+        config.FS['ich'] = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
+                         [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
+            
+        config.InterfArray = config.Interferometer(name='chara')
+        
+        CommonOutputs = ["KgdKpd","PD","GD","curPdErrBaseMicrons",
                            "curGdErrBaseMicrons","PdClosure","GdClosure",
                            "curRefPD","curRefGD","Photometry","curPdVar",
                            "avPdVar","VisiNorm","pdDlCmdMicrons","gdDlCmdMicrons",
                            "curFsPosFromStartMicrons","MetBoxCurrentOffsetMicrons"]
         
+        AdditionalOutputs = []
         for key in hduL[1].data.names:
-            if key not in AnalogVariables:
-                globals()[key] = hduL[1].data[key]
+            if key not in CommonOutputs:
+                setattr(outputs,key,hduL[1].data[key])
+                AdditionalOutputs.append(key)
                 
         # tBefore = hduL[1].data['tBeforeProcessFrameCall'][:,0] + hduL[1].data['tBeforeProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)
         # timestamps = tBefore-tBefore[0]
         
-        dt = 4e-3 # frame duration
-        timestamps = np.arange(NT)*dt        # Times in seconds
-        TimeID = "%Y%m%d-%H%M%S"
-        
-        ich = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
-                         [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
-        
-        whichSNR = 'pd'
+        config.dt = 4e-3 # frame duration
+        outputs.timestamps = np.arange(NT)*config.dt        # Times in seconds
+        outputs.TimeID = "%Y%m%d-%H%M%S"
             
-        """Global variables analog to simu module"""
+        """Global variables analog to outputs module"""
         
-        GainPD = hduL[1].data["KgdKpd"][:,1] # Gains PD [NT]
-        GainGD = hduL[1].data["KgdKpd"][:,0] # Gains GD [NT]
+        outputs.GainPD = hduL[1].data["KgdKpd"][:,1] # Gains PD [NT]
+        outputs.GainGD = hduL[1].data["KgdKpd"][:,0] # Gains GD [NT]
         
-        PDEstimated = hduL[1].data["PD"] # Estimated baselines PD [NTxNINmes - rad]
-        GDEstimated = hduL[1].data["GD"] # Estimated baselines GD [NTxNINmes - rad]
-        PDResidual2 = hduL[1].data["curPdErrBaseMicrons"] # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - microns]
-        GDResidual2 = hduL[1].data["curGdErrBaseMicrons"] # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - microns]
-        ClosurePhasePD = hduL[1].data["PdClosure"] # PD closure phase [NTxNC - rad]
-        ClosurePhaseGD = hduL[1].data["GdClosure"] # GD closure phase [NTxNC - rad]
-        PDref = hduL[1].data["curRefPD"] # PD reference vector [NTxNINmes - microns]
-        GDref = hduL[1].data["curRefGD"] # GD reference vector [NTxNINmes - microns]
+        outputs.PDEstimated = hduL[1].data["PD"] # Estimated baselines PD [NTxNINmes - rad]
+        outputs.GDEstimated = hduL[1].data["GD"] # Estimated baselines GD [NTxNINmes - rad]
+        outputs.PDResidual2 = hduL[1].data["curPdErrBaseMicrons"]/lmbda*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
+        outputs.GDResidual2 = hduL[1].data["curGdErrBaseMicrons"]/R/lmbda*2*np.pi # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - rad]
+        outputs.ClosurePhasePD = hduL[1].data["PdClosure"] # PD closure phase [NTxNC - rad]
+        outputs.ClosurePhaseGD = hduL[1].data["GdClosure"] # GD closure phase [NTxNC - rad]
+        outputs.PDref = hduL[1].data["curRefPD"]/lmbda*2*np.pi # PD reference vector [NTxNINmes - rad]
+        outputs.GDref = hduL[1].data["curRefGD"]/R/lmbda*2*np.pi # GD reference vector [NTxNINmes - rad]
         
-        PhotometryEstimated = hduL[1].data["Photometry"] # Estimated photometries [NTxNA - ADU]
+        outputs.PhotometryEstimated = hduL[1].data["Photometry"] # Estimated photometries [NTxNA - ADU]
         
-        varPD = hduL[1].data["curPdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
-        SquaredSNRMovingAverage = 1/hduL[1].data["avPdVar"] # Estimated SNR² averaged over N dit [NTxNINmes]
+        outputs.varPD = hduL[1].data["curPdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
+        outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["avPdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
         
-        VisibilityEstimated = 1/hduL[1].data["VisiNorm"] # Estimated fringe visibility [NTxNINmes]
+        outputs.VisibilityEstimated = np.nan_to_num(1/hduL[1].data["VisiNorm"],posinf=0) # Estimated fringe visibility [NTxNINmes]
         
-        PistonPDCommand = hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
-        PistonGDCommand = hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
-        SearchCommand = hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
-        CommandODL = hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
+        outputs.PistonPDCommand = hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
+        outputs.PistonGDCommand = hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
+        outputs.SearchCommand = hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
+        outputs.CommandODL = hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
         
-    print("Load telemetries into simu module:")
-    for key in globals():
-        if key not in globals1:
-            print(f"- {key}")
+    print("Load telemetries into outputs module:")
+    for key in CommonOutputs+AdditionalOutputs:
+        print(f"- {key}")
     
     return
         

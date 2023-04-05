@@ -130,14 +130,16 @@ MacroImages = np.zeros([NT,MW,FS['NP']])            # Contains microtime images 
 """ FT state-machine quantities"""
 FTmode = np.ones([NT])                              # State mode of the Fringe Tracker
                                                     # 0: off, 1: SEARCH, 2: TRACK, 3: RELOCK
+GainPD = np.zeros([NT])                             # Gain PD in real time, usually constant
+GainGD = np.zeros([NT])                             # Gain GD in real time, usually constant
 Ipd = np.ones([NT,NINmes,NINmes])                   # Weighting matrix PD command
 Igd = np.ones([NT,NINmes,NINmes])                   # Weighting matrix GD command
-Igdna = np.ones([NT,NA,NA])
+Igdna = np.ones([NT,NA,NA])                         # Matrice with ones everywhere
 IgdRank =np.ones([NT])                              # Rank of the weighting matrix GD
 time_since_loss=np.zeros(NT)                        # Time since the loss of one telescope
 NoPhotometryFiltration = np.zeros([NT,NA,NA])       # Matrix that filters telescopes which have no photometry
-LostTelescopes = np.zeros([NT,NA])
-noSignal_on_T = np.zeros([NT,NA])
+LostTelescopes = np.zeros([NT,NA])                  # Lost telescopes
+noSignal_on_T = np.zeros([NT,NA])                   # No photometry on telescopes
 
 """
 Performance Observables will be introduced and processed when the function 

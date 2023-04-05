@@ -13,8 +13,9 @@ cophasim/__init__.py
 cophasim/coh_tools.py
 cophasim/config.py
 cophasim/decorators.py
+cophasim/display_module.py
 cophasim/optimisation.py
-cophasim/simu.py
+cophasim/outputs.py
 cophasim/skeleton.py
 cophasim/tol_colors.py
 cophasim.egg-info/PKG-INFO

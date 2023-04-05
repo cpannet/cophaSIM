@@ -373,8 +373,8 @@ def update_config(verbose=False,**kwargs):
             
     if len(config.timestamps) != config.NT:
         config.timestamps = np.arange(config.NT)*config.dt
-        from . import simu
-        simu.timestamps = np.copy(config.timestamps)
+        from . import outputs
+        outputs.timestamps = np.copy(config.timestamps)
         config.FT['state'] = np.zeros(config.NT)
         config.FT['usaw'] = np.zeros(config.NT)
         if verbose:
@@ -746,8 +746,8 @@ Longueur timestamps: {len(timestamps)}")
         
                     PistonDisturbance[:,ia]= rmsPiston*motif/np.std(motif)/3
 
-            # simu.DisturbancePSD = np.abs(newdsp[freqfft>=0])**2    # Save the PSD of the last disturbance for example
-            # simu.FreqSampling = freqfft[freqfft>=0]
+            # outputs.DisturbancePSD = np.abs(newdsp[freqfft>=0])**2    # Save the PSD of the last disturbance for example
+            # outputs.FreqSampling = freqfft[freqfft>=0]
 
         elif 'new' in kwargs.keys():        # Correct: The DSP are true DSP
 
@@ -1101,16 +1101,16 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
 
     """
     
-    from . import simu
+    from . import outputs
 
     from .config import NT, NA, NW,timestamps, spectra, OW, MW, checktime, checkperiod
     
-    simu.TimeID=time.strftime("%Y%m%d-%H%M%S")
+    outputs.TimeID=time.strftime("%Y%m%d-%H%M%S")
     
-    # Reload simu module for initialising the observables with their shape
+    # Reload outputs module for initialising the observables with their shape
     if verbose:
-        print('Reloading simu for reinitialising the observables.')
-    reload(simu)
+        print('Reloading outputs for reinitialising the observables.')
+    reload(outputs)
     
     # Importation of the object
     if NA>=3:
@@ -1125,7 +1125,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     CfObj = CfObj * config.dt*1e-3      # Photons/spectralchannel/DIT at the entrance of the FS
     
     if NA>=3:
-        simu.ClosurePhaseObject = CPObj
+        outputs.ClosurePhaseObject = CPObj
         
         BestTel=config.FT['BestTel'] ; itelbest=BestTel-1
         if config.FT['CPref']:                     # At time 0, we create the reference vectors
@@ -1140,38 +1140,38 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
                         else:
                             ic = ct.poskfai(itelbest,ia,iap,NA)
                     
-                        simu.OPDrefObject[ib] = np.median(simu.ClosurePhaseObject[:,ic])/(2*np.pi)*config.PDspectra
+                        outputs.OPDrefObject[ib] = np.median(outputs.ClosurePhaseObject[:,ic])/(2*np.pi)*config.PDspectra
         
-    simu.CoherentFluxObject = CfObj
-    simu.VisibilityObject = VisObj
+    outputs.CoherentFluxObject = CfObj
+    outputs.VisibilityObject = VisObj
     
     # Importation of the disturbance
     CfDist, PistonDist, TransmissionDist = ct.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps,verbose=verbose)
     
-    simu.CfDisturbance = CfDist
-    simu.PistonDisturbance = PistonDist
-    simu.TransmissionDisturbance = TransmissionDist    
-    # simu.PhotometryDisturbance = np.zeros([config.NT,config.NW,config.NA])
+    outputs.CfDisturbance = CfDist
+    outputs.PistonDisturbance = PistonDist
+    outputs.TransmissionDisturbance = TransmissionDist    
+    # outputs.PhotometryDisturbance = np.zeros([config.NT,config.NW,config.NA])
     
     for ia in range(config.NA):
         PhotometryObject = np.abs(CfObj[:,ia*(config.NA+1)])
-        simu.PhotometryDisturbance[:,:,ia] = simu.TransmissionDisturbance[:,:,ia]*PhotometryObject
+        outputs.PhotometryDisturbance[:,:,ia] = outputs.TransmissionDisturbance[:,:,ia]*PhotometryObject
 
-    simu.FTmode[:config.starttracking] = np.zeros(config.starttracking)
+    outputs.FTmode[:config.starttracking] = np.zeros(config.starttracking)
 
     if verbose2:
         print("Processing simulation ...")
     
-    simu.it = 0
+    outputs.it = 0
     time0 = time.time()
     for it in range(NT):                        # We browse all the (macro)times
-        simu.it = it
+        outputs.it = it
         
         # Coherence of the ODL
-        CfODL = coh__pis2coh(-simu.EffectiveMoveODL[it,:],1/config.spectra)
+        CfODL = coh__pis2coh(-outputs.EffectiveMoveODL[it,:],1/config.spectra)
         
-        currCfTrue = CfObj * simu.CfDisturbance[it,:,:] * CfODL
-        simu.CfTrue[it,:,:] = currCfTrue   #NB
+        currCfTrue = CfObj * outputs.CfDisturbance[it,:,:] * CfODL
+        outputs.CfTrue[it,:,:] = currCfTrue   #NB
         
         """
         Fringe Sensor: From oversampled true coherences to macrosampled 
@@ -1179,7 +1179,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         """
         fringesensor = config.FS['func']
         currCfEstimated = fringesensor(currCfTrue)
-        simu.CfEstimated[it,:,:] = currCfEstimated   # NBmes
+        outputs.CfEstimated[it,:,:] = currCfEstimated   # NBmes
 
         """
         FRINGE TRACKER: From measured coherences to ODL commands
@@ -1187,7 +1187,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         GainGD = config.FT['GainGD']
         GainPD = config.FT['GainPD']
         
-        if simu.FTmode[it] == 0:
+        if outputs.FTmode[it] == 0:
             config.FT['GainGD'] = 0
             config.FT['GainPD'] = 0
             
@@ -1197,10 +1197,10 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         config.FT['GainGD'] = GainGD
         config.FT['GainPD'] = GainPD
         
-        simu.CommandODL[it+1,:] = CmdODL
+        outputs.CommandODL[it+1,:] = CmdODL
         
         # Very simple step response of the delay lines: if latency==1, the odl response is instantaneous.
-        simu.EffectiveMoveODL[it+config.latency] = CmdODL
+        outputs.EffectiveMoveODL[it+config.latency] = CmdODL
         
         checkpoint = int(checkperiod/100 * NT)
         if (it>checkpoint) and (it%checkpoint == 0) and (it!=0) and checktime:
@@ -1212,33 +1212,33 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     print(f"Done. (Total: {round(time.time()-time0)}s)")
     
     # Process observables for visualisation
-    simu.PistonTrue = simu.PistonDisturbance - simu.EffectiveMoveODL[:-config.latency]
+    outputs.PistonTrue = outputs.PistonDisturbance - outputs.EffectiveMoveODL[:-config.latency]
 
     # Save true OPDs in an observable
     for ia in range(config.NA):
         for iap in range(ia+1,config.NA):
             ib = ct.posk(ia,iap,config.NA)
-            simu.OPDTrue[:,ib] = simu.PistonTrue[:,ia] - simu.PistonTrue[:,iap]
-            simu.OPDDisturbance[:,ib] = simu.PistonDisturbance[:,ia] - simu.PistonDisturbance[:,iap]
-            simu.OPDCommand[:,ib] = simu.CommandODL[:,ia] - simu.CommandODL[:,iap]    
-            simu.EffectiveOPDMove[:,ib] = simu.EffectiveMoveODL[:,ia] - simu.EffectiveMoveODL[:,iap]    
+            outputs.OPDTrue[:,ib] = outputs.PistonTrue[:,ia] - outputs.PistonTrue[:,iap]
+            outputs.OPDDisturbance[:,ib] = outputs.PistonDisturbance[:,ia] - outputs.PistonDisturbance[:,iap]
+            outputs.OPDCommand[:,ib] = outputs.CommandODL[:,ia] - outputs.CommandODL[:,iap]    
+            outputs.EffectiveOPDMove[:,ib] = outputs.EffectiveMoveODL[:,ia] - outputs.EffectiveMoveODL[:,iap]    
             
             # if 'search' in config.FT.keys():
-            #     simu.OPDSearchCommand[:,ib] = simu.SearchCommand[:,ia] - simu.SearchCommand[:,iap]
+            #     outputs.OPDSearchCommand[:,ib] = outputs.SearchCommand[:,ia] - outputs.SearchCommand[:,iap]
             
             for iow in range(MW):
-                GammaObject = simu.CoherentFluxObject[iow*OW,ia*NA+iap]/np.sqrt(simu.CoherentFluxObject[iow*OW,ia*(NA+1)]*simu.CoherentFluxObject[iow*OW,iap*(NA+1)])
+                GammaObject = outputs.CoherentFluxObject[iow*OW,ia*NA+iap]/np.sqrt(outputs.CoherentFluxObject[iow*OW,ia*(NA+1)]*outputs.CoherentFluxObject[iow*OW,iap*(NA+1)])
                 
-                Ia = np.abs(simu.CfTrue[:,iow*OW,ia*(NA+1)])    # Photometry pupil a
-                Iap = np.abs(simu.CfTrue[:,iow*OW,iap*(NA+1)])  # Photometry pupil a'
-                Iaap = np.abs(simu.CfTrue[:,iow*OW,ia*NA+iap])  # Mutual intensity aa'
+                Ia = np.abs(outputs.CfTrue[:,iow*OW,ia*(NA+1)])    # Photometry pupil a
+                Iap = np.abs(outputs.CfTrue[:,iow*OW,iap*(NA+1)])  # Photometry pupil a'
+                Iaap = np.abs(outputs.CfTrue[:,iow*OW,ia*NA+iap])  # Mutual intensity aa'
                 
                 Lc = config.FS['R']*spectra[iow*OW]
-                simu.VisibilityTrue[:,iow,ib] = Iaap/np.sqrt(Ia*Iap)*np.abs(GammaObject)*np.sinc(simu.OPDTrue[:,ib]/Lc)*np.exp(1j*2*np.pi*simu.OPDTrue[:,ib]/spectra[iow*OW])
+                outputs.VisibilityTrue[:,iow,ib] = Iaap/np.sqrt(Ia*Iap)*np.abs(GammaObject)*np.sinc(outputs.OPDTrue[:,ib]/Lc)*np.exp(1j*2*np.pi*outputs.OPDTrue[:,ib]/spectra[iow*OW])
     
     if len(args):
-        filepath = args[0]+f"results_{simu.TimeID}.fits"
-        save_data(simu, config, filepath, LightSave=LightSave, overwrite=overwrite, verbose=verbose)
+        filepath = args[0]+f"results_{outputs.TimeID}.fits"
+        save_data(outputs, config, filepath, LightSave=LightSave, overwrite=overwrite, verbose=verbose)
     
     return
 
@@ -1303,11 +1303,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
 
     """
     
-    from . import simu
+    from . import display_module
+    from . import outputs
     from . import TrueTelemetries as TT
-
-    from .config import NA,NT,NIN,NC,OW
     
+    from .config import NA,NIN,NC,OW,NT
     NINmes = config.FS['NINmes']
     
     if 'which' in args:
@@ -1336,48 +1336,44 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         os.makedirs(savedir)
     
     ms=1e3
+    ich = config.FS['ich']
+    R = config.FS['R']
+    
+    dt=config.dt
+    whichSNR = config.FT['whichSNR']
+    
+    from .outputs import timestamps, TimeID
+    
     if UsedTelemetries == 'simu':
-        from .simu import timestamps, TimeID
         
         WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
         wl = config.spectraM[WLIndex]
         
-        ich = config.FS['ich']
-        R = config.FS['R']
+        VisObj = ct.NB2NIN(outputs.VisibilityObject[WLIndex])
+        VisibilityPhase = np.angle(outputs.VisibilityEstimated[:,WLIndex,:])
         
-        dt=config.dt
         
-        InterfArray = config.InterfArray
-        
-        VisObj = ct.NB2NIN(simu.VisibilityObject[WLIndex])
-        VisibilityPhase = np.angle(simu.VisibilityEstimated[:,WLIndex,:])
-        
-        whichSNR = config.FT['whichSNR']
             
     else:
-        from .TrueTelemetries import timestamps, TimeID
 
         #WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
         wl = TT.lmbda
         
-        ich = TT.ich
-        R = TT.R
-        
-        dt=TT.dt
-        
-        InterfArray = config.Interferometer(name='chara')
-        
-        VisObj = np.ones([NIN])#ct.NB2NIN(simu.VisibilityObject[WLIndex])
-        VisibilityPhase = np.zeros([NIN])#np.angle(simu.VisibilityEstimated[:,WLIndex,:])
+        # Temporary before getting info in fitsfile
+        VisObj = np.ones([NIN])#ct.NB2NIN(outputs.VisibilityObject[WLIndex])
+        VisibilityPhase = np.zeros([NIN])#np.angle(outputs.VisibilityEstimated[:,WLIndex,:])
 
-        whichSNR = TT.whichSNR
-
+    display_module.wl = wl
+    
+    InterfArray = config.InterfArray
     t = timestamps*ms # time in ms
     timerange = range(NT)
 
     stationaryregim_start = config.starttracking+(config.NT-config.starttracking)*1//3
     if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
     stationaryregim = np.arange(stationaryregim_start,NT)
+    
+    display_module.stationaryregim = stationaryregim
     
     effDIT = min(DIT, config.NT - config.starttracking -1)
     
@@ -1411,7 +1407,6 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     """
     HANDLE THE POSSILIBITY TO SHOW ONLY A PART OF THE TELESCOPES/BASELINES/CLOSURES
     """
-
     
     TelConventionalArrangement = InterfArray.TelNames
     if 'TelescopeArrangement' in infos.keys():
@@ -1424,13 +1419,12 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     for ia in range(NA):
         beam_patches.append(mpatches.Patch(color=telcolors[ia],label=tels[ia]))
         
+    display_module.beam_patches = beam_patches
     # Tel2Beam = np.zeros([NA,NA])
     # for ia in range(NA):
     #     tel = tels[ia] ; tel0 = TelConventionalArrangement[ia]
     #     pos = np.argwhere(np.array(tels)==tel0)[0][0]
     #     Tel2Beam[pos,ia]=1
-        
-        
     
     baselinesNIN = []
     itel=0
@@ -1439,6 +1433,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             baselinesNIN.append(f'{tel1}{tel2}')
         itel+=1
     baselinesNIN = np.array(baselinesNIN) 
+    display_module.baselinesNIN = baselinesNIN
+    
     
     baselines = []
     itel=0
@@ -1447,7 +1443,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         tel1,tel2 = tels[ia],tels[iap]
         baselines.append(f'{tel1}{tel2}')
         
-    baselines = np.array(baselines) 
+    baselines = np.array(baselines)
+    display_module.baselines = baselines
+    
     
     closures = []
     tel1=tels[0] ; itel1=0 
@@ -1461,6 +1459,8 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
                 itel3+=1
             itel2+=1
     closures = np.array(closures)
+    display_module.closures = closures
+    
     
     PlotTel = [False]*NA ; PlotTelOrigin=[False]*NA
     PlotBaselineNIN = [False]*NIN
@@ -1474,7 +1474,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             tel = tels[ia] ; tel2 = TelConventionalArrangement[ia]
             if tel in TelsToDisplay:
                 PlotTel[ia]=True
-            if tel2 in TelsToDisplay:  
+            if tel2 in TelsToDisplay:
                 PlotTelOrigin[ia]=True
                 
         if not 'BaselinesToDisplay' in infos.keys():
@@ -1565,43 +1565,50 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
     PlotBaselineNINIndex = np.argwhere(PlotBaselineNIN).ravel()
     PlotBaselineIndex = np.argwhere(PlotBaseline).ravel()
+    
+    display_module.PlotTel = PlotTel
+    display_module.PlotTelOrigin = PlotTelOrigin
+    display_module.PlotBaselineNIN = PlotBaselineNIN
+    display_module.PlotBaseline = PlotBaseline
+    display_module.PlotClosure = PlotClosure
+    display_module.TelNameLength = TelNameLength
 
     
     """
     COMPUTATION RMS
     """
     
-    if UsedTelemetries == 'simu':
-        # Estimated, before patch (priority 1)
-        GD = simu.GDEstimated ; PD=simu.PDEstimated 
-        
-        # Estimated, after patch
-        GD2 = simu.GDEstimated2 ; PD2 = simu.PDEstimated2   
-        
-        # Residual, after subtraction of reference vectors (priority 2)
-        GDerr = simu.GDResidual ; PDerr = simu.PDResidual
-        
-        # Residual, after Igd and Ipd
-        GDerr2 = simu.GDResidual2 ; PDerr2 = simu.PDResidual2
-        
-        # Reference vectors
-        GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
+    # if UsedTelemetries == 'simu':
+    # Estimated, before patch (priority 1)
+    GD = outputs.GDEstimated ; PD=outputs.PDEstimated 
     
-    else:
-        # Estimated, before patch (priority 1)
-        GD = TT.GDEstimated ; PD=TT.PDEstimated
+    # Estimated, after patch
+    GD2 = outputs.GDEstimated2 ; PD2 = outputs.PDEstimated2   
+    
+    # Residual, after subtraction of reference vectors (priority 2)
+    GDerr = outputs.GDResidual ; PDerr = outputs.PDResidual
+    
+    # Residual, after Igd and Ipd
+    GDerr2 = outputs.GDResidual2 ; PDerr2 = outputs.PDResidual2
+    
+    # Reference vectors
+    GDrefmic = outputs.GDref*R*wl/2/np.pi ; PDrefmic = outputs.PDref*wl/2/np.pi
+    
+    # else:
+    #     # Estimated, before patch (priority 1)
+    #     GD = TT.GDEstimated ; PD=outputs.PDEstimated
         
-        # Estimated, after patch
-        GD2 = np.zeros_like(GD) ; PD2 = np.zeros_like(GD)
+    #     # Estimated, after patch
+    #     GD2 = np.zeros_like(GD) ; PD2 = np.zeros_like(GD)
         
-        # Residual, after Igd and Ipd
-        GDerr2 = TT.GDResidual2/R/wl*2*np.pi ; PDerr2 = TT.PDResidual2/wl*2*np.pi
+    #     # Residual, after Igd and Ipd
+    #     GDerr2 = TT.GDResidual2/R/wl*2*np.pi ; PDerr2 = TT.PDResidual2/wl*2*np.pi
         
-        # Residual, after subtraction of reference vectors (priority 2)
-        GDerr = np.zeros_like(GDerr2) ; PDerr = np.zeros_like(PDerr2)
+    #     # Residual, after subtraction of reference vectors (priority 2)
+    #     GDerr = np.zeros_like(GDerr2) ; PDerr = np.zeros_like(PDerr2)
         
-        # Reference vectors
-        GDrefmic = TT.GDref ; PDrefmic = TT.PDref
+    #     # Reference vectors
+    #     GDrefmic = TT.GDref ; PDrefmic = TT.PDref
     
     GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
     GDmic2 = GD2*R*wl/2/np.pi ; PDmic2 = PD2*wl/2/np.pi
@@ -1609,9 +1616,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     GDerrmic2 = GDerr2*R*wl/2/np.pi ; PDerrmic2 = PDerr2*wl/2/np.pi
     
     # GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
-    # GDrefmic = simu.GDref*R*wl/2/np.pi ; PDrefmic = simu.PDref*wl/2/np.pi
+    # GDrefmic = outputs.GDref*R*wl/2/np.pi ; PDrefmic = outputs.PDref*wl/2/np.pi
     
-    # GDerr = simu.GDResidual2 ; PDerr =simu.PDResidual2
+    # GDerr = outputs.GDResidual2 ; PDerr =outputs.PDResidual2
     # GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
     
     RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
@@ -1620,16 +1627,16 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     RMSgderrmic = np.std(GDerrmic[start_pd_tracking:,:],axis=0)
     RMSpderrmic = np.std(PDerrmic[start_pd_tracking:,:],axis=0)
     
-    RMStrueOPD = np.sqrt(simu.VarOPD)
+    RMStrueOPD = np.sqrt(outputs.VarOPD)
     
     
     """
     SIGNAL TO NOISE RATIOS
     """
     
-    SNR_pd = np.sqrt(simu.SquaredSNRMovingAveragePD)
-    SNR_gd = np.sqrt(simu.SquaredSNRMovingAverageGD)
-    SNRGD = np.sqrt(simu.SquaredSNRMovingAverageGDUnbiased)
+    SNR_pd = np.sqrt(outputs.SquaredSNRMovingAveragePD)
+    SNR_gd = np.sqrt(outputs.SquaredSNRMovingAverageGD)
+    SNRGD = np.sqrt(outputs.SquaredSNRMovingAverageGDUnbiased)
     
     if whichSNR == 'pd':
         SNR = SNR_pd
@@ -1640,19 +1647,22 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     NOW YOU CAN DISPLAY
     """
     
+    if len(savedir) and (not os.path.exists(savedir)):
+        os.makedirs(savedir)
+            
     if displayall or ('disturbances' in args):
         
-        pis_max = 1.1*np.max([np.max(np.abs(simu.PistonDisturbance)),wl/2])
+        pis_max = 1.1*np.max([np.max(np.abs(outputs.PistonDisturbance)),wl/2])
         pis_min = -pis_max
         ylim = [pis_min,pis_max]
         
         fig = plt.figure("Disturbances")
         
-        if not hasattr(simu, 'FreqSampling'):
+        if not hasattr(outputs, 'FreqSampling'):
             ax1 = fig.subplots(nrows=1,ncols=1)
             for ia in range(NA):
                 # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia])
+                ax1.plot(timestamps, outputs.PistonDisturbance[:,ia],color=telcolors[ia])
             
             ax1.set_xlabel('Time (ms)')
             ax1.set_ylabel('Piston [µm]')
@@ -1667,7 +1677,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax1 = fig.subplots(nrows=1,ncols=1)
             for ia in range(NA):
                 # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-                ax1.plot(timestamps, simu.PistonDisturbance[:,ia],color=telcolors[ia])
+                ax1.plot(timestamps, outputs.PistonDisturbance[:,ia],color=telcolors[ia])
             
             ax1.set_xlabel('Time (ms)')
             ax1.set_ylabel('Piston [µm]')
@@ -1676,15 +1686,15 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
             ax1.legend(handles=beam_patches)
             
-            if simu.FreqSampling.size == simu.DisturbancePSD.size:
-                ax2.plot(simu.FreqSampling, simu.DisturbancePSD)
+            if outputs.FreqSampling.size == outputs.DisturbancePSD.size:
+                ax2.plot(outputs.FreqSampling, outputs.DisturbancePSD)
                 ax2.set_title('Power spectral distribution of the last pupil \
             (same shape for all)')
                 ax2.set_xlabel('Frequency [Hz]')             
                 ax2.set_xscale('log')
                 ax2.set_yscale('log')
                 
-                ax3.plot(simu.FreqSampling, simu.DisturbanceFilter)
+                ax3.plot(outputs.FreqSampling, outputs.DisturbanceFilter)
                 ax3.set_title('Filter')
                 ax3.set_xlabel('Frequency [Hz]')             
                 ax3.set_xscale('log')
@@ -1696,7 +1706,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         
     if displayall or ('phot' in args):
-        s=(0,1.1*np.max(simu.PhotometryEstimated))
+        s=(0,1.1*np.max(outputs.PhotometryEstimated))
         linestyles=[]
         linestyles.append(mlines.Line2D([], [], color='black',
                                         linestyle='solid',label='Estimated'))    
@@ -1710,9 +1720,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         plt.suptitle('Photometries in the spectral channel containing {:.2f}µm'.format(wl))
         
         for ia in range(NA):
-            plt.plot(t[timerange], np.sum(simu.PhotometryDisturbance[:,OW*WLIndex:OW*(WLIndex+1),ia],axis=1),
+            plt.plot(t[timerange], np.sum(outputs.PhotometryDisturbance[:,OW*WLIndex:OW*(WLIndex+1),ia],axis=1),
                      color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
-            plt.plot(t[timerange], simu.PhotometryEstimated[:,WLIndex,ia],
+            plt.plot(t[timerange], outputs.PhotometryEstimated[:,WLIndex,ia],
                      color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
             
         plt.vlines(config.starttracking*dt*ms,s[0],s[1],
@@ -1741,7 +1751,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         # linestyles.append(mlines.Line2D([], [], color='black',
         #                                 linestyle='dotted',label='Command'))
         
-        ax2ymax = np.max([np.max(np.abs(simu.PistonTrue)),wl/2])
+        ax2ymax = np.max([np.max(np.abs(outputs.PistonTrue)),wl/2])
         ax2ylim = [-ax2ymax,ax2ymax]
         fig = plt.figure("Pistons")
         plt.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
@@ -1751,20 +1761,20 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         if config.TELref:
             iTELref = config.TELref - 1
-            PistonRef=simu.PistonTrue[:,iTELref]
-            PistonDistRef = simu.PistonDisturbance[:,iTELref]
+            PistonRef=outputs.PistonTrue[:,iTELref]
+            PistonDistRef = outputs.PistonDisturbance[:,iTELref]
         else:
-            PistonRef=0#np.mean(simu.PistonTrue, axis=1)
+            PistonRef=0#np.mean(outputs.PistonTrue, axis=1)
             PistonDistRef = 0
         
         for ia in range(NA):
             
-            ax1.plot(timestamps, simu.PistonDisturbance[:,ia]-PistonDistRef,
+            ax1.plot(timestamps, outputs.PistonDisturbance[:,ia]-PistonDistRef,
                       color=telcolors[ia],linestyle='dashed')
-            ax2.plot(timestamps, simu.PistonTrue[:,ia]-PistonRef,
+            ax2.plot(timestamps, outputs.PistonTrue[:,ia]-PistonRef,
                      color=telcolors[ia],linestyle='solid')
             
-            axText.text(0.3,.9-ia*.05,f"$\sigma_{{{ia+1}}}={int(np.sqrt(simu.VarPiston[ia])*1e3)}$nm")
+            axText.text(0.3,.9-ia*.05,f"$\sigma_{{{ia+1}}}={int(np.sqrt(outputs.VarPiston[ia])*1e3)}$nm")
         
         ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
                    color='k', linestyle=':')
@@ -1809,22 +1819,22 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         fig = plt.figure("Piston details")
         fig.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
         axes = fig.subplots(nrows=NA,ncols=1, sharex=True)
-        ax2ymax = np.max(np.abs(simu.PistonTrue))
+        ax2ymax = np.max(np.abs(outputs.PistonTrue))
         ax2ylim = [-ax2ymax,ax2ymax]
         for ia in range(NA):
             ax = axes[ia]
-            ax.plot(timestamps, simu.PistonDisturbance[:,ia],
+            ax.plot(timestamps, outputs.PistonDisturbance[:,ia],
                      color=colors[0])
-            ax.plot(timestamps, simu.CommandODL[:-1,ia],
+            ax.plot(timestamps, outputs.CommandODL[:-1,ia],
                      color=colors[1])
-            ax.plot(timestamps, simu.PistonPDCommand[:-1,ia],
+            ax.plot(timestamps, outputs.PistonPDCommand[:-1,ia],
                      color=colors[2])
-            ax.plot(timestamps, simu.PistonGDCommand[:-1,ia],
+            ax.plot(timestamps, outputs.PistonGDCommand[:-1,ia],
                      color=colors[3])
-            ax.plot(timestamps, simu.SearchCommand[:-1,ia],
+            ax.plot(timestamps, outputs.SearchCommand[:-1,ia],
                      color=colors[4])
             # ax2 = ax.twinx()
-            # ax2.plot(timestamps, simu.PistonTrue[:,ia],
+            # ax2.plot(timestamps, outputs.PistonTrue[:,ia],
             #          color='blue',linestyle='solid')
             ax.set_ylim(ylim)
             # ax2.set_ylim(ax2ylim)
@@ -1839,499 +1849,551 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         plt.legend(handles=linestyles)
         if display:
             plt.show()
-        config.newfig+=1    
+        config.newfig+=1
 
-        
+
 
     if displayall or ('perftable' in args) :
-        plt.rcParams.update(rcParamsForBaselines)
         generaltitle = "GD and PD estimated"
         typeobs = "GDPDest"
+        filename= savedir+f"Simulation{TimeID}_{typeobs}"
         
         GDobs = GDmic
         PDobs = PDmic
         
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
-
-        linestyles=[mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking')]
-        if 'ThresholdGD' in config.FT.keys():
-            linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Threshold GD'))
         
-        for iFig in range(NumberOfBaseFigures):
-            NINtodisplay=NINdisp
-            if iFig == NumberOfBaseFigures-1:
-                if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
-                    NINtodisplay = NINmes%NINdisp
-                    
-            iFirstBase = NINdisp*iFig   # Index of first baseline to display
-            iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
-            
-            len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
-            basecolors = colors[:len1]+colors[:len2]
-            basecolors = np.array(basecolors)
-            
-            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
-            title=f'{generaltitle}: {rangeBases}'
-            plt.close(title)
-            fig=plt.figure(title, clear=True)
-            fig.suptitle(title)
-            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-            ax1.set_title(f"From {baselines[iFirstBase]} \
-to {baselines[iFirstBase+len1-1]}")
-            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
-to {baselines[iLastBase]}")
-            
-            FirstSet = range(iFirstBase,iFirstBase+len1)
-            SecondSet = range(iFirstBase+len1,iLastBase+1)
-            iColor=0
-            for iBase in FirstSet:   # First serie
-                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-                ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            for iBase in SecondSet:   # Second serie
-                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-                ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            
-            # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-            #             color='k', linestyle=':')
-            # ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
-            #             color='k', linestyle=':')
-            # ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-            #             color='k', linestyle=':')
-            # ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
-            #             color='k', linestyle=':')
-            
-            ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
-            # ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
-            # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
-            # ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
-            # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-            ax4.get_shared_x_axes().join(ax4,ax5)
-            ax9.get_shared_x_axes().join(ax9,ax10)
-            
-            ax1.get_shared_y_axes().join(ax1,ax6)
-            ax2.get_shared_y_axes().join(ax2,ax7)
-            ax3.get_shared_y_axes().join(ax3,ax8)
-            ax4.get_shared_y_axes().join(ax4,ax9)
-            ax5.get_shared_y_axes().join(ax5,ax10)
-            
-            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic)]),ymin=0)
-            
-            ax4.tick_params(labelbottom=False)
-            ax9.tick_params(labelbottom=False)
-            
-            ax1.set_ylabel('SNR')
-            ax2.set_ylabel('Group-Delays [µm]')
-            ax3.set_ylabel('Phase-Delays [µm]')
-            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            
-            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-            
-            ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
-            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-    
-            ax7.legend(handles=linestyles, loc='upper right')
-            if display:
-                fig.show()
-    
-            if len(savedir):
-                if verbose:
-                    print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
-
-        plt.rcParams.update(plt.rcParamsDefault)
-
+        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                 generaltitle,display=display,filename=filename,ext='pdf',
+                                 infos=infos)
+        
     if displayall or ('perftable2' in args) :
-        plt.rcParams.update(rcParamsForBaselines)
-        generaltitle = "GD and PD after patch"
+        generaltitle = "GD and PD estimated, after patch"
         typeobs = "GDPDest2"
+        filename= savedir+f"Simulation{TimeID}_{typeobs}"
         
         GDobs = GDmic2
         PDobs = PDmic2
         
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
-
-        linestyles=[mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking')]
-        if 'ThresholdGD' in config.FT.keys():
-            linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Threshold GD'))
         
-        for iFig in range(NumberOfBaseFigures):
-            NINtodisplay=NINdisp
-            if iFig == NumberOfBaseFigures-1:
-                if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
-                    NINtodisplay = NINmes%NINdisp
-                    
-            iFirstBase = NINdisp*iFig   # Index of first baseline to display
-            iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
-            
-            len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
-            basecolors = colors[:len1]+colors[:len2]
-            basecolors = np.array(basecolors)
-            
-            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
-            title=f'{generaltitle}: {rangeBases}'
-            plt.close(title)
-            fig=plt.figure(title, clear=True)
-            fig.suptitle(title)
-            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-            ax1.set_title(f"From {baselines[iFirstBase]} \
-to {baselines[iFirstBase+len1-1]}")
-            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
-to {baselines[iLastBase]}")
-            
-            FirstSet = range(iFirstBase,iFirstBase+len1)
-            SecondSet = range(iFirstBase+len1,iLastBase+1)
-            iColor=0
-            for iBase in FirstSet:   # First serie
-                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-                ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            for iBase in SecondSet:   # Second serie
-                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-                ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            
-            # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-            #             color='k', linestyle=':')
-            # ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
-            #             color='k', linestyle=':')
-            # ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-            #             color='k', linestyle=':')
-            # ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
-            #             color='k', linestyle=':')
-            
-            ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
-            # ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
-            # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
-            # ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
-            # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-            ax4.get_shared_x_axes().join(ax4,ax5)
-            ax9.get_shared_x_axes().join(ax9,ax10)
-            
-            ax1.get_shared_y_axes().join(ax1,ax6)
-            ax2.get_shared_y_axes().join(ax2,ax7)
-            ax3.get_shared_y_axes().join(ax3,ax8)
-            ax4.get_shared_y_axes().join(ax4,ax9)
-            ax5.get_shared_y_axes().join(ax5,ax10)
-            
-            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic)]),ymin=0)
-            
-            ax4.tick_params(labelbottom=False)
-            ax9.tick_params(labelbottom=False)
-            
-            ax1.set_ylabel('SNR')
-            ax2.set_ylabel('Group-Delays [µm]')
-            ax3.set_ylabel('Phase-Delays [µm]')
-            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            
-            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-            
-            ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
-            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-    
-            ax7.legend(handles=linestyles, loc='upper right')
-            if display:
-                fig.show()
-    
-            if len(savedir):
-                if verbose:
-                    print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
-
-        plt.rcParams.update(plt.rcParamsDefault)
-
-
+        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                 generaltitle,display=display,filename=filename,ext='pdf',
+                                 infos=infos)
+        
+        
     if displayall or ('perftableres' in args) :
-        plt.rcParams.update(rcParamsForBaselines)
         generaltitle = "GD and PD residuals"
         typeobs = "GDPDres"
+        filename= savedir+f"Simulation{TimeID}_{typeobs}"
         
         GDobs = GDerrmic
         PDobs = PDerrmic
         
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
-
-        linestyles=[mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking')]
-        if 'ThresholdGD' in config.FT.keys():
-            linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Threshold GD'))
         
-        for iFig in range(NumberOfBaseFigures):
-            NINtodisplay=NINdisp
-            if iFig == NumberOfBaseFigures-1:
-                if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
-                    NINtodisplay = NINmes%NINdisp
-                    
-            iFirstBase = NINdisp*iFig   # Index of first baseline to display
-            iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
-            
-            len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
-            basecolors = colors[:len1]+colors[:len2]
-            basecolors = np.array(basecolors)
-            
-            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
-            title=f'{generaltitle}: {rangeBases}'
-            plt.close(title)
-            fig=plt.figure(title, clear=True)
-            fig.suptitle(title)
-            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-            ax1.set_title(f"From {baselines[iFirstBase]} \
-to {baselines[iFirstBase+len1-1]}")
-            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
-to {baselines[iLastBase]}")
-            
-            FirstSet = range(iFirstBase,iFirstBase+len1)
-            SecondSet = range(iFirstBase+len1,iLastBase+1)
-            iColor=0
-            for iBase in FirstSet:   # First serie
-                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-                ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            for iBase in SecondSet:   # Second serie
-                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-                ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            
-            # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-            #             color='k', linestyle=':')
-            # ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
-            #             color='k', linestyle=':')
-            # ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
-            #             color='k', linestyle=':')
-            # ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
-            #             color='k', linestyle=':')
-            
-            ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
-            # ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
-            # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
-            # ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
-            # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-            ax4.get_shared_x_axes().join(ax4,ax5)
-            ax9.get_shared_x_axes().join(ax9,ax10)
-            
-            ax1.get_shared_y_axes().join(ax1,ax6)
-            ax2.get_shared_y_axes().join(ax2,ax7)
-            ax3.get_shared_y_axes().join(ax3,ax8)
-            ax4.get_shared_y_axes().join(ax4,ax9)
-            ax5.get_shared_y_axes().join(ax5,ax10)
-            
-            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic)]),ymin=0)
-            
-            ax4.tick_params(labelbottom=False)
-            ax9.tick_params(labelbottom=False)
-            
-            ax1.set_ylabel('SNR')
-            ax2.set_ylabel('Group-Delays [µm]')
-            ax3.set_ylabel('Phase-Delays [µm]')
-            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            
-            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-            
-            ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
-            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-    
-            ax7.legend(handles=linestyles, loc='upper right')
-            if display:
-                fig.show()
-    
-            if len(savedir):
-                if verbose:
-                    print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
-
-        plt.rcParams.update(plt.rcParamsDefault)
-
-
-
+        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                 generaltitle,display=display,filename=filename,ext='pdf',
+                                 infos=infos)
+        
     if displayall or ('perftableres2' in args) :
-        plt.rcParams.update(rcParamsForBaselines)
-        generaltitle = "GD and PD residuals after least square"
+        generaltitle = "GD and PD residuals, after least square"
         typeobs = "GDPDres2"
+        filename= savedir+f"Simulation{TimeID}_{typeobs}"
         
         GDobs = GDerrmic2
         PDobs = PDerrmic2
         
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
-
-        linestyles=[mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking')]
-        if 'ThresholdGD' in config.FT.keys():
-            linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle='--', label='Threshold GD'))
         
-        for iFig in range(NumberOfBaseFigures):
-            NINtodisplay=NINdisp
-            if iFig == NumberOfBaseFigures-1:
-                if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
-                    NINtodisplay = NINmes%NINdisp
-                    
-            iFirstBase = NINdisp*iFig   # Index of first baseline to display
-            iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
-            
-            len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
-            basecolors = colors[:len1]+colors[:len2]
-            basecolors = np.array(basecolors)
-            
-            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
-            title=f'{generaltitle}: {rangeBases}'
-            plt.close(title)
-            fig=plt.figure(title, clear=True)
-            fig.suptitle(title)
-            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-            ax1.set_title(f"From {baselines[iFirstBase]} \
-to {baselines[iFirstBase+len1-1]}")
-            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
-to {baselines[iLastBase]}")
-            
-            FirstSet = range(iFirstBase,iFirstBase+len1)
-            SecondSet = range(iFirstBase+len1,iLastBase+1)
-            iColor=0
-            for iBase in FirstSet:   # First serie
-                ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-                ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            for iBase in SecondSet:   # Second serie
-                ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
-                if 'ThresholdGD' in config.FT.keys():
-                    ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-                ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-                ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-                ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-                iColor+=1
-            
-            ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
-            # ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
-            # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
-            # ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
-            # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
-            
-            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-            ax4.get_shared_x_axes().join(ax4,ax5)
-            ax9.get_shared_x_axes().join(ax9,ax10)
-            
-            ax1.get_shared_y_axes().join(ax1,ax6)
-            ax2.get_shared_y_axes().join(ax2,ax7)
-            ax3.get_shared_y_axes().join(ax3,ax8)
-            ax4.get_shared_y_axes().join(ax4,ax9)
-            ax5.get_shared_y_axes().join(ax5,ax10)
-            
-            ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
-            ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
-            ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-            ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
-            ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic)]),ymin=0)
-            
-            ax4.tick_params(labelbottom=False)
-            ax9.tick_params(labelbottom=False)
-            
-            ax1.set_ylabel('SNR')
-            ax2.set_ylabel('Group-Delays [µm]')
-            ax3.set_ylabel('Phase-Delays [µm]')
-            ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-            
-            ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-            
-            ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
-            ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-    
-            ax7.legend(handles=linestyles, loc='upper right')
-            if display:
-                fig.show()
-    
-            if len(savedir):
-                if verbose:
-                    print("Saving perftable figure.")
-                plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                 generaltitle,display=display,filename=filename,ext='pdf',
+                                 infos=infos)
 
-        plt.rcParams.update(plt.rcParamsDefault)
+
+
+#     if displayall or ('perftable' in args) :
+#         plt.rcParams.update(rcParamsForBaselines)
+#         generaltitle = "GD and PD estimated"
+#         typeobs = "GDPDest"
+        
+#         GDobs = GDmic
+#         PDobs = PDmic
+        
+#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
+#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+
+#         # if 'ThresholdGD' in config.FT.keys():
+#         #     linestyles.append(mlines.Line2D([],[], color='black',
+#         #                                 linestyle='--', label='Threshold GD'))
+        
+#         for iFig in range(NumberOfBaseFigures):
+#             NINtodisplay=NINdisp
+#             if iFig == NumberOfBaseFigures-1:
+#                 if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
+#                     NINtodisplay = NINmes%NINdisp
+                    
+#             iFirstBase = NINdisp*iFig   # Index of first baseline to display
+#             iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
+            
+#             len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
+#             basecolors = colors[:len1]+colors[:len2]
+#             basecolors = np.array(basecolors)
+            
+#             rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+#             title=f'{generaltitle}: {rangeBases}'
+#             plt.close(title)
+#             fig=plt.figure(title, clear=True)
+#             fig.suptitle(title)
+#             (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+#             ax1.set_title(f"From {baselines[iFirstBase]} \
+# to {baselines[iFirstBase+len1-1]}")
+#             ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+# to {baselines[iLastBase]}")
+            
+#             FirstSet = range(iFirstBase,iFirstBase+len1)
+#             SecondSet = range(iFirstBase+len1,iLastBase+1)
+#             iColor=0
+#             for iBase in FirstSet:   # First serie
+#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
+#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+#             for iBase in SecondSet:   # Second serie
+#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
+#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+            
+#             ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
+#             # ax4.bar(baselines[FirstSet],outputs.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+#             ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
+#             # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
+#             # ax9.bar(baselines[SecondSet],outputs.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+#             ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
+#             # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+#             ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+#             ax4.get_shared_x_axes().join(ax4,ax5)
+#             ax9.get_shared_x_axes().join(ax9,ax10)
+            
+#             ax1.get_shared_y_axes().join(ax1,ax6)
+#             ax2.get_shared_y_axes().join(ax2,ax7)
+#             ax3.get_shared_y_axes().join(ax3,ax8)
+#             ax4.get_shared_y_axes().join(ax4,ax9)
+#             ax5.get_shared_y_axes().join(ax5,ax10)
+            
+#             ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+#             ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDobs[stationaryregim],ylim_min=[-wl/2,wl/2])
+#             ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+#             ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdobs),[1]]),ymin=0)
+#             ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdobs)]),ymin=0)
+            
+#             ax4.tick_params(labelbottom=False)
+#             ax9.tick_params(labelbottom=False)
+            
+#             ax1.set_ylabel('SNR')
+#             ax2.set_ylabel('Group-Delays [µm]')
+#             ax3.set_ylabel('Phase-Delays [µm]')
+#             ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+#             ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+#             ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+#             ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
+#             ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+    
+#             # ax7.legend(handles=linestyles, loc='upper right')
+#             if display:
+#                 fig.show()
+    
+#             if len(savedir):
+#                 if verbose:
+#                     print("Saving perftable figure.")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+
+#         plt.rcParams.update(plt.rcParamsDefault)
+
+#     if displayall or ('perftable2' in args) :
+#         plt.rcParams.update(rcParamsForBaselines)
+#         generaltitle = "GD and PD after patch"
+#         typeobs = "GDPDest2"
+        
+#         GDobs = GDmic2
+#         PDobs = PDmic2
+        
+#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
+#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+
+#         # linestyles=[mlines.Line2D([],[], color='black',
+#         #                                 linestyle=':', label='Start tracking')]
+#         # if 'ThresholdGD' in config.FT.keys():
+#         #     linestyles.append(mlines.Line2D([],[], color='black',
+#         #                                 linestyle='--', label='Threshold GD'))
+        
+#         for iFig in range(NumberOfBaseFigures):
+#             NINtodisplay=NINdisp
+#             if iFig == NumberOfBaseFigures-1:
+#                 if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
+#                     NINtodisplay = NINmes%NINdisp
+                    
+#             iFirstBase = NINdisp*iFig   # Index of first baseline to display
+#             iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
+            
+#             len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
+#             basecolors = colors[:len1]+colors[:len2]
+#             basecolors = np.array(basecolors)
+            
+#             rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+#             title=f'{generaltitle}: {rangeBases}'
+#             plt.close(title)
+#             fig=plt.figure(title, clear=True)
+#             fig.suptitle(title)
+#             (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+#             ax1.set_title(f"From {baselines[iFirstBase]} \
+# to {baselines[iFirstBase+len1-1]}")
+#             ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+# to {baselines[iLastBase]}")
+            
+#             FirstSet = range(iFirstBase,iFirstBase+len1)
+#             SecondSet = range(iFirstBase+len1,iLastBase+1)
+#             iColor=0
+#             for iBase in FirstSet:   # First serie
+#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
+#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+#             for iBase in SecondSet:   # Second serie
+#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
+#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+            
+#             # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+#             #             color='k', linestyle=':')
+#             # ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+#             #             color='k', linestyle=':')
+#             # ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+#             #             color='k', linestyle=':')
+#             # ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+#             #             color='k', linestyle=':')
+            
+#             ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
+#             # ax4.bar(baselines[FirstSet],outputs.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+#             ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
+#             # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
+#             # ax9.bar(baselines[SecondSet],outputs.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+#             ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
+#             # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+#             ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+#             ax4.get_shared_x_axes().join(ax4,ax5)
+#             ax9.get_shared_x_axes().join(ax9,ax10)
+            
+#             ax1.get_shared_y_axes().join(ax1,ax6)
+#             ax2.get_shared_y_axes().join(ax2,ax7)
+#             ax3.get_shared_y_axes().join(ax3,ax8)
+#             ax4.get_shared_y_axes().join(ax4,ax9)
+#             ax5.get_shared_y_axes().join(ax5,ax10)
+            
+#             ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+#             ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+#             ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+#             ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+#             ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic)]),ymin=0)
+            
+#             ax4.tick_params(labelbottom=False)
+#             ax9.tick_params(labelbottom=False)
+            
+#             ax1.set_ylabel('SNR')
+#             ax2.set_ylabel('Group-Delays [µm]')
+#             ax3.set_ylabel('Phase-Delays [µm]')
+#             ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+#             ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+#             ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+#             ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
+#             ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+    
+#             # ax7.legend(handles=linestyles, loc='upper right')
+#             if display:
+#                 fig.show()
+    
+#             if len(savedir):
+#                 if verbose:
+#                     print("Saving perftable figure.")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+
+#         plt.rcParams.update(plt.rcParamsDefault)
+
+
+#     if displayall or ('perftableres' in args) :
+#         plt.rcParams.update(rcParamsForBaselines)
+#         generaltitle = "GD and PD residuals"
+#         typeobs = "GDPDres"
+        
+#         GDobs = GDerrmic
+#         PDobs = PDerrmic
+        
+#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
+#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+
+#         # linestyles=[mlines.Line2D([],[], color='black',
+#         #                                 linestyle=':', label='Start tracking')]
+#         # if 'ThresholdGD' in config.FT.keys():
+#         #     linestyles.append(mlines.Line2D([],[], color='black',
+#         #                                 linestyle='--', label='Threshold GD'))
+        
+#         for iFig in range(NumberOfBaseFigures):
+#             NINtodisplay=NINdisp
+#             if iFig == NumberOfBaseFigures-1:
+#                 if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
+#                     NINtodisplay = NINmes%NINdisp
+                    
+#             iFirstBase = NINdisp*iFig   # Index of first baseline to display
+#             iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
+            
+#             len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
+#             basecolors = colors[:len1]+colors[:len2]
+#             basecolors = np.array(basecolors)
+            
+#             rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+#             title=f'{generaltitle}: {rangeBases}'
+#             plt.close(title)
+#             fig=plt.figure(title, clear=True)
+#             fig.suptitle(title)
+#             (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+#             ax1.set_title(f"From {baselines[iFirstBase]} \
+# to {baselines[iFirstBase+len1-1]}")
+#             ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+# to {baselines[iLastBase]}")
+            
+#             FirstSet = range(iFirstBase,iFirstBase+len1)
+#             SecondSet = range(iFirstBase+len1,iLastBase+1)
+#             iColor=0
+#             for iBase in FirstSet:   # First serie
+#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
+#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+#             for iBase in SecondSet:   # Second serie
+#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
+#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+            
+#             # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+#             #             color='k', linestyle=':')
+#             # ax3.vlines(config.starttracking*dt,-wl/2,wl/2,
+#             #             color='k', linestyle=':')
+#             # ax7.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
+#             #             color='k', linestyle=':')
+#             # ax8.vlines(config.starttracking*dt,-wl/2,wl/2,
+#             #             color='k', linestyle=':')
+            
+#             ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
+#             # ax4.bar(baselines[FirstSet],outputs.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+#             ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
+#             # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
+#             # ax9.bar(baselines[SecondSet],outputs.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+#             ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
+#             # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+#             ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+#             ax4.get_shared_x_axes().join(ax4,ax5)
+#             ax9.get_shared_x_axes().join(ax9,ax10)
+            
+#             ax1.get_shared_y_axes().join(ax1,ax6)
+#             ax2.get_shared_y_axes().join(ax2,ax7)
+#             ax3.get_shared_y_axes().join(ax3,ax8)
+#             ax4.get_shared_y_axes().join(ax4,ax9)
+#             ax5.get_shared_y_axes().join(ax5,ax10)
+            
+#             ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+#             ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+#             ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+#             ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+#             ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic)]),ymin=0)
+            
+#             ax4.tick_params(labelbottom=False)
+#             ax9.tick_params(labelbottom=False)
+            
+#             ax1.set_ylabel('SNR')
+#             ax2.set_ylabel('Group-Delays [µm]')
+#             ax3.set_ylabel('Phase-Delays [µm]')
+#             ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+#             ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+#             ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+#             ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
+#             ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+    
+#             # ax7.legend(handles=linestyles, loc='upper right')
+#             if display:
+#                 fig.show()
+    
+#             if len(savedir):
+#                 if verbose:
+#                     print("Saving perftable figure.")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+
+#         plt.rcParams.update(plt.rcParamsDefault)
+
+
+
+#     if displayall or ('perftableres2' in args) :
+#         plt.rcParams.update(rcParamsForBaselines)
+#         generaltitle = "GD and PD residuals after least square"
+#         typeobs = "GDPDres2"
+        
+#         GDobs = GDerrmic2
+#         PDobs = PDerrmic2
+        
+#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
+#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+
+#         # linestyles=[mlines.Line2D([],[], color='black',
+#         #                                 linestyle=':', label='Start tracking')]
+#         # if 'ThresholdGD' in config.FT.keys():
+#         #     linestyles.append(mlines.Line2D([],[], color='black',
+#         #                                 linestyle='--', label='Threshold GD'))
+        
+#         for iFig in range(NumberOfBaseFigures):
+#             NINtodisplay=NINdisp
+#             if iFig == NumberOfBaseFigures-1:
+#                 if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
+#                     NINtodisplay = NINmes%NINdisp
+                    
+#             iFirstBase = NINdisp*iFig   # Index of first baseline to display
+#             iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
+            
+#             len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
+#             basecolors = colors[:len1]+colors[:len2]
+#             basecolors = np.array(basecolors)
+            
+#             rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+#             title=f'{generaltitle}: {rangeBases}'
+#             plt.close(title)
+#             fig=plt.figure(title, clear=True)
+#             fig.suptitle(title)
+#             (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+#             ax1.set_title(f"From {baselines[iFirstBase]} \
+# to {baselines[iFirstBase+len1-1]}")
+#             ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+# to {baselines[iLastBase]}")
+            
+#             FirstSet = range(iFirstBase,iFirstBase+len1)
+#             SecondSet = range(iFirstBase+len1,iLastBase+1)
+#             iColor=0
+#             for iBase in FirstSet:   # First serie
+#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
+#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+#             for iBase in SecondSet:   # Second serie
+#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 if 'ThresholdGD' in config.FT.keys():
+#                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
+#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 iColor+=1
+            
+#             ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
+#             # ax4.bar(baselines[FirstSet],outputs.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
+#             ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
+#             # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
+#             # ax9.bar(baselines[SecondSet],outputs.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
+#             ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
+#             # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
+            
+#             ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+#             ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+#             ax4.get_shared_x_axes().join(ax4,ax5)
+#             ax9.get_shared_x_axes().join(ax9,ax10)
+            
+#             ax1.get_shared_y_axes().join(ax1,ax6)
+#             ax2.get_shared_y_axes().join(ax2,ax7)
+#             ax3.get_shared_y_axes().join(ax3,ax8)
+#             ax4.get_shared_y_axes().join(ax4,ax9)
+#             ax5.get_shared_y_axes().join(ax5,ax10)
+            
+#             ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=SNR,ymin=0)
+#             ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDmic[stationaryregim],ylim_min=[-wl/2,wl/2])
+#             ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
+#             ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdmic),[1]]),ymin=0)
+#             ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdmic)]),ymin=0)
+            
+#             ax4.tick_params(labelbottom=False)
+#             ax9.tick_params(labelbottom=False)
+            
+#             ax1.set_ylabel('SNR')
+#             ax2.set_ylabel('Group-Delays [µm]')
+#             ax3.set_ylabel('Phase-Delays [µm]')
+#             ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+#             ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
+            
+#             ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
+            
+#             ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
+#             ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
+    
+#             # ax7.legend(handles=linestyles, loc='upper right')
+#             if display:
+#                 fig.show()
+    
+#             if len(savedir):
+#                 if verbose:
+#                     print("Saving perftable figure.")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+
+#         plt.rcParams.update(plt.rcParamsDefault)
 
 
     if displayall or ('perfarray' in args):
@@ -2343,8 +2405,8 @@ to {baselines[iLastBase]}")
         
         
         #visibilities, _,_,_=ct.VanCittert(WLOfScience,config.Obs,config.Target)
-        #simu.VisibilityAtPerfWL = visibilities
-        visibilities = ct.NB2NIN(simu.VisibilityObject[WLIndex])
+        #outputs.VisibilityAtPerfWL = visibilities
+        visibilities = ct.NB2NIN(outputs.VisibilityObject[WLIndex])
         vismod = np.abs(visibilities) ; visangle = np.angle(visibilities)
         PhotometricBalance = config.FS['PhotometricBalance']
         
@@ -2390,15 +2452,15 @@ to {baselines[iLastBase]}")
             for iap in range(ia+1,NA):
                 ib=ct.posk(ia,iap,NA)
                 x2,y2 = InterfArray.TelCoordinates[iap,:2]
-                ls = (0,(10*simu.LR4[ib],np.max([0,10*(1-simu.LR4[ib])])))
+                ls = (0,(10*outputs.LR4[ib],np.max([0,10*(1-outputs.LR4[ib])])))
                 if PhotometricBalance[ib]>0:
                     im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
                             linewidth=3,
-                            color=cm(int(simu.FringeContrast[ib]*Nnuances)))
+                            color=cm(int(outputs.FringeContrast[ib]*Nnuances)))
                 else:
                     im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
                             linewidth=1,
-                            color=cm(int(simu.FringeContrast[ib]*Nnuances)))
+                            color=cm(int(outputs.FringeContrast[ib]*Nnuances)))
         ax2.set_xlabel("X [m]")
         ax2.set_ylabel("Y [m]")
         ax2.set_xlim([-210,160]) ; ax2.set_ylim([-50,350])
@@ -2458,24 +2520,24 @@ to {baselinesNIN[iLastBase]}")
             SecondSet = range(iFirstBase+len1,iLastBase+1)
             iColor = 0
             for iBase in FirstSet:  # First serie
-                ax1.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iColor])
+                ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iColor])
                 iColor+=1
                 
             for iBase in SecondSet:   # Second serie
-                ax6.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iColor])
+                ax6.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iColor])
                 iColor+=1
                 
-            ax1.vlines(config.starttracking*dt*ms,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+            ax1.vlines(config.starttracking*dt*ms,-3*np.max(np.abs(outputs.OPDTrue)),3*np.max(np.abs(outputs.OPDTrue)),
                        color='k', linestyle=':')
-            ax6.vlines(config.starttracking*dt*ms,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+            ax6.vlines(config.starttracking*dt*ms,-3*np.max(np.abs(outputs.OPDTrue)),3*np.max(np.abs(outputs.OPDTrue)),
                        color='k', linestyle=':')
             
             ax3.bar(baselinesNIN[FirstSet],RMStrueOPD[FirstSet], color=basecolors[:len1])
-            ax5.bar(baselinesNIN[FirstSet],simu.LR4[FirstSet], color=basecolors[:len1])
+            ax5.bar(baselinesNIN[FirstSet],outputs.LR4[FirstSet], color=basecolors[:len1])
             ax5.bar(baselinesNIN[FirstSet],np.abs(VisObj[FirstSet])**2, fill=False, edgecolor='black', linestyle='-',linewidth=1.5)
             
             ax8.bar(baselinesNIN[SecondSet],RMStrueOPD[SecondSet], color=basecolors[len1:])
-            ax10.bar(baselinesNIN[SecondSet],simu.LR4[SecondSet], color=basecolors[len1:])
+            ax10.bar(baselinesNIN[SecondSet],outputs.LR4[SecondSet], color=basecolors[len1:])
             ax10.bar(baselinesNIN[SecondSet],np.abs(VisObj[SecondSet])**2, fill=False, edgecolor='black', linestyle='-', linewidth=1.5)
     
             ax1.get_shared_x_axes().join(ax1,ax6)
@@ -2502,7 +2564,7 @@ to {baselinesNIN[iLastBase]}")
             ax1.set_xlabel('Time [s]') ; ax6.set_xlabel('Time [s]')
             ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
     
-            ct.setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
+            ct.setaxelim(ax1,ydata=outputs.OPDTrue,ylim_min=[-wl/2,wl/2])        
             ct.setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
             ax5.set_ylim(0,1.1) ; ax5.grid(True) ; ax10.grid(True)
     
@@ -2544,7 +2606,7 @@ to {baselinesNIN[iLastBase]}")
             
             k=0
             for iBase in PlotBaselineIndex:   # First serie
-                ax1.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolorstemp[k],label=baselines[iBase])
+                ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolorstemp[k],label=baselines[iBase])
                 # barbasecolors[iBase] = basecolorstemp[k]
                 k+=1                
             
@@ -2555,17 +2617,17 @@ to {baselinesNIN[iLastBase]}")
         else:
             for iBase in range(len1):   # First serie
                 if PlotBaseline[iBase]:
-                    ax1.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+                    ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
     
             for iBase in range(len1,NIN):   # Second serie
                 if PlotBaseline[iBase]:
-                    ax3.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+                    ax3.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
     
             p1=ax5.bar(baselines[:len1],RMStrueOPD[:len1], color=basecolors[:len1])
             p2=ax6.bar(baselines[len1:],RMStrueOPD[len1:], color=basecolors[len1:])
             # ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
             # ax4.set_ylim(ylimGD)
-            ct.setaxelim(ax1, ydata=simu.OPDTrue, ymargin=0.4,ymin=0)
+            ct.setaxelim(ax1, ydata=outputs.OPDTrue, ymargin=0.4,ymin=0)
             
             ax5.set_ylabel('OPD rms\n[µm]') ;
             ax5.bar_label(p1,label_type='edge',fmt='%.2f')
@@ -2573,7 +2635,7 @@ to {baselinesNIN[iLastBase]}")
             ax5.set_anchor('S') ; ax6.set_anchor('S')
             ax5.set_box_aspect(1/15) ; ax6.set_box_aspect(1/15)
             
-        ct.setaxelim(ax1,ydata=[simu.OPDTrue[timerange,iBase] for iBase in PlotBaselineIndex])
+        ct.setaxelim(ax1,ydata=[outputs.OPDTrue[timerange,iBase] for iBase in PlotBaselineIndex])
         ct.setaxelim(ax2,ydata=list(RMStrueOPD)+[wl/2], ymin=0)
         ax1.set_ylabel('True OPD [µm]')
         ax1.set_xlabel("Time [s]")#, labelpad=xlabelpad) ; ax4.set_xlabel("Time (s)", labelpad=xlabelpad)
@@ -2606,14 +2668,14 @@ to {baselinesNIN[iLastBase]}")
         ax6.set_title("Second serie of baselines, from 26 to 56")
         
         for iBase in range(len1):   # First serie
-            ax1.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+            ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
 
         for iBase in range(len1,NIN):   # Second serie
-            ax6.plot(t[timerange],simu.OPDTrue[timerange,iBase],color=basecolors[iBase])
+            ax6.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
         
-        ax1.vlines(config.starttracking*dt,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+        ax1.vlines(config.starttracking*dt,-3*np.max(np.abs(outputs.OPDTrue)),3*np.max(np.abs(outputs.OPDTrue)),
                    color='k', linestyle=':')
-        ax6.vlines(config.starttracking*dt,-3*np.max(np.abs(simu.OPDTrue)),3*np.max(np.abs(simu.OPDTrue)),
+        ax6.vlines(config.starttracking*dt,-3*np.max(np.abs(outputs.OPDTrue)),3*np.max(np.abs(outputs.OPDTrue)),
                    color='k', linestyle=':')
         
         # Histogram of OPD rms (colored bars) and visibilities (black lines)
@@ -2647,7 +2709,7 @@ to {baselinesNIN[iLastBase]}")
         ax1.set_xlabel('Time [ms]') ; ax6.set_xlabel('Time [ms]')
         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
 
-        ct.setaxelim(ax1,ydata=simu.OPDTrue,ylim_min=[-wl/2,wl/2])        
+        ct.setaxelim(ax1,ydata=outputs.OPDTrue,ylim_min=[-wl/2,wl/2])        
         ct.setaxelim(ax3,ydata=RMStrueOPD,ymin=0)
         ax5.set_ylim(0,1.1) ; ax5.grid(True) ; ax10.grid(True)
 
@@ -2667,9 +2729,9 @@ to {baselinesNIN[iLastBase]}")
         OPD
         """
         
-        OPD_max = 1.1*np.max([np.max(np.abs([simu.OPDDisturbance,
-                              simu.OPDTrue,
-                              simu.OPDCommand[:-1],simu.EffectiveOPDMove[:-config.latency]])),wl/2])
+        OPD_max = 1.1*np.max([np.max(np.abs([outputs.OPDDisturbance,
+                              outputs.OPDTrue,
+                              outputs.OPDCommand[:-1],outputs.EffectiveOPDMove[:-config.latency]])),wl/2])
         OPD_min = -OPD_max
         ylim = [OPD_min,OPD_max]
     
@@ -2712,7 +2774,7 @@ to {baselinesNIN[iLastBase]}")
             # Add a unique axe on the first column
             ax1 = fig.add_subplot(gs[:, 0])
             ax2 = ax1.twinx()
-            ax2ymax = 1.1*np.max([np.max(np.abs(simu.OPDTrue[stationaryregim][:,BaselinesIndices])),wl/2])
+            ax2ymax = 1.1*np.max([np.max(np.abs(outputs.OPDTrue[stationaryregim][:,BaselinesIndices])),wl/2])
             ax2ylim = [-ax2ymax,ax2ymax]
             
             ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
@@ -2729,13 +2791,13 @@ to {baselinesNIN[iLastBase]}")
                 if iap<ia:
                     linestyles2.append(mlines.Line2D([],[],color=colors[iap],label=f'Baseline {iap+1}{ia+1}'))
                     ib = ct.posk(iap,ia,NA)
-                    ax1.plot(timestamps, -simu.OPDDisturbance[:,ib],
+                    ax1.plot(timestamps, -outputs.OPDDisturbance[:,ib],
                              color=colors[iap],linestyle="--")
-                    ax1.plot(timestamps, -simu.OPDCommand[:-1,ib],
+                    ax1.plot(timestamps, -outputs.OPDCommand[:-1,ib],
                             color=colors[iap],linestyle=':')   
-                    ax1.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                    ax1.plot(timestamps, -outputs.EffectiveOPDMove[:-config.latency,ib],
                             color=colors[iap],linestyle='-.')
-                    ax1.plot(timestamps, -simu.OPDTrue[:,ib],
+                    ax1.plot(timestamps, -outputs.OPDTrue[:,ib],
                              color=colors[iap],linestyle='solid')
                     
                 elif iap == ia:
@@ -2744,18 +2806,18 @@ to {baselinesNIN[iLastBase]}")
                 else: # ia<iap
                     linestyles2.append(mlines.Line2D([],[],color=colors[iap],label=f'Baseline {ia+1}{iap+1}'))
                     ib = ct.posk(ia,iap,NA)
-                    ax1.plot(timestamps, simu.OPDDisturbance[:,ib],
+                    ax1.plot(timestamps, outputs.OPDDisturbance[:,ib],
                              color=colors[iap],linestyle="--")
-                    ax1.plot(timestamps, simu.OPDCommand[:-1,ib],
+                    ax1.plot(timestamps, outputs.OPDCommand[:-1,ib],
                              color=colors[iap],linestyle=':')
-                    ax1.plot(timestamps, simu.EffectiveOPDMove[:-config.latency,ib],
+                    ax1.plot(timestamps, outputs.EffectiveOPDMove[:-config.latency,ib],
                             color=colors[iap],linestyle='-.')
-                    ax1.plot(timestamps, simu.OPDTrue[:,ib],
+                    ax1.plot(timestamps, outputs.OPDTrue[:,ib],
                              color=colors[iap],linestyle='solid')
                 
                 
                 
-                axes[0,1].text(0,0.9-0.2*k,f"$\sigma_{{{ia+1}{iap+1}}}={np.sqrt(simu.VarOPD[ib])*1e3:.0f}$nm RMS")
+                axes[0,1].text(0,0.9-0.2*k,f"$\sigma_{{{ia+1}{iap+1}}}={np.sqrt(outputs.VarOPD[ib])*1e3:.0f}$nm RMS")
                 axes[k,1].axis("off") ; k+=1
                 
             ax1.set_ylim(ylim)
@@ -2796,8 +2858,8 @@ to {baselinesNIN[iLastBase]}")
 
     
     if 'OPDcmd' in args:
-        OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
-                              simu.GDCommand[:-1,:],simu.OPDCommand[:-1,:]]))
+        OPD_max = 1.1*np.max(np.abs([outputs.OPDDisturbance,
+                              outputs.GDCommand[:-1,:],outputs.OPDCommand[:-1,:]]))
         OPD_min = -OPD_max
         ylim = [OPD_min,OPD_max]
     
@@ -2825,38 +2887,38 @@ to {baselinesNIN[iLastBase]}")
             iap,iax=0,0
             for ax,axText,axLegend in axes:
                 ax2 = ax.twinx()
-                ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
+                ax2ymax = 1.1*np.max(np.abs(outputs.GDEstimated*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
                 ax2ylim = [-ax2ymax,ax2ymax]
                 if iap == ia:
                     iap+=1
                 if ia < iap:
                     ib = ct.posk(ia,iap,NA)
-                    ax.plot(timestamps, simu.OPDDisturbance[:,ib],
+                    ax.plot(timestamps, outputs.OPDDisturbance[:,ib],
                             color=colors[0])
-                    ax.plot(timestamps, simu.OPDCommand[:-1,ib],
+                    ax.plot(timestamps, outputs.OPDCommand[:-1,ib],
                             color=colors[1])
-                    ax.plot(timestamps, simu.PDCommand[:-1,ib],
+                    ax.plot(timestamps, outputs.PDCommand[:-1,ib],
                             color=colors[2])
-                    ax.plot(timestamps, simu.GDCommand[:-1,ib],
+                    ax.plot(timestamps, outputs.GDCommand[:-1,ib],
                             color=colors[3])
-                    ax.plot(timestamps, simu.OPDSearchCommand[:-1,ib],
+                    ax.plot(timestamps, outputs.OPDSearchCommand[:-1,ib],
                             color=colors[4])
-                    ax.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                    ax.plot(timestamps, -outputs.EffectiveOPDMove[:-config.latency,ib],
                             color=colors[5])
 
                 else:
                     ib = ct.posk(iap,ia,NA)
-                    ax2.plot(timestamps, -simu.OPDDisturbance[:,ib],
+                    ax2.plot(timestamps, -outputs.OPDDisturbance[:,ib],
                             color=colors[0])
-                    ax2.plot(timestamps, -simu.OPDCommand[:-1,ib],
+                    ax2.plot(timestamps, -outputs.OPDCommand[:-1,ib],
                             color=colors[1])
-                    ax2.plot(timestamps, -simu.PDCommand[:-1,ib],
+                    ax2.plot(timestamps, -outputs.PDCommand[:-1,ib],
                             color=colors[2])
-                    ax2.plot(timestamps, -simu.GDCommand[:-1,ib],
+                    ax2.plot(timestamps, -outputs.GDCommand[:-1,ib],
                             color=colors[3])
-                    ax2.plot(timestamps, -simu.OPDSearchCommand[:-1,ib],
+                    ax2.plot(timestamps, -outputs.OPDSearchCommand[:-1,ib],
                             color=colors[4])
-                    ax2.plot(timestamps, -simu.EffectiveOPDMove[:-config.latency,ib],
+                    ax2.plot(timestamps, -outputs.EffectiveOPDMove[:-config.latency,ib],
                             color=colors[5])
                 
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
@@ -2869,8 +2931,8 @@ to {baselinesNIN[iLastBase]}")
                 ax2.set_ylabel('OPD [µm]')
                 ax2.set_yticks([-wl,0,wl])
 
-                axText.text(0,0.70,f"PD:{np.std(simu.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
-                axText.text(0,0.30,f"GD:{np.std(simu.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                axText.text(0,0.70,f"PD:{np.std(outputs.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                axText.text(0,0.30,f"GD:{np.std(outputs.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
                 # axText.axis("off")
                 # axLegend.axis("off")
                 wlr = round(wl,2)
@@ -2898,8 +2960,8 @@ to {baselinesNIN[iLastBase]}")
     
     
     if displayall or ('OPDdetails' in args):
-        OPD_max = 1.1*np.max(np.abs([simu.OPDDisturbance,
-                              simu.GDCommand[:-config.latency,:]]))
+        OPD_max = 1.1*np.max(np.abs([outputs.OPDDisturbance,
+                              outputs.GDCommand[:-config.latency,:]]))
         OPD_min = -OPD_max
         ylim = [OPD_min,OPD_max]
         
@@ -2923,28 +2985,28 @@ to {baselinesNIN[iLastBase]}")
             iap,iax=0,0
             for ax,axText,axLegend in axes:
                 ax2 = ax.twinx()
-                ax2ymax = 1.1*np.max(np.abs(simu.GDEstimated[stationaryregim,:]*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
+                ax2ymax = 1.1*np.max(np.abs(outputs.GDEstimated[stationaryregim,:]*config.FS['R']/config.FT['Ncross']*wl/(2*np.pi)))
                 ax2ylim = [-ax2ymax,ax2ymax]
                 if iap == ia:
                     iap+=1
                 if ia < iap:
                     ib = ct.posk(ia,iap,NA)
-                    ax.plot(timestamps, simu.OPDDisturbance[:,ib],
+                    ax.plot(timestamps, outputs.OPDDisturbance[:,ib],
                             color='red')
-                    ax2.plot(timestamps, simu.GDCommand[:-config.latency,ib],
+                    ax2.plot(timestamps, outputs.GDCommand[:-config.latency,ib],
                             color='green',linestyle='dotted')
-                    ax2.plot(timestamps, simu.GDResidual[:,ib]*wl/(2*np.pi),
+                    ax2.plot(timestamps, outputs.GDResidual[:,ib]*wl/(2*np.pi),
                              color='black',linestyle='-.')
-                    ax2.plot(timestamps, simu.PDResidual[:,ib]*wl/(2*np.pi),
+                    ax2.plot(timestamps, outputs.PDResidual[:,ib]*wl/(2*np.pi),
                              color='black',linestyle='-')
                 else:
                     ib = ct.posk(iap,ia,NA)
-                    ax.plot(timestamps, -simu.OPDDisturbance[:,ib],color='red')
-                    ax.plot(timestamps, -simu.GDCommand[:-config.latency,ib],
+                    ax.plot(timestamps, -outputs.OPDDisturbance[:,ib],color='red')
+                    ax.plot(timestamps, -outputs.GDCommand[:-config.latency,ib],
                             color='green',linestyle='dotted')
-                    ax2.plot(timestamps, -simu.GDResidual[:,ib]*wl/(2*np.pi), color='black',
+                    ax2.plot(timestamps, -outputs.GDResidual[:,ib]*wl/(2*np.pi), color='black',
                              linestyle='-.')
-                    ax2.plot(timestamps, -simu.PDResidual[:,ib]*wl/(2*np.pi), color='black',
+                    ax2.plot(timestamps, -outputs.PDResidual[:,ib]*wl/(2*np.pi), color='black',
                              linestyle='-')
                 
                 ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
@@ -2960,8 +3022,8 @@ to {baselinesNIN[iLastBase]}")
                 else:
                     ax2.set_yticks([-wl,0,wl])
 
-                axText.text(0,0.70,f"PD:{np.std(simu.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
-                axText.text(0,0.30,f"GD:{np.std(simu.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                axText.text(0,0.70,f"PD:{np.std(outputs.PDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
+                axText.text(0,0.30,f"GD:{np.std(outputs.GDEstimated[stationaryregim,ib]*wl/(2*np.pi)*1e3):.0f}nm RMS")
                 axText.axis("off")
                 axLegend.axis("off")
                 # wlr = round(wl,2)
@@ -2990,7 +3052,7 @@ to {baselinesNIN[iLastBase]}")
 
     if 'OPDgathered' in args:
 
-        OPD_max = 1.1*np.max(np.abs(simu.OPDTrue))
+        OPD_max = 1.1*np.max(np.abs(outputs.OPDTrue))
         OPD_min = -OPD_max
         s = [OPD_min,OPD_max]
 
@@ -2999,7 +3061,7 @@ to {baselinesNIN[iLastBase]}")
         
         for ib in range(config.NIN):
             
-            ax.plot(timestamps, simu.OPDTrue[:,ib], linestyle='-', label=f'{ich[ib]}: {np.sqrt(simu.VarOPD[ib])*1e3:.0f}nm RMS')
+            ax.plot(timestamps, outputs.OPDTrue[:,ib], linestyle='-', label=f'{ich[ib]}: {np.sqrt(outputs.VarOPD[ib])*1e3:.0f}nm RMS')
             
         ax.vlines(config.starttracking*dt,s[0],s[1],
                color='k', linestyle=':')
@@ -3041,11 +3103,11 @@ to {baselinesNIN[iLastBase]}")
             for iap in range(ia+1,NA):
                 ic = ct.poskfai(0,ia,iap,NA)
                 
-                ax1.plot(timestamps, simu.ClosurePhasePD[:,ic],
+                ax1.plot(timestamps, outputs.ClosurePhasePD[:,ic],
                          color=colors[ic])
-                ax1.plot(timestamps, simu.ClosurePhaseGD[:,ic],
+                ax1.plot(timestamps, outputs.ClosurePhaseGD[:,ic],
                          color=colors[ic],linestyle=':')
-                ax1.hlines(simu.ClosurePhaseObject[WLIndex,ic], 0, timestamps[-1], 
+                ax1.hlines(outputs.ClosurePhaseObject[WLIndex,ic], 0, timestamps[-1], 
                            color=colors[ic], linestyle='--')
                 linestyles1.append(mlines.Line2D([],[], color=colors[ic],
                                                 linestyle='-', label=f'{1}{ia+1}{iap+1}'))
@@ -3056,11 +3118,11 @@ to {baselinesNIN[iLastBase]}")
                 for iapp in range(iap+1,NA):
                     ic = ct.poskfai(ia,iap,iapp,NA)
                     colorindex = int(ic - config.NC//2)
-                    ax2.plot(timestamps, simu.ClosurePhasePD[:,ic],
+                    ax2.plot(timestamps, outputs.ClosurePhasePD[:,ic],
                              color=colors[colorindex])
-                    ax2.plot(timestamps, simu.ClosurePhaseGD[:,ic],
+                    ax2.plot(timestamps, outputs.ClosurePhaseGD[:,ic],
                              color=colors[colorindex],linestyle=':')
-                    ax2.hlines(simu.ClosurePhaseObject[WLIndex,ic], 0, timestamps[-1],
+                    ax2.hlines(outputs.ClosurePhaseObject[WLIndex,ic], 0, timestamps[-1],
                                color=colors[colorindex], linestyle='--')
                     linestyles2.append(mlines.Line2D([],[], color=colors[colorindex],
                                                     linestyle='-', label=f'{ia+1}{iap+1}{iapp+1}'))
@@ -3102,8 +3164,8 @@ to {baselinesNIN[iLastBase]}")
                     iap+=1
                 
                 ib = ct.posk(ia,iap,NA)
-                ax.plot(timestamps, np.abs(simu.VisibilityEstimated[:,WLIndex,ib]), color='k')
-                ax.plot(timestamps, np.abs(simu.VisibilityTrue[:,WLIndex,ib]),color='k',linestyle='--')
+                ax.plot(timestamps, np.abs(outputs.VisibilityEstimated[:,WLIndex,ib]), color='k')
+                ax.plot(timestamps, np.abs(outputs.VisibilityTrue[:,WLIndex,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                 iap += 1
@@ -3133,8 +3195,8 @@ to {baselinesNIN[iLastBase]}")
                     iap+=1
                 
                 ib = ct.posk(ia,iap,NA)
-                ax.plot(timestamps, np.angle(simu.VisibilityEstimated[:,WLIndex,ib]), color='k')
-                ax.plot(timestamps, np.angle(simu.VisibilityTrue[:,WLIndex,ib]),color='k',linestyle='--')
+                ax.plot(timestamps, np.angle(outputs.VisibilityEstimated[:,WLIndex,ib]), color='k')
+                ax.plot(timestamps, np.angle(outputs.VisibilityTrue[:,WLIndex,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                 
@@ -3177,8 +3239,8 @@ to {baselinesNIN[iLastBase]}")
                 ax = plt.subplot(NIN,NMod,ip+1)
                 if ip < NMod:
                     ax.set_title(config.FS['Modulation'][ip])
-                im = plt.imshow(np.transpose(np.dot(np.reshape(simu.MacroImages[:,WLIndex,ip],[NT,1]), \
-                                                    np.ones([1,100]))), vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))    
+                im = plt.imshow(np.transpose(np.dot(np.reshape(outputs.MacroImages[:,WLIndex,ip],[NT,1]), \
+                                                    np.ones([1,100]))), vmin=np.min(outputs.MacroImages), vmax=np.max(outputs.MacroImages))    
                     
                 plt.tick_params(axis='y',left='off')
                 if ip//NMod == ip/NMod:
@@ -3206,11 +3268,11 @@ to {baselinesNIN[iLastBase]}")
             
             # realimage = np.zeros([NT,MW,L])
             # for ia in range(NA):
-            #     realimage[:,posp[ia]] = simu.MacroImages[:,:,ia]
+            #     realimage[:,posp[ia]] = outputs.MacroImages[:,:,ia]
             
-            # realimage[:,:,posi_center//p-(NP-NA)//2:posi_center//p+(NP-NA)//2] = simu.MacroImages[:,:,NA:]
+            # realimage[:,:,posi_center//p-(NP-NA)//2:posi_center//p+(NP-NA)//2] = outputs.MacroImages[:,:,NA:]
             ax = plt.subplot()
-            im = plt.imshow(simu.MacroImages[:,WLIndex,:], vmin=np.min(simu.MacroImages), vmax=np.max(simu.MacroImages))
+            im = plt.imshow(outputs.MacroImages[:,WLIndex,:], vmin=np.min(outputs.MacroImages), vmax=np.max(outputs.MacroImages))
             
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.3, 0.05, 0.6])
@@ -3637,7 +3699,7 @@ to {baselines[iLastBase]}")
         
         ax2.plot(timestamps, config.FT['state'], 
                 color='blue', label='State-machine')
-        ax2.plot(timestamps, simu.IgdRank, 
+        ax2.plot(timestamps, outputs.IgdRank, 
                 color='k', label='Rank')
         
         ax.set_ylim(ylim)
@@ -3666,7 +3728,7 @@ to {baselines[iLastBase]}")
 
 def investigate(*args):
     from . import config
-    from . import simu
+    from . import outputs
     
     from cophasim.tol_colors import tol_cset
     
@@ -3674,10 +3736,10 @@ def investigate(*args):
         fig=plt.figure('detail FS', clear=True)
         ax1,ax2,ax3 = fig.subplots(nrows=3)
         for ia in range(config.NA):
-            ax1.plot(simu.timestamps, simu.last_usaw[:,ia], color=colors[ia], label=f"Tel{ia+1}")
-            ax2.plot(simu.timestamps, simu.it_last[:,ia]*config.dt, color=colors[ia])
-            ax3.plot(simu.timestamps, simu.eps[:,ia], color=colors[ia])
-            ax3.plot(simu.timestamps, np.gradient(simu.SearchCommand[:-2,ia]), color=colors[ia], linestyle='-.')
+            ax1.plot(outputs.timestamps, outputs.last_usaw[:,ia], color=colors[ia], label=f"Tel{ia+1}")
+            ax2.plot(outputs.timestamps, outputs.it_last[:,ia]*config.dt, color=colors[ia])
+            ax3.plot(outputs.timestamps, outputs.eps[:,ia], color=colors[ia])
+            ax3.plot(outputs.timestamps, np.gradient(outputs.SearchCommand[:-2,ia]), color=colors[ia], linestyle='-.')
         ax1.set_ylabel("last_usaw")
         ax2.set_ylabel("it_last")
         ax3.set_ylabel("eps")
@@ -3726,7 +3788,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     None.
 
     """
-    from . import simu
+    from . import outputs
     from . import config
     
     ich = config.FS['ich']
@@ -3788,69 +3850,69 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
         
         
         from cophasim.SCIENTIFIC_INSTRUMENTS import SPICAVIS
-        simu.IntegrationTime, simu.VarSquaredVis, simu.SNR_E, simu.SNR_E_perSC = SPICAVIS(CoherentFluxObject,simu.OPDTrue[InFrame:],SpectraForScience,DIT=DIT)
+        outputs.IntegrationTime, outputs.VarSquaredVis, outputs.SNR_E, outputs.SNR_E_perSC = SPICAVIS(CoherentFluxObject,outputs.OPDTrue[InFrame:],SpectraForScience,DIT=DIT)
         
    
     if MultiWavelength:
-        simu.FringeContrast=np.zeros([MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
+        outputs.FringeContrast=np.zeros([MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
     else:
-        simu.FringeContrast=np.zeros(NIN)       # Fringe Contrast at given wavelengths [0,1]
+        outputs.FringeContrast=np.zeros(NIN)       # Fringe Contrast at given wavelengths [0,1]
 
-    simu.VarOPD=np.zeros(NIN)
-    simu.VarGDRes=np.zeros(NINmes)
-    simu.VarPDRes=np.zeros(NINmes)
-    simu.VarGDEst=np.zeros(NINmes)
-    simu.VarPDEst=np.zeros(NINmes)
-    simu.VarPiston=np.zeros(NA)
-    simu.VarPistonGD=np.zeros(NA)
-    simu.VarPistonPD=np.zeros(NA)
+    outputs.VarOPD=np.zeros(NIN)
+    outputs.VarGDRes=np.zeros(NINmes)
+    outputs.VarPDRes=np.zeros(NINmes)
+    outputs.VarGDEst=np.zeros(NINmes)
+    outputs.VarPDEst=np.zeros(NINmes)
+    outputs.VarPiston=np.zeros(NA)
+    outputs.VarPistonGD=np.zeros(NA)
+    outputs.VarPistonPD=np.zeros(NA)
 
-    simu.VarCPD =np.zeros(NC); simu.VarCGD=np.zeros(NC)
+    outputs.VarCPD =np.zeros(NC); outputs.VarCGD=np.zeros(NC)
     
-    simu.LockedRatio=np.zeros(NIN)          # sig_opd < lambda/p
-    simu.LR2 = np.zeros(NINmes)             # Mode TRACK
-    simu.LR3= np.zeros(NIN)                 # In Central Fringe
-    simu.LR4= np.zeros(NIN)                 # No fringe jump
-    simu.WLockedRatio = np.zeros(NIN)
+    outputs.LockedRatio=np.zeros(NIN)          # sig_opd < lambda/p
+    outputs.LR2 = np.zeros(NINmes)             # Mode TRACK
+    outputs.LR3= np.zeros(NIN)                 # In Central Fringe
+    outputs.LR4= np.zeros(NIN)                 # No fringe jump
+    outputs.WLockedRatio = np.zeros(NIN)
     
     MaxPhaseVarForLocked = (2*np.pi/p)**2
     MaxVarOPDForLocked = (MeanWavelength/p)**2
     
     Ndit = Period//DIT_NumberOfFrames
-    simu.PhaseVar_atWOI = np.zeros([Ndit,NIN])
-    simu.PhaseStableEnough= np.zeros([Ndit,NIN])
-    simu.LR2 = np.mean(simu.TrackedBaselines[InFrame:], axis=0)   # Array [NINmes]
-    simu.InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < MeanWavelength/2
-    simu.LR3 = np.mean(simu.InCentralFringe[InFrame:], axis=0)    # Array [NIN]
+    outputs.PhaseVar_atWOI = np.zeros([Ndit,NIN])
+    outputs.PhaseStableEnough= np.zeros([Ndit,NIN])
+    outputs.LR2 = np.mean(outputs.TrackedBaselines[InFrame:], axis=0)   # Array [NINmes]
+    outputs.InCentralFringe = np.abs(outputs.OPDTrue-outputs.OPDrefObject) < MeanWavelength/2
+    outputs.LR3 = np.mean(outputs.InCentralFringe[InFrame:], axis=0)    # Array [NIN]
     
     for it in range(Ndit):
         OutFrame=InFrame+DIT_NumberOfFrames
-        OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
-        OPDptp = np.ptp(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+        OPDVar = np.var(outputs.OPDTrue[InFrame:OutFrame,:],axis=0)
+        OPDptp = np.ptp(outputs.OPDTrue[InFrame:OutFrame,:],axis=0)
         
-        GDResVar = np.var(simu.GDResidual2[InFrame:OutFrame,:],axis=0)
-        PDResVar = np.var(simu.PDResidual2[InFrame:OutFrame,:],axis=0)
-        GDEstVar = np.var(simu.GDEstimated[InFrame:OutFrame,:],axis=0)
-        PDEstVar = np.var(simu.PDEstimated[InFrame:OutFrame,:],axis=0)
-        PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
-        PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
-        PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
-        simu.PhaseVar_atWOI[it] = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
-        simu.PhaseStableEnough[it] = 1*(OPDVar < MaxVarOPDForLocked)
+        GDResVar = np.var(outputs.GDResidual2[InFrame:OutFrame,:],axis=0)
+        PDResVar = np.var(outputs.PDResidual2[InFrame:OutFrame,:],axis=0)
+        GDEstVar = np.var(outputs.GDEstimated[InFrame:OutFrame,:],axis=0)
+        PDEstVar = np.var(outputs.PDEstimated[InFrame:OutFrame,:],axis=0)
+        PistonVar = np.var(outputs.PistonTrue[InFrame:OutFrame,:],axis=0)
+        PistonVarGD = np.var(outputs.GDPistonResidual[InFrame:OutFrame,:],axis=0)
+        PistonVarPD = np.var(outputs.PDPistonResidual[InFrame:OutFrame,:],axis=0)
+        outputs.PhaseVar_atWOI[it] = np.var(2*np.pi*outputs.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
+        outputs.PhaseStableEnough[it] = 1*(OPDVar < MaxVarOPDForLocked)
         NoFringeJumpDuringPose = 1*(OPDptp < 1.5*MeanWavelength)
         
-        simu.VarOPD += 1/Ndit*OPDVar
-        simu.LR4 += 1/Ndit*NoFringeJumpDuringPose
+        outputs.VarOPD += 1/Ndit*OPDVar
+        outputs.LR4 += 1/Ndit*NoFringeJumpDuringPose
         
-        simu.VarPDRes += 1/Ndit*PDResVar
-        simu.VarGDRes += 1/Ndit*GDResVar
-        simu.VarPDEst += 1/Ndit*PDEstVar
-        simu.VarGDEst += 1/Ndit*GDEstVar
-        simu.VarPiston += 1/Ndit*PistonVar
-        simu.VarPistonGD += 1/Ndit*PistonVarGD
-        simu.VarPistonPD += 1/Ndit*PistonVarPD
-        simu.VarCPD += 1/Ndit*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
-        simu.VarCGD += 1/Ndit*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
+        outputs.VarPDRes += 1/Ndit*PDResVar
+        outputs.VarGDRes += 1/Ndit*GDResVar
+        outputs.VarPDEst += 1/Ndit*PDEstVar
+        outputs.VarGDEst += 1/Ndit*GDEstVar
+        outputs.VarPiston += 1/Ndit*PistonVar
+        outputs.VarPistonGD += 1/Ndit*PistonVarGD
+        outputs.VarPistonPD += 1/Ndit*PistonVarPD
+        outputs.VarCPD += 1/Ndit*np.var(outputs.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
+        outputs.VarCGD += 1/Ndit*np.var(outputs.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
         
         
         # Fringe contrast
@@ -3858,32 +3920,32 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
             for iw in range(MW):
                 wl = SpectraForScience[iw]
                 for ib in range(NIN):
-                    CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
-                    Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
-                    simu.FringeContrast[iw,ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
+                    CoherenceEnvelopModulation = np.sinc(outputs.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
+                    Phasors = np.exp(1j*2*np.pi*outputs.OPDTrue[InFrame:OutFrame,ib]/wl)
+                    outputs.FringeContrast[iw,ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
         else:
             for ib in range(NIN):
-                CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc)
-                Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/MeanWavelength)
-                simu.FringeContrast[ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
+                CoherenceEnvelopModulation = np.sinc(outputs.OPDTrue[InFrame:OutFrame,ib]/Lc)
+                Phasors = np.exp(1j*2*np.pi*outputs.OPDTrue[InFrame:OutFrame,ib]/MeanWavelength)
+                outputs.FringeContrast[ib] += 1/Ndit*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
 
         InFrame += DIT_NumberOfFrames
         
-    simu.LockedRatio = np.mean(simu.PhaseStableEnough,axis=0)
-    simu.WLockedRatio = np.mean(simu.PhaseStableEnough*simu.FringeContrast, axis=0)
+    outputs.LockedRatio = np.mean(outputs.PhaseStableEnough,axis=0)
+    outputs.WLockedRatio = np.mean(outputs.PhaseStableEnough*outputs.FringeContrast, axis=0)
     
-    simu.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-simu.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
+    outputs.autreWlockedRatio = np.mean((MaxPhaseVarForLocked-outputs.PhaseVar_atWOI)/MaxPhaseVarForLocked, axis=0)
 
-    simu.WLR2 = np.mean(simu.TrackedBaselines * simu.SquaredSNRMovingAveragePD, axis=0)
+    outputs.WLR2 = np.mean(outputs.TrackedBaselines * outputs.SquaredSNRMovingAveragePD, axis=0)
     
     # if 'ThresholdGD' in config.FT.keys():
-    #     simu.WLR3 = np.mean(simu.TrackedBaselines * simu.SquaredSNRMovingAveragePD, axis=0)
+    #     outputs.WLR3 = np.mean(outputs.TrackedBaselines * outputs.SquaredSNRMovingAveragePD, axis=0)
 
 
     if not display:
         return
 
-    observable = simu.VarOPD
+    observable = outputs.VarOPD
     xrange = np.arange(NIN)
     
     plt.figure(f'Variance OPD @{round(config.PDspectra,2)}µm')    
@@ -3897,7 +3959,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     plt.show()
     config.newfig += 1
     
-    observable = simu.VarPDEst*(config.PDspectra/2/np.pi)
+    observable = outputs.VarPDEst*(config.PDspectra/2/np.pi)
     
     plt.figure(f'Variance Estimated PD @{round(config.PDspectra,2)}µm')    
     plt.ylim([np.min(observable),np.max(observable)])
@@ -3911,7 +3973,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     config.newfig += 1
     
     
-    observable = simu.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
+    observable = outputs.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
     
     plt.figure(f'Variance Estimated GD @{round(config.PDspectra,2)}µm')    
     plt.ylim([np.min(observable),np.max(observable)])
@@ -3925,7 +3987,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     config.newfig += 1
     
     
-    observable = simu.VarCPD
+    observable = outputs.VarCPD
     xrange = np.arange(config.NC)
     
     plt.figure('Variance CPD')    
@@ -3940,7 +4002,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     config.newfig += 1
 
 
-    observable = simu.VarCGD
+    observable = outputs.VarCGD
     
     plt.figure('Variance CGD')    
     plt.ylim([np.min(observable),np.max(observable)])
@@ -3955,9 +4017,9 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
 
     
     plt.figure('Integrated Visibility')    
-    plt.ylim([0.9*np.min(simu.FringeContrast),1.1])
+    plt.ylim([0.9*np.min(outputs.FringeContrast),1.1])
     for ib in range(NIN):
-        plt.scatter(SpectraForScience,simu.FringeContrast[:,ib], label=f'{ich[ib]}')
+        plt.scatter(SpectraForScience,outputs.FringeContrast[:,ib], label=f'{ich[ib]}')
         
     plt.legend(), plt.grid()
     plt.show()
@@ -4005,7 +4067,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
     None.
 
     """
-    from . import simu
+    from . import outputs
     from . import config
     
     ich = config.FS['ich']
@@ -4088,7 +4150,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
     else:
         NewIntegrationTimes = IntegrationTimes
         
-    simu.DITsForPerformance = NewIntegrationTimes
+    outputs.DITsForPerformance = NewIntegrationTimes
     Ndit = len(NewIntegrationTimes)
     
     if OnlyCheckDIT:
@@ -4110,48 +4172,48 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
     from cophasim.SCIENTIFIC_INSTRUMENTS import SPICAVIS
    
 
-    simu.VarSquaredVis=np.zeros([Ndit,MW,NIN])*np.nan
-    simu.SNR_E=np.zeros([Ndit,NIN])*np.nan
-    simu.SNR_E_perSC=np.zeros([Ndit,MW,NIN])*np.nan
-    simu.VarOPD=np.zeros([Ndit,NIN])
-    simu.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
-    simu.LR2 = np.zeros([Ndit,NINmes])          # Mode TRACK
-    simu.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
-    simu.LR4 = np.zeros([Ndit,NIN])          # No Fringe Jump
-    simu.FringeContrast=np.zeros([Ndit,MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
+    outputs.VarSquaredVis=np.zeros([Ndit,MW,NIN])*np.nan
+    outputs.SNR_E=np.zeros([Ndit,NIN])*np.nan
+    outputs.SNR_E_perSC=np.zeros([Ndit,MW,NIN])*np.nan
+    outputs.VarOPD=np.zeros([Ndit,NIN])
+    outputs.LockedRatio=np.zeros([Ndit,NIN])    # sig_opd < lambda/p
+    outputs.LR2 = np.zeros([Ndit,NINmes])          # Mode TRACK
+    outputs.LR3= np.zeros([Ndit,NIN])           # In Central Fringe
+    outputs.LR4 = np.zeros([Ndit,NIN])          # No Fringe Jump
+    outputs.FringeContrast=np.zeros([Ndit,MW,NIN])  # Fringe Contrast at given wavelengths [0,1]
     
-    simu.VarPiston=np.zeros([Ndit,NA])
-    simu.VarPistonGD=np.zeros([Ndit,NA])
-    simu.VarPistonPD=np.zeros([Ndit,NA])
+    outputs.VarPiston=np.zeros([Ndit,NA])
+    outputs.VarPistonGD=np.zeros([Ndit,NA])
+    outputs.VarPistonPD=np.zeros([Ndit,NA])
     
     if criterias!='light': # additional informations
 
-        simu.EnergyPicFrange=np.zeros([Ndit,MW,NIN])*np.nan
-        simu.PhotonNoise=np.zeros([Ndit,MW,NIN])*np.nan
-        simu.ReadNoise=np.zeros([Ndit,NIN])*np.nan
-        simu.CoupledTerms=np.zeros([Ndit,MW,NIN])*np.nan
-        simu.VarCf=np.zeros([Ndit,MW,NIN])*np.nan
+        outputs.EnergyPicFrange=np.zeros([Ndit,MW,NIN])*np.nan
+        outputs.PhotonNoise=np.zeros([Ndit,MW,NIN])*np.nan
+        outputs.ReadNoise=np.zeros([Ndit,NIN])*np.nan
+        outputs.CoupledTerms=np.zeros([Ndit,MW,NIN])*np.nan
+        outputs.VarCf=np.zeros([Ndit,MW,NIN])*np.nan
     
-        simu.VarGDRes=np.zeros([Ndit,NINmes])
-        simu.VarPDRes=np.zeros([Ndit,NINmes])
+        outputs.VarGDRes=np.zeros([Ndit,NINmes])
+        outputs.VarPDRes=np.zeros([Ndit,NINmes])
     
-        simu.VarPDEst=np.zeros([Ndit,NINmes])
-        simu.VarGDEst=np.zeros([Ndit,NINmes])
+        outputs.VarPDEst=np.zeros([Ndit,NINmes])
+        outputs.VarGDEst=np.zeros([Ndit,NINmes])
         
-        simu.WLockedRatio = np.zeros([Ndit,NIN])
-        simu.WLR2 = np.zeros([Ndit,NINmes])
+        outputs.WLockedRatio = np.zeros([Ndit,NIN])
+        outputs.WLR2 = np.zeros([Ndit,NINmes])
     
-        simu.VarCPD =np.zeros([Ndit,NC])
-        simu.VarCGD = np.zeros([Ndit,NC])
+        outputs.VarCPD =np.zeros([Ndit,NC])
+        outputs.VarCGD = np.zeros([Ndit,NC])
     
-    simu.IntegrationTime=NewIntegrationTimes
+    outputs.IntegrationTime=NewIntegrationTimes
 
     MaxPhaseVarForLocked = (2*np.pi/p)**2
     MaxVarOPDForLocked = (MeanWavelength/p)**2
     
-    InCentralFringe = np.abs(simu.OPDTrue-simu.OPDrefObject) < MeanWavelength/2
+    InCentralFringe = np.abs(outputs.OPDTrue-outputs.OPDrefObject) < MeanWavelength/2
     if 'ThresholdGD' in config.FT.keys():
-        TrackedBaselines = (simu.SquaredSNRMovingAverage >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
+        TrackedBaselines = (outputs.SquaredSNRMovingAverage >= config.FT['ThresholdGD']**2) #Array [NT,NIN]
         
     FirstFrame = InFrame
     for idit in range(Ndit):
@@ -4160,14 +4222,14 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         
         # if config.NA ==6:
         #     # Calculation of SNR
-        #     _, simu.VarSquaredVis[idit], simu.SNR_E[idit], simu.SNR_E_perSC[idit] = SPICAVIS(CoherentFluxObject,simu.OPDTrue[FirstFrame:], SpectraForScience,DIT=DIT)
+        #     _, outputs.VarSquaredVis[idit], outputs.SNR_E[idit], outputs.SNR_E_perSC[idit] = SPICAVIS(CoherentFluxObject,outputs.OPDTrue[FirstFrame:], SpectraForScience,DIT=DIT)
         
         # if criterias!='light':
-        #     simu.EnergyPicFrange[idit] = simu.SNRnum
-        #     simu.PhotonNoise[idit]= simu.PhNoise
-        #     simu.ReadNoise[idit]=simu.RNoise
-        #     simu.CoupledTerms[idit]=simu.CTerms
-        #     simu.VarCf[idit]=simu.var_cf
+        #     outputs.EnergyPicFrange[idit] = outputs.SNRnum
+        #     outputs.PhotonNoise[idit]= outputs.PhNoise
+        #     outputs.ReadNoise[idit]=outputs.RNoise
+        #     outputs.CoupledTerms[idit]=outputs.CTerms
+        #     outputs.VarCf[idit]=outputs.var_cf
         
         if onlySNR:
             continue
@@ -4179,61 +4241,61 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         PhaseStableEnough= np.zeros([NIN])
         
         if 'ThresholdGD' in config.FT.keys():
-            simu.LR2[idit] = np.mean(TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
+            outputs.LR2[idit] = np.mean(TrackedBaselines[InFrame:], axis=0)   # Array [NIN]
         
-        simu.LR3[idit] = np.mean(InCentralFringe[InFrame:], axis=0)    # Array [NIN]
+        outputs.LR3[idit] = np.mean(InCentralFringe[InFrame:], axis=0)    # Array [NIN]
         
         InFrame = FirstFrame
         for iframe in range(Nframes):
             OutFrame=InFrame+DIT_NumberOfFrames
             
-            OPDVar = np.var(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
-            OPDptp = np.ptp(simu.OPDTrue[InFrame:OutFrame,:],axis=0)
+            OPDVar = np.var(outputs.OPDTrue[InFrame:OutFrame,:],axis=0)
+            OPDptp = np.ptp(outputs.OPDTrue[InFrame:OutFrame,:],axis=0)
             
-            PhaseVar_atWOI = np.var(2*np.pi*simu.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
+            PhaseVar_atWOI = np.var(2*np.pi*outputs.OPDTrue[InFrame:OutFrame,:]/MeanWavelength,axis=0)
             PhaseStableEnough = 1*(OPDVar < MaxVarOPDForLocked)
             NoFringeJumpDuringPose = 1*(OPDptp < 1.5*MeanWavelength)
             
-            simu.LockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough,axis=0)
-            simu.LR4[idit] += 1/Nframes*np.mean(NoFringeJumpDuringPose,axis=0)
-            simu.VarOPD[idit] += 1/Nframes*OPDVar
+            outputs.LockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough,axis=0)
+            outputs.LR4[idit] += 1/Nframes*np.mean(NoFringeJumpDuringPose,axis=0)
+            outputs.VarOPD[idit] += 1/Nframes*OPDVar
 
 
             # Telescopes
-            PistonVar = np.var(simu.PistonTrue[InFrame:OutFrame,:],axis=0)
-            PistonVarGD = np.var(simu.GDPistonResidual[InFrame:OutFrame,:],axis=0)
-            PistonVarPD = np.var(simu.PDPistonResidual[InFrame:OutFrame,:],axis=0)
-            simu.VarPiston[idit] += 1/Nframes*PistonVar
-            simu.VarPistonGD[idit] += 1/Nframes*PistonVarGD
-            simu.VarPistonPD[idit] += 1/Nframes*PistonVarPD
+            PistonVar = np.var(outputs.PistonTrue[InFrame:OutFrame,:],axis=0)
+            PistonVarGD = np.var(outputs.GDPistonResidual[InFrame:OutFrame,:],axis=0)
+            PistonVarPD = np.var(outputs.PDPistonResidual[InFrame:OutFrame,:],axis=0)
+            outputs.VarPiston[idit] += 1/Nframes*PistonVar
+            outputs.VarPistonGD[idit] += 1/Nframes*PistonVarGD
+            outputs.VarPistonPD[idit] += 1/Nframes*PistonVarPD
             
             # Fringe contrast
             for iw in range(MW):
                 wl = SpectraForScience[iw]
                 for ib in range(NIN):
-                    CoherenceEnvelopModulation = np.sinc(simu.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
-                    Phasors = np.exp(1j*2*np.pi*simu.OPDTrue[InFrame:OutFrame,ib]/wl)
-                    simu.FringeContrast[idit,iw,ib] += 1/Nframes*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
+                    CoherenceEnvelopModulation = np.sinc(outputs.OPDTrue[InFrame:OutFrame,ib]/Lc[iw])
+                    Phasors = np.exp(1j*2*np.pi*outputs.OPDTrue[InFrame:OutFrame,ib]/wl)
+                    outputs.FringeContrast[idit,iw,ib] += 1/Nframes*np.abs(np.mean(Phasors*CoherenceEnvelopModulation,axis=0))
 
 
             if criterias!='light':
-                GDResVar = np.var(simu.GDResidual2[InFrame:OutFrame,:],axis=0)
-                PDResVar = np.var(simu.PDResidual2[InFrame:OutFrame,:],axis=0)
-                simu.VarPDRes[idit] += 1/Nframes*PDResVar
-                simu.VarGDRes[idit] += 1/Nframes*GDResVar
+                GDResVar = np.var(outputs.GDResidual2[InFrame:OutFrame,:],axis=0)
+                PDResVar = np.var(outputs.PDResidual2[InFrame:OutFrame,:],axis=0)
+                outputs.VarPDRes[idit] += 1/Nframes*PDResVar
+                outputs.VarGDRes[idit] += 1/Nframes*GDResVar
 
-                simu.VarPDEst[idit] += 1/Nframes*np.var(simu.PDEstimated2[InFrame:OutFrame,:],axis=0)
-                simu.VarGDEst[idit] += 1/Nframes*np.var(simu.GDEstimated2[InFrame:OutFrame,:],axis=0)
-                simu.VarCPD[idit] += 1/Nframes*np.var(simu.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
-                simu.VarCGD[idit] += 1/Nframes*np.var(simu.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
+                outputs.VarPDEst[idit] += 1/Nframes*np.var(outputs.PDEstimated2[InFrame:OutFrame,:],axis=0)
+                outputs.VarGDEst[idit] += 1/Nframes*np.var(outputs.GDEstimated2[InFrame:OutFrame,:],axis=0)
+                outputs.VarCPD[idit] += 1/Nframes*np.var(outputs.ClosurePhasePD[InFrame:OutFrame,:],axis=0)
+                outputs.VarCGD[idit] += 1/Nframes*np.var(outputs.ClosurePhaseGD[InFrame:OutFrame,:],axis=0)
                 
-                simu.WLockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough*simu.FringeContrast[idit], axis=0)
+                outputs.WLockedRatio[idit] += 1/Nframes*np.mean(PhaseStableEnough*outputs.FringeContrast[idit], axis=0)
     
             InFrame += DIT_NumberOfFrames
             
         # Don't depend on DIT but better for same treatment after.
         if criterias!='light':
-            simu.WLR2[idit] = np.mean(TrackedBaselines * simu.SquaredSNRMovingAverage, axis=0)
+            outputs.WLR2[idit] = np.mean(TrackedBaselines * outputs.SquaredSNRMovingAverage, axis=0)
         
         
     if onlySNR:
@@ -4242,7 +4304,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
     
     if display:
 
-        observable = simu.VarOPD
+        observable = outputs.VarOPD
         xrange = np.arange(NIN)
         
         plt.figure(f'Variance OPD @{round(config.PDspectra,2)}µm')    
@@ -4256,7 +4318,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         plt.show()
         config.newfig += 1
         
-        observable = simu.VarPDEst*(config.PDspectra/2/np.pi)
+        observable = outputs.VarPDEst*(config.PDspectra/2/np.pi)
         
         plt.figure(f'Variance Estimated PD @{round(config.PDspectra,2)}µm')    
         plt.ylim([np.min(observable),np.max(observable)])
@@ -4270,7 +4332,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         config.newfig += 1
         
         
-        observable = simu.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
+        observable = outputs.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
         
         plt.figure(f'Variance Estimated GD @{round(config.PDspectra,2)}µm')    
         plt.ylim([np.min(observable),np.max(observable)])
@@ -4284,7 +4346,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         config.newfig += 1
         
         
-        observable = simu.VarCPD
+        observable = outputs.VarCPD
         xrange = np.arange(config.NC)
         
         plt.figure('Variance CPD')    
@@ -4299,7 +4361,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         config.newfig += 1
     
     
-        observable = simu.VarCGD
+        observable = outputs.VarCGD
         
         plt.figure('Variance CGD')    
         plt.ylim([np.min(observable),np.max(observable)])
@@ -4314,9 +4376,9 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
     
         
         plt.figure('Integrated Visibility')    
-        plt.ylim([0.9*np.min(simu.FringeContrast),1.1])
+        plt.ylim([0.9*np.min(outputs.FringeContrast),1.1])
         for ib in range(NIN):
-            plt.scatter(MeanWavelength,simu.FringeContrast[:,ib], label=f'{ich[ib]}')
+            plt.scatter(MeanWavelength,outputs.FringeContrast[:,ib], label=f'{ich[ib]}')
             
         plt.legend(), plt.grid()
         plt.show()
@@ -4473,7 +4535,7 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0, details='', window='hanning',
     None.
 
     """
-    from . import simu
+    from . import outputs
     from .config import NA, NT, dt
     
     tel1 = OPD[0]-1
@@ -4496,9 +4558,9 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0, details='', window='hanning',
     PresentFrequencies = (FrequencySampling >= 0) & (FrequencySampling < 200)
     FrequencySampling = FrequencySampling[PresentFrequencies]
     
-    Residues = simu.OPDTrue[SampleIndices,ib]
-    Turb = simu.OPDDisturbance[SampleIndices,ib]
-    Command = simu.OPDCommand[SampleIndices,ib]
+    Residues = outputs.OPDTrue[SampleIndices,ib]
+    Turb = outputs.OPDDisturbance[SampleIndices,ib]
+    Command = outputs.OPDCommand[SampleIndices,ib]
     
     if window =='hanning':
         windowsequence = np.hanning(nNT)
@@ -4626,21 +4688,21 @@ def ReadCf(currCfEstimated):
     OUTPUT: 
         
     UPDATE:
-        - simu.CfPD: Coherent Flux Phase-Delay      [NT,MW,NIN]*1j
-        - simu.CfGD: Coherent Flux GD               [NT,MW,NIN]*1j
-        - simu.ClosurePhasePD                       [NT,MW,NC]
-        - simu.ClosurePhaseGD                       [NT,MW,NC]
-        - simu.PhotometryEstimated                  [NT,MW,NA]
-        - simu.VisibilityEstimated                  [NT,MW,NIN]*1j
-        - simu.SquaredCoherenceDegree               [NT,MW,NIN]
+        - outputs.CfPD: Coherent Flux Phase-Delay      [NT,MW,NIN]*1j
+        - outputs.CfGD: Coherent Flux GD               [NT,MW,NIN]*1j
+        - outputs.ClosurePhasePD                       [NT,MW,NC]
+        - outputs.ClosurePhaseGD                       [NT,MW,NC]
+        - outputs.PhotometryEstimated                  [NT,MW,NA]
+        - outputs.VisibilityEstimated                  [NT,MW,NIN]*1j
+        - outputs.SquaredCoherenceDegree               [NT,MW,NIN]
     """
 
-    from . import simu
+    from . import outputs
     
     from .config import NA,NIN,NC
     from .config import MW,FS
     
-    it = simu.it            # Time
+    it = outputs.it            # Time
      
     """
     Photometries extraction
@@ -4658,7 +4720,7 @@ def ReadCf(currCfEstimated):
         currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
         
     # Save coherent flux and photometries in stack
-    simu.PhotometryEstimated[it] = PhotEst
+    outputs.PhotometryEstimated[it] = PhotEst
     
     """
     Visibilities extraction
@@ -4671,8 +4733,8 @@ def ReadCf(currCfEstimated):
             Iaap = currCfEstimatedNIN[:,ib]                     # Interferometric intensity (a,a')
             Ia = PhotEst[:,ia]                                  # Photometry pupil a
             Iap = PhotEst[:,iap]                                # Photometry pupil a'
-            simu.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Fringe VisibilityEstimated of the base (a,a')
-            simu.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
+            outputs.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Fringe VisibilityEstimated of the base (a,a')
+            outputs.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
  
     """
     Phase-delays extraction
@@ -4686,13 +4748,13 @@ def ReadCf(currCfEstimated):
     
     # Coherent flux corrected from dispersion
     for imw in range(MW):
-        simu.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
+        outputs.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
         
         # If ClosurePhase correction before wrapping
-        # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref)
+        # outputs.CfPD[it,imw] = outputs.CfPD[it,imw]*np.exp(-1j*outputs.PDref)
         
     # Current Phase-Delay
-    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0))*FS['active_ich']
+    currPD = np.angle(np.sum(outputs.CfPD[it,:,:], axis=0))*FS['active_ich']
         
     """
     Group-Delays extration
@@ -4713,18 +4775,18 @@ def ReadCf(currCfEstimated):
     # Integrates GD with Ngd last frames (from it-Ngd to it)
     timerange = range(it+1-Ngd,it+1)
     for iot in timerange:
-        cfgd = simu.CfPD[iot]*np.exp(-1j*simu.PDEstimated[iot])/Ngd
+        cfgd = outputs.CfPD[iot]*np.exp(-1j*outputs.PDEstimated[iot])/Ngd
         
         # If ClosurePhase correction before wrapping
-        # cfgd = cfgd*np.exp(-1j*simu.GDref)
+        # cfgd = cfgd*np.exp(-1j*outputs.GDref)
         
-        simu.CfGD[it,:,:] += cfgd
+        outputs.CfGD[it,:,:] += cfgd
 
 
     currGD = np.zeros(NIN)
     for ib in range(NIN):
         # cs = 0*1j
-        cfGDlmbdas = simu.CfGD[it,:-Ncross,ib]*np.conjugate(simu.CfGD[it,Ncross:,ib])
+        cfGDlmbdas = outputs.CfGD[it,:-Ncross,ib]*np.conjugate(outputs.CfGD[it,Ncross:,ib])
         cfGDmoy = np.sum(cfGDlmbdas)
 
             
@@ -4752,20 +4814,20 @@ def ReadCf(currCfEstimated):
         for iap in range(ia+1,NA):
             ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
             valid1=config.FS['active_ich'][ib]
-            cs1 = np.sum(simu.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
-            cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+            cs1 = np.sum(outputs.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
+            cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
             cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
             for iapp in range(iap+1,NA):
                 ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
                 valid2=config.FS['active_ich'][ib]
-                cs2 = np.sum(simu.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
-                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cs2 = np.sum(outputs.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
+                cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
                 ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
                 valid3=config.FS['active_ich'][ib]
-                cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib]),axis=1) # Sum of 
-                cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib])
+                cs3 = np.sum(np.conjugate(outputs.CfPD[timerange,:,ib]),axis=1) # Sum of 
+                cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
                 cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
                 
                 # The bispectrum of one time and one triangle adds up to
@@ -4775,16 +4837,16 @@ def ReadCf(currCfEstimated):
                 bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
                 bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
     
-    simu.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
-    simu.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
+    outputs.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
+    outputs.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
     
     if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
         for ia in range(1,NA-1):
             for iap in range(ia+1,NA):
                 k = ct.posk(ia,iap,NA)
                 ic = ct.poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
-                simu.PDref[it,k] = simu.ClosurePhasePD[it,ic]
-                simu.GDref[it,k] = simu.ClosurePhaseGD[it,ic]
+                outputs.PDref[it,k] = outputs.ClosurePhasePD[it,ic]
+                outputs.GDref[it,k] = outputs.ClosurePhaseGD[it,ic]
 
     
     return currPD, currGD
@@ -4808,9 +4870,9 @@ def SimpleIntegrator(*args, init=False, Ngd=1, Npd=1, Ncp = 1, GainPD=0, GainGD=
     USED OBSERVABLES:
         - config.FT
     UPDATED OBSERVABLES:
-        - simu.PDEstimated: [MW,NIN] Estimated PD before subtraction of the reference
-        - simu.GDEstimated: [MW,NIN] Estimated GD before subtraction of the reference
-        - simu.CommandODL: Piston Command to send       [NT,NA]
+        - outputs.PDEstimated: [MW,NIN] Estimated PD before subtraction of the reference
+        - outputs.GDEstimated: [MW,NIN] Estimated GD before subtraction of the reference
+        - outputs.CommandODL: Piston Command to send       [NT,NA]
         
     SUBROUTINES:
         - ReadCf
@@ -4876,15 +4938,15 @@ Ngd={Ngd} ; Type={config.FT['Name']} \n\ ***")
               
         return
     
-    from . import simu
-    from .simu import it
+    from . import outputs
+    from .outputs import it
     
     currCfEstimated = args[0]
     
     currPD, currGD = ReadCf(currCfEstimated)
     
-    simu.PDEstimated[it] = currPD
-    simu.GDEstimated[it] = currGD#*config.FS['R']
+    outputs.PDEstimated[it] = currPD
+    outputs.GDEstimated[it] = currGD#*config.FS['R']
     
     currCmd = SimpleCommandCalc(currPD,currGD)
     
@@ -4910,18 +4972,18 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
 
     """
     
-    from . import simu
+    from . import outputs
     
     from .config import NA,NIN
     from .config import FT,FS
     
-    it = simu.it            # Frame number
+    it = outputs.it            # Frame number
     
     """
     Group-Delay tracking
     """
     
-    currGDerr = currGD - simu.GDref[it]
+    currGDerr = currGD - outputs.GDref[it]
     
     # Keep the GD between [-Pi, Pi] (because the GDref could have make it
     # leave this interval)
@@ -4936,7 +4998,7 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
     R = config.FS['R']
     
     # Store residual GD for display only [radians]
-    simu.GDResidual[it] = currGDerr*R
+    outputs.GDResidual[it] = currGDerr*R
 
     
     if FT['Threshold']:             # Threshold function (eq.36)
@@ -4956,17 +5018,17 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
     """
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*config.PDspectra*config.FS['R']/(2*np.pi)*currGDerr
+        outputs.GDCommand[it+1] = outputs.GDCommand[it] + FT['GainGD']*config.PDspectra*config.FS['R']/(2*np.pi)*currGDerr
         # From OPD to Pistons
-        simu.PistonGDCommand[it+1] = np.dot(FS['OPD2Piston'], simu.GDCommand[it+1])
+        outputs.PistonGDCommand[it+1] = np.dot(FS['OPD2Piston'], outputs.GDCommand[it+1])
         
     else:                       # integrator on PD
         # From OPD to Piston
         currPistonGD = np.dot(FS['OPD2Piston'], currGDerr)
         # Integrator
-        simu.PistonGDCommand[it+1] = simu.PistonGDCommand[it] + FT['GainPD']*currPistonGD
+        outputs.PistonGDCommand[it+1] = outputs.PistonGDCommand[it] + FT['GainPD']*currPistonGD
     
-    uGD = simu.PistonGDCommand[it+1]
+    uGD = outputs.PistonGDCommand[it+1]
     
     if config.FT['roundGD']=='round':
         for ia in range(NA):
@@ -4989,7 +5051,7 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
     Phase-Delay command
     """
     
-    currPDerr = currPD - simu.PDref[it]
+    currPDerr = currPD - outputs.PDref[it]
  
     # Keep the PD between [-Pi, Pi]
     # Eq. 35
@@ -5000,21 +5062,21 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
             currPDerr[ib] += 2*np.pi
     
     # Store residual PD for display only [radians]
-    simu.PDResidual[it] = currPDerr
+    outputs.PDResidual[it] = currPDerr
     
     if config.FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.PDCommand[it+1] = simu.PDCommand[it] + FT['GainPD']*config.PDspectra/(2*np.pi)*currPDerr
+        outputs.PDCommand[it+1] = outputs.PDCommand[it] + FT['GainPD']*config.PDspectra/(2*np.pi)*currPDerr
         # From OPD to Pistons
-        simu.PistonPDCommand[it+1] = np.dot(FS['OPD2Piston'], simu.PDCommand[it+1])
+        outputs.PistonPDCommand[it+1] = np.dot(FS['OPD2Piston'], outputs.PDCommand[it+1])
         
     else:                       # integrator on PD
         # From OPD to Piston
         currPistonPD = np.dot(FS['OPD2Piston'], currPDerr)
         # Integrator
-        simu.PistonPDCommand[it+1] = simu.PistonPDCommand[it] + FT['GainPD']*currPistonPD
+        outputs.PistonPDCommand[it+1] = outputs.PistonPDCommand[it] + FT['GainPD']*currPistonPD
     
-    uPD = simu.PistonPDCommand[it+1]
+    uPD = outputs.PistonPDCommand[it+1]
 
     """
     ODL command
@@ -5049,7 +5111,7 @@ def addnoiseADU(inputADU):
     """
     
     from .config import ron, G, enf
-    from .simu import it
+    from .outputs import it
     
     (seedph, seedron) = (config.seedph+1,config.seedron+1)
     
@@ -5091,7 +5153,7 @@ def addnoise(inPhotons):
     """
     
     from .config import ron, enf, qe
-    from .simu import it
+    from .outputs import it
     
     (seedph, seedron) = (config.seedph+1,config.seedron+1)
     
