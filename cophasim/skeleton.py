@@ -1244,7 +1244,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
 
 
 def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
-            Pistondetails=False,OPDdetails=False,
+            Pistondetails=False,OPDdetails=False,withsnr=True,
             OneTelescope=True, pause=False, display=True,verbose=False,
             start_pd_tracking = 50,UsedTelemetries='simu',
             savedir='',ext='pdf',infos={"details":''}):
@@ -1864,9 +1864,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
         
-        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                 generaltitle,display=display,filename=filename,ext='pdf',
-                                 infos=infos)
+        if withsnr:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
+        else:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
         
     if displayall or ('perftable2' in args) :
         generaltitle = "GD and PD estimated, after patch"
@@ -1879,9 +1884,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
         
-        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                 generaltitle,display=display,filename=filename,ext='pdf',
-                                 infos=infos)
+        if withsnr:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
+        else:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
         
         
     if displayall or ('perftableres' in args) :
@@ -1895,9 +1905,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
         
-        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                 generaltitle,display=display,filename=filename,ext='pdf',
-                                 infos=infos)
+        if withsnr:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
+        else:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
         
     if displayall or ('perftableres2' in args) :
         generaltitle = "GD and PD residuals, after least square"
@@ -1910,9 +1925,14 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
         
-        display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                 generaltitle,display=display,filename=filename,ext='pdf',
-                                 infos=infos)
+        if withsnr:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
+        else:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     generaltitle,display=display,filename=filename,ext='pdf',
+                                     infos=infos)
 
 
 

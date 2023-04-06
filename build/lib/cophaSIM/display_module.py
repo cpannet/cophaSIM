@@ -7,7 +7,6 @@ Created on Mon Mar 27 17:11:39 2023
 from cophasim import config
 from cophasim import coh_tools as ct
 import matplotlib.pyplot as plt
-import os
 import matplotlib.lines as mlines
 # import matplotlib.patches as mpatches
 import numpy as np
@@ -54,17 +53,18 @@ telcolors = colors[:NAdisp]*NumberOfTelFigures
 
 
 def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-              generaltitle,display=True,filename='',ext='pdf',infos={"details":''},
-              verbose=False):
+              generaltitle,SNR=[],display=True,
+              filename='',ext='pdf',infos={"details":''},verbose=False):
     
-    global telescopes, baselines, closures, stationaryregim,wl
+    global telescopes, baselines, closures, stationaryregim,wl,\
+        PlotTel,PlotTelOrigin,PlotBaselineNIN,PlotBaseline,PlotClosure,TelNameLength
             
     plt.rcParams.update(rcParamsForBaselines)
-    # typeobs = "GDPDest"
-    
-    # RMSgdobs = np.std(GDobs,axis=0)
-    # RMSpdobs = np.std(PDobs,axis=0)
-    
+
+    plotSNR=False
+    if len(SNR):
+        plotSNR=True
+
     linestyles=[]
     if 'ThresholdGD' in config.FT.keys():
         linestyles.append(mlines.Line2D([],[], color='black',
@@ -76,8 +76,8 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
             if (NINmes%NINdisp < NINdisp) and (NINmes%NINdisp != 0):
                 NINtodisplay = NINmes%NINdisp
                 
-        iFirstBase = NINdisp*iFig   # Index of first baseline to display
-        iLastBase = iFirstBase + NINtodisplay - 1        # Index of last baseline to display
+        iFirstBase = NINdisp*iFig                       # Index of first baseline to display
+        iLastBase = iFirstBase + NINtodisplay - 1       # Index of last baseline to display
         
         len2 = NINtodisplay//2 ; len1 = NINtodisplay-len2
         basecolors = colors[:len1]+colors[:len2]
@@ -88,17 +88,26 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
         plt.close(title)
         fig=plt.figure(title, clear=True)
         fig.suptitle(title)
-        (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
-        ax1.set_title(f"From {baselines[iFirstBase]} \
-to {baselines[iFirstBase+len1-1]}")
-        ax6.set_title(f"From {baselines[iFirstBase+len1]} \
-to {baselines[iLastBase]}")
+        if plotSNR:
+            (ax1,ax6),(ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=6,ncols=2, gridspec_kw={"height_ratios":[1,4,4,0.5,1,1]})
+            ax1.set_title(f"From {baselines[iFirstBase]} \
+    to {baselines[iFirstBase+len1-1]}")
+            ax6.set_title(f"From {baselines[iFirstBase+len1]} \
+    to {baselines[iLastBase]}")
+        
+        else:
+            (ax2,ax7), (ax3,ax8),(ax11,ax12),(ax4,ax9),(ax5,ax10) = fig.subplots(nrows=5,ncols=2, gridspec_kw={"height_ratios":[4,4,0.5,1,1]})
+            ax2.set_title(f"From {baselines[iFirstBase]} \
+    to {baselines[iFirstBase+len1-1]}")
+            ax7.set_title(f"From {baselines[iFirstBase+len1]} \
+    to {baselines[iLastBase]}")
         
         FirstSet = range(iFirstBase,iFirstBase+len1)
         SecondSet = range(iFirstBase+len1,iLastBase+1)
         iColor=0
         for iBase in FirstSet:   # First serie
-            # ax1.plot(timestamps,SNR[:,iBase],color=basecolors[iColor])
+            if plotSNR:
+                ax1.plot(timestamps,SNR[:,iBase],color=basecolors[iColor])
             if 'ThresholdGD' in config.FT.keys():
                 ax1.hlines(config.FT['ThresholdGD'][iBase], timestamps[0],timestamps[-1], color=basecolors[iColor], linestyle='dashed')
             ax2.plot(timestamps,GDobs[:,iBase],color=basecolors[iColor])
@@ -107,7 +116,8 @@ to {baselines[iLastBase]}")
             ax3.plot(timestamps,PDrefmic[:,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
             iColor+=1
         for iBase in SecondSet:   # Second serie
-            # ax6.plot(timestamps,SNR[:,iBase],color=basecolors[iColor])
+            if plotSNR:
+                ax6.plot(timestamps,SNR[:,iBase],color=basecolors[iColor])
             if 'ThresholdGD' in config.FT.keys():
                 ax6.hlines(config.FT['ThresholdGD'][iBase],timestamps[0],timestamps[-1],color=basecolors[iColor], linestyle='dashed')
             ax7.plot(timestamps,GDobs[:,iBase],color=basecolors[iColor])
@@ -117,27 +127,31 @@ to {baselines[iLastBase]}")
             iColor+=1
         
         ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
-        # ax4.bar(baselines[FirstSet],simu.LR4[FirstSet],fill=False,edgecolor='black',linestyle='-')
         ax5.bar(baselines[FirstSet],RMSpdobs[FirstSet], color=basecolors[:len1])
-        # ax5.bar(baselines[FirstSet],RMStrueOPD[FirstSet],fill=False,edgecolor='black',linestyle='-')
         
         ax9.bar(baselines[SecondSet],RMSgdobs[SecondSet], color=basecolors[len1:])
-        # ax9.bar(baselines[SecondSet],simu.LR4[SecondSet],fill=False,edgecolor='black',linestyle='-')
         ax10.bar(baselines[SecondSet],RMSpdobs[SecondSet], color=basecolors[len1:])
-        # ax10.bar(baselines[SecondSet],RMStrueOPD[SecondSet],fill=False,edgecolor='black',linestyle='-')
         
-        ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-        ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+        if plotSNR:
+            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
+            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
+        else:
+            ax2.sharex(ax3)
+            ax7.sharex(ax8)
+            
         ax4.get_shared_x_axes().join(ax4,ax5)
         ax9.get_shared_x_axes().join(ax9,ax10)
         
-        ax1.get_shared_y_axes().join(ax1,ax6)
+        if plotSNR:
+            ax1.get_shared_y_axes().join(ax1,ax6)
+            ax6.tick_params(labelleft=False) ;
+            ax1.set_ylabel('SNR')
+            
         ax2.get_shared_y_axes().join(ax2,ax7)
         ax3.get_shared_y_axes().join(ax3,ax8)
         ax4.get_shared_y_axes().join(ax4,ax9)
         ax5.get_shared_y_axes().join(ax5,ax10)
         
-        ax6.tick_params(labelleft=False) ; #ct.setaxelim(ax1,ydata=SNR,ymin=0)
         ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDobs[stationaryregim],ylim_min=[-wl/2,wl/2])
         ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
         ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdobs),[1]]),ymin=0)
@@ -146,7 +160,7 @@ to {baselines[iLastBase]}")
         ax4.tick_params(labelbottom=False)
         ax9.tick_params(labelbottom=False)
         
-        ax1.set_ylabel('SNR')
+        
         ax2.set_ylabel('Group-Delays [µm]')
         ax3.set_ylabel('Phase-Delays [µm]')
         ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
@@ -157,7 +171,6 @@ to {baselines[iLastBase]}")
         ax3.set_xlabel('Time [s]', labelpad=-10) ; ax8.set_xlabel('Time [s]', labelpad=-10)
         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
 
-        ax7.legend(handles=linestyles, loc='upper right')
         
         if display:
             fig.show()
@@ -172,3 +185,5 @@ to {baselines[iLastBase]}")
                 plt.savefig(filename+f"_{rangeBases}.{ext}")
 
     plt.rcParams.update(plt.rcParamsDefault)
+
+
