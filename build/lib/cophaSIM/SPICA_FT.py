@@ -46,9 +46,9 @@ def SPICAFT(*args, init=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD
     USED OBSERVABLES:
         - config.FT
     UPDATED OBSERVABLES:
-        - simu.PDEstimated: [NT,MW,NINmes] Estimated PD before subtraction of the reference
-        - simu.GDEstimated: [NT,MW,NINmes] Estimated GD before subtraction of the reference
-        - simu.CommandODL: Piston Command to send       [NT,NA]
+        - outputs.PDEstimated: [NT,MW,NINmes] Estimated PD before subtraction of the reference
+        - outputs.GDEstimated: [NT,MW,NINmes] Estimated GD before subtraction of the reference
+        - outputs.CommandODL: Piston Command to send       [NT,NA]
         
     SUBROUTINES:
         - ReadCf
@@ -218,9 +218,9 @@ I set ThresholdRELOCK to the {NINmes} first values."))
 
         return
     
-    from . import simu
+    from . import outputs
 
-    it = simu.it
+    it = outputs.it
     
     currCfEstimated = args[0]
 
@@ -245,22 +245,22 @@ def ReadCf(currCfEstimated):
     OUTPUT: 
         
     UPDATE:
-        - simu.CfEstimated_             
-        - simu.CfPD: Coherent Flux Phase-Delay     [NT,MW,NINmes]
-        - simu.CfGD: Coherent Flux GD              [NT,MW,NINmes]
-        - simu.ClosurePhasePD                       [NT,MW,NC]
-        - simu.ClosurePhaseGD                       [NT,MW,NC]
-        - simu.PhotometryEstimated                  [NT,MW,NA]
-        - simu.VisibilityEstimated                    [NT,MW,NIN]*1j
-        - simu.CoherenceDegree                      [NT,MW,NIN]
+        - outputs.CfEstimated_             
+        - outputs.CfPD: Coherent Flux Phase-Delay     [NT,MW,NINmes]
+        - outputs.CfGD: Coherent Flux GD              [NT,MW,NINmes]
+        - outputs.ClosurePhasePD                       [NT,MW,NC]
+        - outputs.ClosurePhaseGD                       [NT,MW,NC]
+        - outputs.PhotometryEstimated                  [NT,MW,NA]
+        - outputs.VisibilityEstimated                    [NT,MW,NIN]*1j
+        - outputs.CoherenceDegree                      [NT,MW,NIN]
     """
     
-    from . import simu
+    from . import outputs
     
     from .config import NA,NC
     from .config import MW
     
-    it = simu.it            # Time
+    it = outputs.it            # Time
      
     NINmes = config.FS['NINmes']
     """
@@ -275,7 +275,7 @@ def ReadCf(currCfEstimated):
         currCfEstimatedNIN[:,ib] = currCfEstimated[:,NA+ib] + 1j*currCfEstimated[:,NA+NINmes+ib]
             
     # Save coherent flux and photometries in stack
-    simu.PhotometryEstimated[it] = PhotEst
+    outputs.PhotometryEstimated[it] = PhotEst
 
         
     """
@@ -289,8 +289,8 @@ def ReadCf(currCfEstimated):
         Iaap = currCfEstimatedNIN[:,ib]         # Interferometric intensity (a,a')
         Ia = PhotEst[:,ia]                      # Photometry pupil a
         Iap = PhotEst[:,iap]                    # Photometry pupil a'
-        simu.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Estimated Fringe Visibility of the base (a,a')
-        simu.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
+        outputs.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Estimated Fringe Visibility of the base (a,a')
+        outputs.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
  
  
     """
@@ -305,10 +305,10 @@ def ReadCf(currCfEstimated):
     
     # Coherent flux corrected from dispersion
     for imw in range(MW):
-        simu.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
+        outputs.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
         
         # If ClosurePhase correction before wrapping
-        # simu.CfPD[it,imw] = simu.CfPD[it,imw]*np.exp(-1j*simu.PDref[it])
+        # outputs.CfPD[it,imw] = outputs.CfPD[it,imw]*np.exp(-1j*outputs.PDref[it])
 
     """
     Group-Delays extration
@@ -329,15 +329,15 @@ def ReadCf(currCfEstimated):
     # Integrates GD with Ngd last frames (from it-Ngd to it)
     timerange = range(it+1-Ngd,it+1)
     for iot in timerange:
-        cfgd = simu.CfPD[iot]*np.exp(-1j*simu.PDEstimated[iot])/Ngd
+        cfgd = outputs.CfPD[iot]*np.exp(-1j*outputs.PDEstimated[iot])/Ngd
         
         # If ClosurePhase correction before wrapping
-        # cfgd = cfgd*np.exp(-1j*simu.GDref[it])
+        # cfgd = cfgd*np.exp(-1j*outputs.GDref[it])
         
-        simu.CfGD[it,:,:] += cfgd
+        outputs.CfGD[it,:,:] += cfgd
     
-    CfPD = simu.CfPD[it]
-    CfGD = simu.CfGD[it]
+    CfPD = outputs.CfPD[it]
+    CfGD = outputs.CfGD[it]
 
     return CfPD, CfGD
 
@@ -361,7 +361,7 @@ def CommandCalc(CfPD,CfGD):
         DESCRIPTION.
     """
     
-    from . import simu
+    from . import outputs
     
     """
     INIT MODE
@@ -370,7 +370,7 @@ def CommandCalc(CfPD,CfGD):
     from .config import NA,NC
     from .config import FT,FS
     
-    it = simu.it            # Frame number
+    it = outputs.it            # Frame number
     
     NINmes = config.FS['NINmes']
     ich_pos = config.FS['active_ich']
@@ -401,21 +401,21 @@ def CommandCalc(CfPD,CfGD):
         # Raw Weighting matrix in the OPD-space
         
         timerange = range(it+1-Ngd, it+1)
-        simu.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(simu.varPD[timerange], axis=0))
-        simu.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(simu.varGD[timerange], axis=0))
-        simu.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(simu.varGDUnbiased[timerange], axis=0))
+        outputs.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(outputs.varPD[timerange], axis=0))
+        outputs.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(outputs.varGD[timerange], axis=0))
+        outputs.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(outputs.varGDUnbiased[timerange], axis=0))
         
-        simu.TemporalVariancePD[it] = np.var(simu.PDEstimated[timerange], axis=0)
-        simu.TemporalVarianceGD[it] = np.var(simu.GDEstimated[timerange], axis=0)
+        outputs.TemporalVariancePD[it] = np.var(outputs.PDEstimated[timerange], axis=0)
+        outputs.TemporalVarianceGD[it] = np.var(outputs.GDEstimated[timerange], axis=0)
         
         if config.FT['whichSNR'] == 'pd':
-            simu.SquaredSNRMovingAverage[it] = simu.SquaredSNRMovingAveragePD[it]
+            outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAveragePD[it]
         else:
-            simu.SquaredSNRMovingAverage[it] = simu.SquaredSNRMovingAverageGD[it]
+            outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAverageGD[it]
             
-        reliablebaselines = (simu.SquaredSNRMovingAverage[it] >= FT['ThresholdGD']**2)
+        reliablebaselines = (outputs.SquaredSNRMovingAverage[it] >= FT['ThresholdGD']**2)
         
-        simu.TrackedBaselines[it] = reliablebaselines
+        outputs.TrackedBaselines[it] = reliablebaselines
         
         Wdiag=np.zeros(NINmes)
         if config.FT['whichSNR'] == 'pd':
@@ -471,8 +471,8 @@ def CommandCalc(CfPD,CfGD):
         currIgd = np.identity(NINmes)
         currIpd = np.identity(NINmes)
     
-    simu.Igd[it,:,:] = currIgd
-    simu.Ipd[it,:,:] = currIpd
+    outputs.Igd[it,:,:] = currIgd
+    outputs.Ipd[it,:,:] = currIpd
         
     """
     Closure phase calculation
@@ -495,29 +495,29 @@ def CommandCalc(CfPD,CfGD):
             for iapp in range(iap+1,NA):
                 
                 ib = posk(ia,iap,NA); ib1=ich_pos[ib]      # coherent flux (ia,iap)  
-                measured1=(ib1>=0) and simu.TrackedBaselines[it,ib1]
+                measured1=(ib1>=0) and outputs.TrackedBaselines[it,ib1]
                 ib = posk(iap,iapp,NA); ib2=ich_pos[ib] # coherent flux (iap,iapp)    
-                measured2=(ib2>=0) and simu.TrackedBaselines[it,ib2]
+                measured2=(ib2>=0) and outputs.TrackedBaselines[it,ib2]
                 ib = posk(ia,iapp,NA); ib3=ich_pos[ib] # coherent flux (iapp,ia)    
                 measured3=(ib3>=0)
                 
                 if measured1*measured2*measured3:
                     
-                    valid1=simu.TrackedBaselines[it,ib1]
-                    valid2=simu.TrackedBaselines[it,ib2]
-                    valid3=simu.TrackedBaselines[it,ib3]
+                    valid1=outputs.TrackedBaselines[it,ib1]
+                    valid2=outputs.TrackedBaselines[it,ib2]
+                    valid3=outputs.TrackedBaselines[it,ib3]
                     
                     if valid1*valid2*valid3:
-                        cs1 = np.sum(simu.CfPD[timerange,:,ib1], axis=1)     # Sum of coherent flux (ia,iap)
-                        cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib1]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib1])
+                        cs1 = np.sum(outputs.CfPD[timerange,:,ib1], axis=1)     # Sum of coherent flux (ia,iap)
+                        cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib1]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib1])
                         cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
                         
-                        cs2 = np.sum(simu.CfPD[timerange,:,ib2], axis=1) # Sum of coherent flux (iap,iapp)    
-                        cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib2]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib2])
+                        cs2 = np.sum(outputs.CfPD[timerange,:,ib2], axis=1) # Sum of coherent flux (iap,iapp)    
+                        cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib2]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib2])
                         cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                         
-                        cs3 = np.sum(np.conjugate(simu.CfPD[timerange,:,ib3]),axis=1) # Sum of 
-                        cfGDlmbdas = simu.CfGD[timerange,Ncross:,ib3]*np.conjugate(simu.CfGD[timerange,:-Ncross,ib3])
+                        cs3 = np.sum(np.conjugate(outputs.CfPD[timerange,:,ib3]),axis=1) # Sum of 
+                        cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib3]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib3])
                         cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
                         
                         validcp[ic] = 1
@@ -540,17 +540,17 @@ def CommandCalc(CfPD,CfGD):
                 ic+=1
     
                 
-    simu.BispectrumPD[it] = bispectrumPD*validcp+simu.BispectrumPD[it-1]*(1-validcp)
-    simu.BispectrumGD[it] = bispectrumGD*validcp+simu.BispectrumGD[it-1]*(1-validcp)
+    outputs.BispectrumPD[it] = bispectrumPD*validcp+outputs.BispectrumPD[it-1]*(1-validcp)
+    outputs.BispectrumGD[it] = bispectrumGD*validcp+outputs.BispectrumGD[it-1]*(1-validcp)
     
-    cpPD = np.angle(simu.BispectrumPD[it])
-    cpGD = np.angle(simu.BispectrumGD[it])
+    cpPD = np.angle(outputs.BispectrumPD[it])
+    cpGD = np.angle(outputs.BispectrumGD[it])
     
     cpPD[cpPD<-np.pi+config.FT['stdCP']]=np.pi
     cpGD[cpGD<-np.pi+config.FT['stdCP']]=np.pi
     
-    simu.ClosurePhasePD[it] = cpPD
-    simu.ClosurePhaseGD[it] = cpPD/config.FS['R']
+    outputs.ClosurePhasePD[it] = cpPD
+    outputs.ClosurePhaseGD[it] = cpPD/config.FS['R']
     
     BestTel=config.FT['BestTel'] ; itelbest=BestTel-1
     if config.FT['CPref'] and (it>10):                     # At time 0, we create the reference vectors
@@ -566,31 +566,31 @@ def CommandCalc(CfPD,CfGD):
                         else:
                             ic = poskfai(itelbest,ia,iap,NA)
                     
-                        simu.PDref[it,ibmes] = simu.ClosurePhasePD[it,ic]
-                        simu.GDref[it,ibmes] = simu.ClosurePhaseGD[it,ic]   
+                        outputs.PDref[it,ibmes] = outputs.ClosurePhasePD[it,ic]
+                        outputs.GDref[it,ibmes] = outputs.ClosurePhaseGD[it,ic]   
         
-                        simu.CfPDref[it,ibmes] = simu.BispectrumPD[it,ic]#/np.abs(simu.BispectrumPD[it,ic])
-                        simu.CfGDref[it,ibmes] = simu.BispectrumGD[it,ic]#/np.abs(simu.BispectrumGD[it,ic])
+                        outputs.CfPDref[it,ibmes] = outputs.BispectrumPD[it,ic]#/np.abs(outputs.BispectrumPD[it,ic])
+                        outputs.CfGDref[it,ibmes] = outputs.BispectrumGD[it,ic]#/np.abs(outputs.BispectrumGD[it,ic])
     
     """
     GD and PD errors calculation
     """
         
     # Current Phase-Delay
-    currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0)*np.exp(-1j*simu.PDref[it]))
-    # currPD = np.angle(np.sum(simu.CfPD[it,:,:], axis=0)*np.conj(simu.CfPDref[it]))*ich_pos
+    currPD = np.angle(np.sum(outputs.CfPD[it,:,:], axis=0)*np.exp(-1j*outputs.PDref[it]))
+    # currPD = np.angle(np.sum(outputs.CfPD[it,:,:], axis=0)*np.conj(outputs.CfPDref[it]))*ich_pos
     
     # Current Group-Delay
     currGD = np.zeros(NINmes)
     for ib in range(NINmes):
-        cfGDlmbdas = simu.CfGD[it,:-Ncross,ib]*np.conjugate(simu.CfGD[it,Ncross:,ib])
+        cfGDlmbdas = outputs.CfGD[it,:-Ncross,ib]*np.conjugate(outputs.CfGD[it,Ncross:,ib])
         cfGDmoy = np.sum(cfGDlmbdas)
         
-        currGD[ib] = np.angle(cfGDmoy*np.exp(-1j*simu.GDref[it,ib]))
-        # currGD[ib] = np.angle(cfGDmoy*np.conj(simu.CfGDref[it,ib])*np.conj(simu.CfPDref[it,ib]**(1/config.FS['R'])))*ich_pos[ib]
+        currGD[ib] = np.angle(cfGDmoy*np.exp(-1j*outputs.GDref[it,ib]))
+        # currGD[ib] = np.angle(cfGDmoy*np.conj(outputs.CfGDref[it,ib])*np.conj(outputs.CfPDref[it,ib]**(1/config.FS['R'])))*ich_pos[ib]
 
-    simu.PDEstimated[it] = currPD
-    simu.GDEstimated[it] = currGD
+    outputs.PDEstimated[it] = currPD
+    outputs.GDEstimated[it] = currGD
     
     # Patch to stabilize the PD and GD when too close to the Pi/-Pi shift.
     # --> force it to Pi.
@@ -598,8 +598,8 @@ def CommandCalc(CfPD,CfGD):
     currPD[(currPD+np.pi)<config.FT['stdPD']]=np.pi
     currGD[(currGD+np.pi)<config.FT['stdGD']]=np.pi
     
-    simu.PDEstimated2[it] = currPD
-    simu.GDEstimated2[it] = currGD
+    outputs.PDEstimated2[it] = currPD
+    outputs.GDEstimated2[it] = currGD
     
     """
     RELOCK state
@@ -611,24 +611,24 @@ def CommandCalc(CfPD,CfGD):
             """
     
     
-    IgdRank = np.linalg.matrix_rank(simu.Igd[it])
+    IgdRank = np.linalg.matrix_rank(outputs.Igd[it])
     NotCophased = (IgdRank < NA-1)
-    simu.IgdRank[it] = IgdRank
+    outputs.IgdRank[it] = IgdRank
     
     
     if NotCophased:
-        simu.time_since_loss[it]=simu.time_since_loss[it-1]+config.dt
+        outputs.time_since_loss[it]=outputs.time_since_loss[it-1]+config.dt
         
-        # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_rank(simu.Igd[it-1]))
+        # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_rank(outputs.Igd[it-1]))
         # This situation could pose a problem but we don't manage it yet        
-        if (simu.time_since_loss[it] > config.FT['SMdelay']):
+        if (outputs.time_since_loss[it] > config.FT['SMdelay']):
             
             Igdna = np.dot(config.FS['OPD2Piston_moy_r'],
-                           np.dot(simu.Igd[it],config.FS['Piston2OPD_r']))
+                           np.dot(outputs.Igd[it],config.FS['Piston2OPD_r']))
             
             Kernel = np.identity(NA) - Igdna
             
-            CophasedBaselines=np.where(np.diag(simu.Igd[it])!=0)[0]
+            CophasedBaselines=np.where(np.diag(outputs.Igd[it])!=0)[0]
             CophasedPairs=[]
             for ib in CophasedBaselines:
                 ia,iap = config.FS['ich'][ib][0], config.FS['ich'][ib][1]
@@ -637,20 +637,20 @@ def CommandCalc(CfPD,CfGD):
             CophasedGroups = JoinOnCommonElements(CophasedPairs)
             
             # Fringe loss
-            simu.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
+            outputs.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
             # WeLostANewTelescope = (sum(newLostTelescopes) > 0)
             
             # Photometry loss
-            simu.noSignal_on_T[it] = 1*(simu.SNRPhotometry[it] < config.FT['ThresholdPhot'])
+            outputs.noSignal_on_T[it] = 1*(outputs.SNRPhotometry[it] < config.FT['ThresholdPhot'])
                 
-            comparison = (simu.noSignal_on_T[it] == simu.LostTelescopes[it])
-            simu.LossDueToInjection[it] = (comparison.all() and sum(simu.noSignal_on_T[it])>1)       # Evaluates if the two arrays are the same
+            comparison = (outputs.noSignal_on_T[it] == outputs.LostTelescopes[it])
+            outputs.LossDueToInjection[it] = (comparison.all() and sum(outputs.noSignal_on_T[it])>1)       # Evaluates if the two arrays are the same
             
-            if not simu.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
+            if not outputs.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
                 config.FT['state'][it] = 1
                 
-                newLostTelescopes = (simu.LostTelescopes[it] - simu.LostTelescopes[it-1] == 1)
-                TelescopesThatGotBackPhotometry = (simu.noSignal_on_T[it-1] - simu.noSignal_on_T[it] == 1)
+                newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
+                TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
                 # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
                 
                 TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
@@ -664,10 +664,10 @@ def CommandCalc(CfPD,CfGD):
                 Increment = searchfunction_inc_sylvain_gestioncophased(it, Velocities, CophasedGroups)
             
                 #You should send command only on telescope with flux
-                simu.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(simu.noSignal_on_T[it])
-                Increment = np.dot(simu.NoPhotometryFiltration[it],Increment)
+                outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
+                Increment = np.dot(outputs.NoPhotometryFiltration[it],Increment)
                 
-                usearch = simu.SearchCommand[it] + Increment
+                usearch = outputs.SearchCommand[it] + Increment
                 
             else:
                     Increment = np.zeros(NA)
@@ -676,14 +676,14 @@ def CommandCalc(CfPD,CfGD):
             Increment = np.zeros(NA)
             
     else:
-        simu.time_since_loss[it] = 0
+        outputs.time_since_loss[it] = 0
         Increment = np.zeros(NA)
             
     Increment = config.FT['search']*Increment
     
-    usearch = simu.SearchCommand[it] + Increment
+    usearch = outputs.SearchCommand[it] + Increment
     # The command is sent at the next time, that's why we note it+1
-    simu.SearchCommand[it+1] = usearch
+    outputs.SearchCommand[it+1] = usearch
     
     
     
@@ -695,7 +695,7 @@ def CommandCalc(CfPD,CfGD):
     """
     
     if config.FT['CPref']:
-        currGDerr = currGD - simu.GDref[it]
+        currGDerr = currGD - outputs.GDref[it]
     else:
         currGDerr = currGD
         
@@ -709,13 +709,13 @@ def CommandCalc(CfPD,CfGD):
     currGDerr[lower_than_mpi] += 2*np.pi
     
     # Store residual GD for display only [radians]
-    simu.GDResidual[it] = currGDerr
+    outputs.GDResidual[it] = currGDerr
     
     # Weights the GD (Eq.35)
     currGDerr = np.dot(currIgd,currGDerr)
      
-    simu.GDResidual2[it] = currGDerr
-    simu.GDPistonResidual[it] = np.dot(FS['OPD2Piston_r'], currGDerr*R*config.PDspectra/(2*np.pi))
+    outputs.GDResidual2[it] = currGDerr
+    outputs.GDPistonResidual[it] = np.dot(FS['OPD2Piston_r'], currGDerr*R*config.PDspectra/(2*np.pi))
     
     # Threshold function (eq.36)
     if FT['Threshold']:
@@ -730,28 +730,28 @@ def CommandCalc(CfPD,CfGD):
             currGDerr[higher_than_pi] -= np.pi/R*FT['switch']
             currGDerr[lower_than_mpi] += np.pi/R*FT['switch']
     
-    simu.GDErr[it] = currGDerr
+    outputs.GDErr[it] = currGDerr
     
     # Integrator (Eq.37)
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*currGDerr*config.PDspectra*R/2/np.pi
+        outputs.GDCommand[it+1] = outputs.GDCommand[it] + FT['GainGD']*currGDerr*config.PDspectra*R/2/np.pi
         
         # From OPD to Pistons
-        uGD = np.dot(FS['OPD2Piston_r'], simu.GDCommand[it+1])
+        uGD = np.dot(FS['OPD2Piston_r'], outputs.GDCommand[it+1])
         
     else:                       # integrator on Pistons
         # From OPD to Piston
         currPistonGD = np.dot(FS['OPD2Piston_r'], currGDerr)*config.PDspectra*R/2/np.pi
         # Integrator
-        uGD = simu.PistonGDCommand[it+1] + FT['GainGD']*currPistonGD
+        uGD = outputs.PistonGDCommand[it+1] + FT['GainGD']*currPistonGD
         
-    # simu.GDCommand[it+1] = simu.GDCommand[it] + FT['GainGD']*currGDerr
+    # outputs.GDCommand[it+1] = outputs.GDCommand[it] + FT['GainGD']*currGDerr
     
     # From OPD to Piston
-    # uGD = np.dot(FS['OPD2Piston'], simu.GDCommand[it+1])
+    # uGD = np.dot(FS['OPD2Piston'], outputs.GDCommand[it+1])
     
-    simu.PistonGDCommand_beforeround[it+1] = uGD
+    outputs.PistonGDCommand_beforeround[it+1] = uGD
     
     if config.FT['roundGD']=='round':
         jumps = np.round(uGD/config.PDspectra)
@@ -770,14 +770,14 @@ def CommandCalc(CfPD,CfGD):
         uGD = uGD - uGD[iTel]
         
         
-    simu.PistonGDCommand[it+1] = uGD
+    outputs.PistonGDCommand[it+1] = uGD
 
     """
     Phase-Delay command
     """
     
     if config.FT['CPref']:
-        currPDerr = currPD - simu.PDref[it]
+        currPDerr = currPD - outputs.PDref[it]
         
     else:
         currPDerr = currPD
@@ -791,35 +791,35 @@ def CommandCalc(CfPD,CfGD):
     currPDerr[higher_than_pi] -= 2*np.pi
     currPDerr[lower_than_mpi] += 2*np.pi
     
-    simu.PDResidual[it] = currPDerr
+    outputs.PDResidual[it] = currPDerr
     
     # Weights the PD (Eq.35)
     currPDerr = np.dot(currIpd,currPDerr)
     
     # Store residual PD and piston for display only
-    simu.PDResidual2[it] = currPDerr
-    simu.PDPistonResidual[it] = np.dot(FS['OPD2Piston_r'], currPDerr*config.PDspectra/(2*np.pi))
+    outputs.PDResidual2[it] = currPDerr
+    outputs.PDPistonResidual[it] = np.dot(FS['OPD2Piston_r'], currPDerr*config.PDspectra/(2*np.pi))
     
     # Integrator (Eq.37)
             
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        simu.PDCommand[it+1] = simu.PDCommand[it] + FT['GainPD']*currPDerr*config.PDspectra/2/np.pi
+        outputs.PDCommand[it+1] = outputs.PDCommand[it] + FT['GainPD']*currPDerr*config.PDspectra/2/np.pi
         # From OPD to Pistons
-        uPD = np.dot(FS['OPD2Piston_r'], simu.PDCommand[it+1])
+        uPD = np.dot(FS['OPD2Piston_r'], outputs.PDCommand[it+1])
         
     else:                       # integrator on Pistons
         # From OPD to Piston
         currPistonPD = np.dot(FS['OPD2Piston_r'], currPDerr)*config.PDspectra/2/np.pi
         # Integrator
-        uPD = simu.PistonPDCommand[it] + FT['GainPD']*currPistonPD
+        uPD = outputs.PistonPDCommand[it] + FT['GainPD']*currPistonPD
     
     
     if config.TELref:
         iTel = config.TELref-1
         uPD = uPD - uPD[iTel]
     
-    simu.PistonPDCommand[it+1] = uPD
+    outputs.PistonPDCommand[it+1] = uPD
     
     # if config.mode == 'track':
     #     if np.linalg.matrix_rank(currIgd) < NA-1:
@@ -870,23 +870,23 @@ def getvar():
 
     GLOBAL
     -------
-    simu.CfPD : 
+    outputs.CfPD : 
         
-    simu.varPD :
+    outputs.varPD :
         
 
     """
     
-    from . import simu
+    from . import outputs
     
     from .config import NA, NIN,MW
     
-    from .simu import it
+    from .outputs import it
     # from .coh_tools import simu2GRAV, NB2NIN
     
     NINmes = config.FS['NINmes']
     
-    image = simu.MacroImages[it]
+    image = outputs.MacroImages[it]
     
     M = config.M            # Amplification ratio camera
     
@@ -898,20 +898,20 @@ def getvar():
     DemodGRAV = config.FS['MacroP2VM_r']
     # Flux variance calculation (eq. 12)
     varFlux = sigmap**2 + M*(image - imsky)
-    simu.varFlux[it] = varFlux
+    outputs.varFlux[it] = varFlux
     
     """
     Covariance calculation (eq. 13)
     """
     
     for imw in range(MW):
-        # simu.CovarianceReal[it,imw] = np.sum(np.real(Demod[imw])**2*varFlux[imw], axis=1)
-        # simu.CovarianceImag[it,imw] = np.sum(np.imag(Demod[imw])**2*varFlux[imw], axis=1)
+        # outputs.CovarianceReal[it,imw] = np.sum(np.real(Demod[imw])**2*varFlux[imw], axis=1)
+        # outputs.CovarianceImag[it,imw] = np.sum(np.imag(Demod[imw])**2*varFlux[imw], axis=1)
 
-        simu.Covariance[it,imw] = np.dot(DemodGRAV[imw], np.dot(np.diag(varFlux[imw]),np.transpose(DemodGRAV[imw])))
-        #simu.BiasModCf[it,imw] = np.dot(ElementsNormDemod[imw],varFlux[imw])
+        outputs.Covariance[it,imw] = np.dot(DemodGRAV[imw], np.dot(np.diag(varFlux[imw]),np.transpose(DemodGRAV[imw])))
+        #outputs.BiasModCf[it,imw] = np.dot(ElementsNormDemod[imw],varFlux[imw])
         
-    simu.DemodGRAV = DemodGRAV
+    outputs.DemodGRAV = DemodGRAV
     
     # Phase variance calculation (eq. 14)
     Nvar = config.FT['Nvar']                # Integration time for phase variance
@@ -928,7 +928,7 @@ def getvar():
 #       Ex = Esperance of X ; Ey = Esperance of Y
 #       VarX = Variance of X ; VarY = Variance of Y
 # =============================================================================
-    diagCovar = np.diagonal(simu.Covariance, axis1=2, axis2=3)
+    diagCovar = np.diagonal(outputs.Covariance, axis1=2, axis2=3)
     varPhot = diagCovar[it,:,:NA]
     timerange = range(it+1-Nvar,it+1)
     varX = np.abs(diagCovar[timerange,:,NA:NA+NINmes])
@@ -936,33 +936,33 @@ def getvar():
     varNum = np.mean(varX+varY,axis=0)
     # for ia in range(NA):
     #     ibp = ia*(NA+1)
-    #     varPhot[:,ia] = simu.Covariance[it,:,ibp,ibp]       # Variance of photometry at each frame
+    #     varPhot[:,ia] = outputs.Covariance[it,:,ibp,ibp]       # Variance of photometry at each frame
     #     for iap in range(ia+1,NA):
     #         ib = posk(ia,iap,NA)
-    #         ibr=NA+ib; varX = simu.Covariance[timerange,:,ibr,ibr]
-    #         ibi=NA+NINmes+ib; varY = simu.Covariance[timerange,:,ibi,ibi]
-    #         covarXY = simu.Covariance[timerange,:,ibr,ibi]
+    #         ibr=NA+ib; varX = outputs.Covariance[timerange,:,ibr,ibr]
+    #         ibi=NA+NINmes+ib; varY = outputs.Covariance[timerange,:,ibi,ibi]
+    #         covarXY = outputs.Covariance[timerange,:,ibr,ibi]
             
     #         varNum[:,ib] = np.mean(varX+varY,axis=0)
     #         varNum2[:,ib] = np.mean(varX+varY + 2*covarXY, axis=0)
             
-    CohFlux = np.mean(simu.CfPD[timerange], axis=0)
+    CohFlux = np.mean(outputs.CfPD[timerange], axis=0)
     CfSumOverLmbda = np.sum(CohFlux,axis=0)
     
-    simu.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
-    simu.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-simu.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
-    simu.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda))#-np.mean(simu.BiasModCf[it],axis=0)) # Original eq.14    
-    #simu.varPDdenom2[it] = np.sum(np.mean(np.abs(simu.CfPD[timerange])**2,axis=0),axis=0)
-    simu.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
+    outputs.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
+    outputs.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-outputs.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
+    outputs.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda))#-np.mean(outputs.BiasModCf[it],axis=0)) # Original eq.14    
+    #outputs.varPDdenom2[it] = np.sum(np.mean(np.abs(outputs.CfPD[timerange])**2,axis=0),axis=0)
+    outputs.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
     
-    simu.varGDUnbiased[it] = simu.varPDnum[it]/simu.varGDdenomUnbiased[it]      # Var(|CohFlux|)/|CohFlux|²
-    simu.varPD[it] = simu.varPDnum[it]/simu.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
-    simu.varGD[it] = simu.varPDnum[it]/simu.varGDdenom[it]
+    outputs.varGDUnbiased[it] = outputs.varPDnum[it]/outputs.varGDdenomUnbiased[it]      # Var(|CohFlux|)/|CohFlux|²
+    outputs.varPD[it] = outputs.varPDnum[it]/outputs.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
+    outputs.varGD[it] = outputs.varPDnum[it]/outputs.varGDdenom[it]
     
-    simu.SNRPhotometry[it,:] = np.sum(simu.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
+    outputs.SNRPhotometry[it,:] = np.sum(outputs.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
     
-    varPD = simu.varPD[it]
-    varGD = simu.varGD[it]
+    varPD = outputs.varPD[it]
+    varGD = outputs.varGD[it]
     
     return varPD, varGD
 
@@ -1026,7 +1026,7 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                 raise ValueError("Please answer by 'y','yes','n' or 'no'")
             
         else:
-            from cophasim import simu,coh_tools
+            from cophasim import outputs,coh_tools
             
             scanned_baselines = [coh_tools.posk(ia,scanned_tel-1,config.NA) for ia in range(config.NA-1)]
             k=0;ib=scanned_baselines[k]
@@ -1036,9 +1036,9 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                 
             Lc = R*config.PDspectra
             
-            ind=np.argmin(np.abs(simu.OPDTrue[:,4]+Lc*0.7))
+            ind=np.argmin(np.abs(outputs.OPDTrue[:,4]+Lc*0.7))
             
-            newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
+            newThresholdGD = np.array([np.max([2,x]) for x in np.sqrt(outputs.SquaredSNRMovingAverage[ind,:])])
                     
             config.FT['ThresholdGD'] = newThresholdGD
             
@@ -1084,11 +1084,11 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                 
                 
         else:
-            from cophasim import simu,coh_tools
+            from cophasim import outputs,coh_tools
             
             if TypeDisturbance=='NoDisturbance':
                 ind=100
-                newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(simu.SquaredSNRMovingAverage[ind,:])])
+                newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(outputs.SquaredSNRMovingAverage[ind,:])])
  
             elif TypeDisturbance == 'CophasedThenForeground':
                 CophasedInd = 50 ; ForegroundInd = 180
@@ -1097,10 +1097,10 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
                 newThresholdGD = np.ones(NINmes)
 
                 for ib in range(NINmes):
-                    SNRcophased = np.mean(np.sqrt(simu.SquaredSNRMovingAverage[CophasedRange,ib]))
-                    SNRfg = np.mean(np.sqrt(simu.SquaredSNRMovingAverage[ForegroundRange,ib]))
-                    fgstd = np.std(np.sqrt(simu.SquaredSNRMovingAverage[ForegroundRange,ib]))
-                    cophasedstd = np.std(np.sqrt(simu.SquaredSNRMovingAverage[CophasedRange,ib]))
+                    SNRcophased = np.mean(np.sqrt(outputs.SquaredSNRMovingAverage[CophasedRange,ib]))
+                    SNRfg = np.mean(np.sqrt(outputs.SquaredSNRMovingAverage[ForegroundRange,ib]))
+                    fgstd = np.std(np.sqrt(outputs.SquaredSNRMovingAverage[ForegroundRange,ib]))
+                    cophasedstd = np.std(np.sqrt(outputs.SquaredSNRMovingAverage[CophasedRange,ib]))
                     
                     # Set threshold to a value between max and foreground with a lower limit defined by the std of foreground.
                     newThresholdGD[ib] = np.max([1.5,SNRfg + 5*fgstd,SNRfg+0.2*(SNRcophased-SNRfg)])
@@ -1140,9 +1140,9 @@ def searchfunction(usaw):
 
     """
     
-    from . import simu
+    from . import outputs
     from .config import NA,dt
-    from .simu import it
+    from .outputs import it
     
     for ia in range(NA):
         it0 = config.FT['it0'][ia] ; it_last = config.FT['it_last'][ia]
@@ -1163,9 +1163,9 @@ def searchfunction(usaw):
             config.FT['LastPosition'][ia] = utemp
         
     
-    simu.eps[it] = config.FT['eps']
-    simu.it_last[it] = config.FT['it_last']
-    simu.LastPosition[it] = config.FT['LastPosition']
+    outputs.eps[it] = config.FT['eps']
+    outputs.it_last[it] = config.FT['it_last']
+    outputs.LastPosition[it] = config.FT['LastPosition']
         
     # Investigation data
     
