@@ -485,7 +485,7 @@ def ReadFits(file):
         
         config.dt = 4e-3 # frame duration
         outputs.timestamps = np.arange(NT)*config.dt        # Times in seconds
-        outputs.TimeID = "%Y%m%d-%H%M%S"
+        outputs.TimeID = time.strftime("%Y%m%d-%H%M%S")
             
         """Global variables analog to outputs module"""
         

@@ -52,7 +52,7 @@ starttracking = 0
 """Source"""
 spectra=np.linspace(1.45,1.75,NW)       # Micro-sampling wavelength
 spectraM=spectra                        # Macro-sampling wavelength
-PDspectra=np.mean(spectra)              # Mean wavelength
+wlOfTrack=np.mean(spectra)              # Mean wavelength
 spectrum=np.ones_like(spectra)          # Source distribution spectral power
 
 
@@ -345,7 +345,7 @@ class ScienceObject():
 #             self.Vfactors = np.array([0, -10,-9,-6,2,7])/10            # Non redundant SPICA
 #                     # Fringe sensor parameters (should be defined by Fringe sensor itself)
 #             self.Ncross = 1             # Distance between spectral channels for GD calc
-#             self.R = np.abs((MW-1)*PDspectra/(spectraM[-1] - spectraM[0]))
+#             self.R = np.abs((MW-1)*wlOfTrack/(spectraM[-1] - spectraM[0]))
             
 #             for key in kwargs.keys():
 #                 setattr(self, key, kwargs[key])
@@ -361,7 +361,7 @@ class ScienceObject():
 #     def __init__(self):
 #         self.spectra=np.linspace(1.5,1.75,NW)      # Micro-sampling wavelength
 #         self.spectraM=spectra                    # Macro-sampling wavelength
-#         self.PDspectra=np.mean(spectra)          # Mean wavelength
+#         self.wlOfTrack=np.mean(spectra)          # Mean wavelength
 #         self.spectrum=np.ones_like(spectra)      # Source distribution spectral power
 #         self.CfObj=np.ones(4)
 

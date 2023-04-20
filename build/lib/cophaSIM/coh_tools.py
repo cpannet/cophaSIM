@@ -1306,14 +1306,14 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=False):
             TransmissionDisturbance = np.ones([NT,NW,NA])
             
         elif DisturbanceFile == 'Foreground':
-            Lc = config.FS['R']*config.PDspectra
+            Lc = config.FS['R']*config.wlOfTrack
             PistonDisturbance = np.zeros([NT,NA])
             for ia in range(NA):  # décoherencing of all telescopes
                 PistonDisturbance[:,ia]=(ia-2)*2*Lc
             TransmissionDisturbance = np.ones([NT,NW,NA])
             
         elif DisturbanceFile == 'CophasedThenForeground':
-            Lc = config.FS['R']*config.PDspectra
+            Lc = config.FS['R']*config.wlOfTrack
             PistonDisturbance = np.zeros([NT,NA])
             for ia in range(NA):  # décoherencing of all telescopes from it=100.
                 PistonDisturbance[100:,ia]=(ia-2)*2*Lc

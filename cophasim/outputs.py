@@ -22,7 +22,7 @@ NINmes = config.FS['NINmes']
 NBmes = config.FS['NBmes']
 # Time
 it = 0
-TimeID="%Y%m%d-%H%M%S"
+TimeID="notime"
 
 
 """Coherent flux [NB]""" # Most general formalism: contains photometries information
@@ -58,7 +58,7 @@ OPDTrue = np.zeros([NT,NIN])                        # True Optical Path Delay
 
 # Commands
 OPDCommand = np.zeros([NT+1,NIN])                   # OPD-space command ODL
-OPDSearchCommand = np.zeros([NT+1,NIN])             # Search command projected in the OPD-space (verify NIN or NINmes ?)
+OPDCommandRelock = np.zeros([NT+1,NIN])             # RELOCK command projected in the OPD-space (verify NIN or NINmes ?)
 
 # Astrophysical Object
 OPDrefObject = np.zeros([NIN])                      # PD reference of the Object (only for analysis)
@@ -91,6 +91,9 @@ TemporalVarianceGD = np.zeros([NT,NINmes])          # Temporal Variance GD estim
 PDCommand = np.zeros([NT+1,NINmes])                 # OPD-space PD command
 GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
 
+# Search state
+diffOffsets = np.zeros([NT,NINmes])                 # Differential offsets (p1-p2) where the fringes are found
+
 
 """Piston-space observables [NA]"""
 # The three true piston quantities (signal, correction and residues)
@@ -109,7 +112,8 @@ SNRPhotometry = np.zeros([NT,NA])                   # SNR of the photometry esti
 PistonGDCommand_beforeround = np.zeros([NT+1,NA])
 PistonPDCommand = np.zeros([NT+1,NA])               # Piston-space PD command
 PistonGDCommand = np.zeros([NT+1,NA])               # Piston-space GD command
-SearchCommand = np.zeros([NT+1,NA])                 # Piston-space Search command
+CommandRelock = np.zeros([NT+1,NA])                 # Piston-space RELOCK command
+CommandSearch = np.zeros([NT+1,NA])                 # Piston-space SEARCH command
 CommandODL = np.zeros([NT+1,NA])                    # Delay lines positionnal command calculated at time it
 
 # Photometries
@@ -129,7 +133,7 @@ MacroImages = np.zeros([NT,MW,FS['NP']])            # Contains microtime images 
 
 """ FT state-machine quantities"""
 FTmode = np.ones([NT])                              # State mode of the Fringe Tracker
-                                                    # 0: off, 1: SEARCH, 2: TRACK, 3: RELOCK
+                                                    # 0: off, 1: RELOCK, 2: TRACK, 3: SEARCH
 GainPD = np.zeros([NT])                             # Gain PD in real time, usually constant
 GainGD = np.zeros([NT])                             # Gain GD in real time, usually constant
 Ipd = np.ones([NT,NINmes,NINmes])                   # Weighting matrix PD command

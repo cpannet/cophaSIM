@@ -274,7 +274,6 @@ def simpleplot(timestamps, obs,rmsObs,generalTitle,plotObs,
             
             p1=ax2.bar(baselinestemp,[rmsObs[iBase] for iBase in plotObsIndex], color=basecolorstemp)
             
-            ax2.bar_label(p1,label_type='edge',fmt='%.2f')
             ax2.set_box_aspect(1/20)
             ax1.legend()
     
@@ -312,18 +311,24 @@ to {baselines[iLastBase]}")
             else:
                 ct.setaxelim(ax4, ydata=rmsObs,ymin=0)
                 
-            ax2.bar_label(p1,label_type='edge',fmt='%.2f')
+            
             ax4.bar_label(p2,label_type='edge',fmt='%.2f')
+            
+            ax3.set_xlabel("Time [s]")
+            ax4.set_xlabel("Baselines")
+            ax4.set_anchor('S')
+            ax2.set_box_aspect(1/6) ; ax4.set_box_aspect(1/6)
             
             
         ct.setaxelim(ax1,ydata=[obs[:,iBase] for iBase in plotObsIndex])
         ct.setaxelim(ax2,ydata=list(rmsObs)+[wl/2], ymin=0)
         ax1.set_ylabel(f'{NameObs} [µm]')
-        ax1.set_xlabel("Time [s]") ; ax3.set_xlabel("Time [s]")
+        ax1.set_xlabel("Time [s]") ; 
         ax2.set_ylabel('RMS [µm]')
-        ax2.set_xlabel("Baselines") ; ax4.set_xlabel("Baselines")
-        ax2.set_anchor('S') ; ax4.set_anchor('S')
-        ax2.set_box_aspect(1/6) ; ax4.set_box_aspect(1/6)
+        ax2.set_xlabel("Baselines") ; 
+        ax2.set_anchor('S')
+        
+        ax2.bar_label(p1,label_type='edge',fmt='%.2f')
     
         if display:
             fig.show()

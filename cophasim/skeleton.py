@@ -47,7 +47,7 @@ rcParamsForBaselines = {"font.size":SS,
 
 def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, 
                ND=1, 
-               spectra = [], spectraM=[],PDspectra=0, spectrum = [],
+               spectra = [], spectraM=[],wlOfTrack=0, spectrum = [],
                mode = 'search',
                fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigmap=[],imsky=[],
                ft = 'integrator', state = 0,
@@ -79,7 +79,7 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5,
         DESCRIPTION. The default is [].
     spectraM : TYPE, optional
         DESCRIPTION. The default is [].
-    PDspectra : TYPE, optional
+    wlOfTrack : TYPE, optional
         DESCRIPTION. The default is 0.
     spectrum : TYPE, optional
         DESCRIPTION. The default is [].
@@ -234,8 +234,8 @@ SOURCE:
         raise ValueError('Macro lambda array required')
     MW = len(spectraM)
     
-    if PDspectra==0:
-        PDspectra = np.median(spectraM) 
+    if wlOfTrack==0:
+        wlOfTrack = np.median(spectraM) 
         
 
     if type(qe) == float:
@@ -316,7 +316,7 @@ SOURCE:
     # Source description
     config.spectra=spectra
     config.spectraM=spectraM
-    config.PDspectra=PDspectra
+    config.wlOfTrack=wlOfTrack
     config.dyn=dyn
     
     # Simulation parameters
@@ -1140,7 +1140,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
                         else:
                             ic = ct.poskfai(itelbest,ia,iap,NA)
                     
-                        outputs.OPDrefObject[ib] = np.median(outputs.ClosurePhaseObject[:,ic])/(2*np.pi)*config.PDspectra
+                        outputs.OPDrefObject[ib] = np.median(outputs.ClosurePhaseObject[:,ic])/(2*np.pi)*config.wlOfTrack
         
     outputs.CoherentFluxObject = CfObj
     outputs.VisibilityObject = VisObj
@@ -1181,6 +1181,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
         currCfEstimated = fringesensor(currCfTrue)
         outputs.CfEstimated[it,:,:] = currCfEstimated   # NBmes
 
+
         """
         FRINGE TRACKER: From measured coherences to ODL commands
         """
@@ -1208,6 +1209,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
             # LeftProcessingTime = (time.time()-time0)*(1-processedfraction)/processedfraction
             if verbose:
                 print(f'Processed: {processedfraction*100}%, Elapsed time: {round(time.time()-time0)}s')
+
 
     print(f"Done. (Total: {round(time.time()-time0)}s)")
     
@@ -1243,7 +1245,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     return
 
 
-def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
+def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             Pistondetails=False,OPDdetails=False,withsnr=True,
             OneTelescope=True, pause=False, display=True,verbose=False,
             start_pd_tracking = 0,UsedTelemetries='simu',
@@ -1272,11 +1274,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     ----------
     *args : optional argument
         Write, as strings, the different observables you want to plot among those listed above.
-    WLOfTrack : FLOAT, optional
+    wlOfTrack : FLOAT, optional
         Wavelength at which the pistonic data are computed. The default is 1.6.
     DIT : FLOAT, optional
         Integration time for the variances, averages, etc... The default is 50.
-    WLOfScience : FLOAT, optional
+    wlOfScience : FLOAT, optional
         Wavelength at which the science instrument is working, for SNR computation. The default is 0.75.
     Pistondetails : BOOLEAN, optional
         DESCRIPTION. The default is False.
@@ -1346,7 +1348,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     
     if UsedTelemetries == 'simu':
         
-        WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
+        WLIndex = np.argmin(np.abs(config.spectraM-wlOfTrack))
         wl = config.spectraM[WLIndex]
         
         VisObj = ct.NB2NIN(outputs.VisibilityObject[WLIndex])
@@ -1356,7 +1358,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
             
     else:
 
-        #WLIndex = np.argmin(np.abs(config.spectraM-WLOfTrack))
+        #WLIndex = np.argmin(np.abs(config.spectraM-wlOfTrack))
         wl = TT.lmbda
         
         # Temporary before getting info in fitsfile
@@ -1378,7 +1380,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     effDIT = min(DIT, config.NT - config.starttracking -1)
     
     if (not ('opdcontrol' in args)) and (UsedTelemetries=='simu'):
-        ShowPerformance(float(timestamps[stationaryregim_start]), WLOfScience, effDIT, display=False)
+        ShowPerformance(float(timestamps[stationaryregim_start]), wlOfScience, effDIT, display=False)
     else:
         if verbose:
             print("don't compute performances")
@@ -1644,13 +1646,9 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     else:
         SNR = SNR_gd
     
-    """
-    NOW YOU CAN DISPLAY
-    """
-    
-    if len(savedir) and (not os.path.exists(savedir)):
-        os.makedirs(savedir)
-    
+    """""""""""""""""""""""""""""""""""""""
+    """"""""  NOW YOU CAN DISPLAY  """"""""
+    """""""""""""""""""""""""""""""""""""""
 
     """ PISTON SPACE """
 
@@ -1865,7 +1863,10 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     if displayall or ('perftable' in args) :
         generaltitle = "GD and PD estimated"
         typeobs = "GDPDest"
-        filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
         
         GDobs = GDmic
         PDobs = PDmic
@@ -1885,8 +1886,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     if displayall or ('perftable2' in args) :
         generaltitle = "GD and PD estimated, after patch"
         typeobs = "GDPDest2"
-        filename= savedir+f"Simulation{TimeID}_{typeobs}"
-        
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
+            
         GDobs = GDmic2
         PDobs = PDmic2
         
@@ -1906,8 +1910,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     if displayall or ('perftableres' in args) :
         generaltitle = "GD and PD residuals"
         typeobs = "GDPDres"
-        filename= savedir+f"Simulation{TimeID}_{typeobs}"
-        
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
+            
         GDobs = GDerrmic
         PDobs = PDerrmic
         
@@ -1926,8 +1933,11 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     if displayall or ('perftableres2' in args) :
         generaltitle = "GD and PD residuals, after least square"
         typeobs = "GDPDres2"
-        filename= savedir+f"Simulation{TimeID}_{typeobs}"
-        
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
+            
         GDobs = GDerrmic2
         PDobs = PDerrmic2
         
@@ -1946,10 +1956,13 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     if displayall or ('GDPDcmd' in args) :
         generaltitle = "GD and PD commands in OPD-space"
         typeobs = "GDPDcmd"
-        filename= savedir+f"Simulation{TimeID}_{typeobs}"
-        
-        GDobs = outputs.GDCommand
-        PDobs = outputs.PDCommand
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
+            
+        GDobs = outputs.GDCommand[:-1]
+        PDobs = outputs.PDCommand[:-1]
         
         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
@@ -1968,109 +1981,161 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
     """ PLOT OF A SINGLE OBSERVABLES (PD,GD,OPD,SNR,etc...) IN OPD-SPACE """
 
     if displayall or ('opd' in args):
+        generaltitle = 'True OPDs'
+        typeobs = "OPDtrue"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
+            
         obs = outputs.OPDTrue
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        filename= savedir+f"Simulation{TimeID}_{typeobs}"
-        
-        generaltitle = 'True OPDs'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
                                   NameObs='OPD',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     
     if displayall or ('pd' in args):
+        generaltitle = 'Phase-delays'
+        typeobs='PD'
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
+
         obs = PDmic
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
-        generaltitle = 'Phase-delays'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='PD',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
     
-    if displayall or ('pd2' in args):
-        obs = PDmic2
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
+    if displayall or ('pd2' in args):      
         generaltitle = 'Phase-delays 2'
+        typeobs = "PD2"
+        obs = PDmic2
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''
+            
+        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='PD',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     if displayall or ('gd' in args):
+
+        generaltitle = 'Group-delays'
+        typeobs = "GD"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''        
+            
         obs = GDmic
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
-        generaltitle = 'Group-delays'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='GD',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     if displayall or ('gd2' in args):
+        generaltitle = 'Group-delays 2'
+        typeobs = "GD2"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''        
+            
         obs = GDmic2
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
-        generaltitle = 'Group-delays'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='GD2',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
         
     if displayall or ('snr' in args):
+        generaltitle = 'SNR'
+        typeobs = "SNR"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''        
+            
         obs = SNR
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
-        generaltitle = 'SNR'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='SNR',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
                 
         
     if displayall or ('snrpd' in args):
+
+        generaltitle = 'SNR PD'
+        typeobs="SNRPD"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''     
+            
         obs = SNR_pd
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        generaltitle = 'SNR PD'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='SNR',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
                 
     if displayall or ('snrgd' in args):
+        generaltitle = 'SNR GD'
+        typeobs="SNRGD"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''     
+            
         obs = SNR_gd
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
-        generaltitle = 'SNR GD'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='SNR',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     if displayall or ('gdcmd' in args):
+        generaltitle = 'GD Commands'
+        typeobs="GDCmd"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''     
+            
         obs = outputs.GDCommand[:-1]
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
-        generaltitle = 'GD Commands'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='Commands',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
         
     if displayall or ('pdcmd' in args):
+        generaltitle = 'PD Commands'
+        typeobs="PDCmd"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''     
+            
         obs = outputs.PDCommand[:-1]
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        
-        generaltitle = 'PD Commands'
         display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='Commands',
-                                  display=True,filename='',ext='pdf',infos={"details":''},
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     # if displayall or ('piscmds' in args):
@@ -2110,7 +2175,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         
         
         
-        #visibilities, _,_,_=ct.VanCittert(WLOfScience,config.Obs,config.Target)
+        #visibilities, _,_,_=ct.VanCittert(wlOfScience,config.Obs,config.Target)
         #outputs.VisibilityAtPerfWL = visibilities
         visibilities = ct.NB2NIN(outputs.VisibilityObject[WLIndex])
         vismod = np.abs(visibilities) ; visangle = np.angle(visibilities)
@@ -2128,7 +2193,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         fig=plt.figure(title, clear=True)
         (ax1,ax2)=fig.subplots(ncols=2, sharex=True, sharey=True)
         ax1.set_title(f"Target visibility and photometric balance ({wl:.3}µm)")
-        ax2.set_title(f"Fringe contrast and Time on central fringe ({WLOfScience:.3}µm)")
+        ax2.set_title(f"Fringe contrast and Time on central fringe ({wlOfScience:.3}µm)")
         
         for ia in range(NA):
             name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
@@ -2174,7 +2239,7 @@ def display(*args, WLOfTrack=1.6,DIT=50,WLOfScience=0.75,
         # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
         # mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
         #                           orientation='vertical',
-        #                           label=f"Fringe Contrast at {WLOfScience:.3}µm")
+        #                           label=f"Fringe Contrast at {wlOfScience:.3}µm")
 
 
         
@@ -3974,7 +4039,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     observable = outputs.VarOPD
     xrange = np.arange(NIN)
     
-    plt.figure(f'Variance OPD @{round(config.PDspectra,2)}µm')    
+    plt.figure(f'Variance OPD @{round(config.wlOfTrack,2)}µm')    
     plt.ylim([np.min(observable),np.max(observable)])
     plt.scatter(np.arange(NIN),observable)
     plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
@@ -3985,9 +4050,9 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     plt.show()
     config.newfig += 1
     
-    observable = outputs.VarPDEst*(config.PDspectra/2/np.pi)
+    observable = outputs.VarPDEst*(config.wlOfTrack/2/np.pi)
     
-    plt.figure(f'Variance Estimated PD @{round(config.PDspectra,2)}µm')    
+    plt.figure(f'Variance Estimated PD @{round(config.wlOfTrack,2)}µm')    
     plt.ylim([np.min(observable),np.max(observable)])
     plt.scatter(np.arange(NINmes),observable)
     plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
@@ -3999,9 +4064,9 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     config.newfig += 1
     
     
-    observable = outputs.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
+    observable = outputs.VarGDEst*(config.wlOfTrack/2/np.pi)*config.FS['R']
     
-    plt.figure(f'Variance Estimated GD @{round(config.PDspectra,2)}µm')    
+    plt.figure(f'Variance Estimated GD @{round(config.wlOfTrack,2)}µm')    
     plt.ylim([np.min(observable),np.max(observable)])
     plt.scatter(np.arange(NINmes),observable)
     plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
@@ -4333,7 +4398,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         observable = outputs.VarOPD
         xrange = np.arange(NIN)
         
-        plt.figure(f'Variance OPD @{round(config.PDspectra,2)}µm')    
+        plt.figure(f'Variance OPD @{round(config.wlOfTrack,2)}µm')    
         plt.ylim([np.min(observable),np.max(observable)])
         plt.scatter(np.arange(NIN),observable)
         plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
@@ -4344,9 +4409,9 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         plt.show()
         config.newfig += 1
         
-        observable = outputs.VarPDEst*(config.PDspectra/2/np.pi)
+        observable = outputs.VarPDEst*(config.wlOfTrack/2/np.pi)
         
-        plt.figure(f'Variance Estimated PD @{round(config.PDspectra,2)}µm')    
+        plt.figure(f'Variance Estimated PD @{round(config.wlOfTrack,2)}µm')    
         plt.ylim([np.min(observable),np.max(observable)])
         plt.scatter(np.arange(NIN),observable)
         plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
@@ -4358,9 +4423,9 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         config.newfig += 1
         
         
-        observable = outputs.VarGDEst*(config.PDspectra/2/np.pi)*config.FS['R']
+        observable = outputs.VarGDEst*(config.wlOfTrack/2/np.pi)*config.FS['R']
         
-        plt.figure(f'Variance Estimated GD @{round(config.PDspectra,2)}µm')    
+        plt.figure(f'Variance Estimated GD @{round(config.wlOfTrack,2)}µm')    
         plt.ylim([np.min(observable),np.max(observable)])
         plt.scatter(np.arange(NIN),observable)
         plt.hlines(np.mean(observable), xrange[0],xrange[-1],linestyle='--')
@@ -4770,7 +4835,7 @@ def ReadCf(currCfEstimated):
     D = 0   # Dispersion correction factor: so far, put to zero because it's a 
             # calibration term (to define in coh_fs?)
             
-    LmbdaTrack = config.PDspectra
+    LmbdaTrack = config.wlOfTrack
     
     # Coherent flux corrected from dispersion
     for imw in range(MW):
@@ -5044,7 +5109,7 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
     """
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        outputs.GDCommand[it+1] = outputs.GDCommand[it] + FT['GainGD']*config.PDspectra*config.FS['R']/(2*np.pi)*currGDerr
+        outputs.GDCommand[it+1] = outputs.GDCommand[it] + FT['GainGD']*config.wlOfTrack*config.FS['R']/(2*np.pi)*currGDerr
         # From OPD to Pistons
         outputs.PistonGDCommand[it+1] = np.dot(FS['OPD2Piston'], outputs.GDCommand[it+1])
         
@@ -5058,13 +5123,13 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
     
     if config.FT['roundGD']=='round':
         for ia in range(NA):
-            jumps = round(uGD[ia]/config.PDspectra)
-            uGD[ia] = jumps*config.PDspectra
+            jumps = round(uGD[ia]/config.wlOfTrack)
+            uGD[ia] = jumps*config.wlOfTrack
 
     elif config.FT['roundGD']=='int':
         for ia in range(NA):
-            jumps = int(uGD[ia]/config.PDspectra)
-            uGD[ia] = jumps*config.PDspectra
+            jumps = int(uGD[ia]/config.wlOfTrack)
+            uGD[ia] = jumps*config.wlOfTrack
             
     elif config.FT['roundGD']=='no':
         pass
@@ -5092,7 +5157,7 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
     
     if config.FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        outputs.PDCommand[it+1] = outputs.PDCommand[it] + FT['GainPD']*config.PDspectra/(2*np.pi)*currPDerr
+        outputs.PDCommand[it+1] = outputs.PDCommand[it] + FT['GainPD']*config.wlOfTrack/(2*np.pi)*currPDerr
         # From OPD to Pistons
         outputs.PistonPDCommand[it+1] = np.dot(FS['OPD2Piston'], outputs.PDCommand[it+1])
         
