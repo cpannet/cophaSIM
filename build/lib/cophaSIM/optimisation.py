@@ -62,7 +62,7 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
 
     """
     
-    from . import simu
+    from . import outputs
     from . import config
     import pandas as pd
     
@@ -177,7 +177,7 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                                 figsave.remove('perfarray')
                             sk.display(*figsave,display=display,savedir=savepath,ext='pdf',verbose=verbose2)
                         
-                # Load the performance observables into simu module
+                # Load the performance observables into outputs module
                 for idit in range(NDIT):
                     DIT=DITs[idit]
                     sk.ShowPerformance(TimeBonds,SpectraForScience,DIT, display=False)
@@ -185,33 +185,33 @@ def OptimGainsTogether(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20),
                     # VarOPD, VarCP, SNRSI, FringeContrast, LockedRatio, WLockedRatio = perfs
                     
                     # Initialise the comparison tables
-                    VarOPD[idit,ig,ip,:] += simu.VarOPD/Nfiles
-                    VarCP[idit,ig,ip,:] += simu.VarCPD/Nfiles
-                    VarGDRes[idit,ig,ip,:] += simu.VarGDRes/Nfiles
-                    VarPDRes[idit,ig,ip,:] += simu.VarPDRes/Nfiles
-                    VarPiston[idit,ig,ip,:] += simu.VarPiston/Nfiles
-                    VarPistonGD[idit,ig,ip,:] += simu.VarPistonGD/Nfiles
-                    VarPistonPD[idit,ig,ip,:] += simu.VarPistonPD/Nfiles
-                    SNRSI[idit,ig,ip,:] += simu.SNR_E/Nfiles
-                    FCArray[idit,ig,ip,:] += simu.FringeContrast[0]/Nfiles
-                    LockedRatio[idit,ig,ip,:] += simu.LockedRatio/Nfiles
-                    WLockedRatio[idit,ig,ip,:] += simu.WLockedRatio/Nfiles
+                    VarOPD[idit,ig,ip,:] += outputs.VarOPD/Nfiles
+                    VarCP[idit,ig,ip,:] += outputs.VarCPD/Nfiles
+                    VarGDRes[idit,ig,ip,:] += outputs.VarGDRes/Nfiles
+                    VarPDRes[idit,ig,ip,:] += outputs.VarPDRes/Nfiles
+                    VarPiston[idit,ig,ip,:] += outputs.VarPiston/Nfiles
+                    VarPistonGD[idit,ig,ip,:] += outputs.VarPistonGD/Nfiles
+                    VarPistonPD[idit,ig,ip,:] += outputs.VarPistonPD/Nfiles
+                    SNRSI[idit,ig,ip,:] += outputs.SNR_E/Nfiles
+                    FCArray[idit,ig,ip,:] += outputs.FringeContrast[0]/Nfiles
+                    LockedRatio[idit,ig,ip,:] += outputs.LockedRatio/Nfiles
+                    WLockedRatio[idit,ig,ip,:] += outputs.WLockedRatio/Nfiles
                 
-                    LR2[idit,ig,ip,:] += simu.LR2/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    LR3[idit,ig,ip,:] += simu.LR3/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    LR2[idit,ig,ip,:] += outputs.LR2/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    LR3[idit,ig,ip,:] += outputs.LR3/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
             
                     # Average of the estimated instantaneous variance. (has a 
                     # signification only in open loop)
-                    InstVarPD[idit,ig,ip,:] += np.mean(simu.varPD,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    InstVarGD[idit,ig,ip,:] += np.mean(simu.varGD,axis=0)/Nfiles
-                    InstVarGDUnbiased[idit,ig,ip,:] += np.mean(simu.varGDUnbiased,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    VarPDnum[idit,ig,ip,:] += np.mean(simu.varPDnum,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    VarPDdenom[idit,ig,ip,:] += np.mean(simu.varPDdenom,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    VarGDdenom[idit,ig,ip,:] += np.mean(simu.varGDdenom,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    VarGDdenomUnbiased[idit,ig,ip,:] += np.mean(simu.varGDdenomUnbiased,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    InstVarPD[idit,ig,ip,:] += np.mean(outputs.varPD,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    InstVarGD[idit,ig,ip,:] += np.mean(outputs.varGD,axis=0)/Nfiles
+                    InstVarGDUnbiased[idit,ig,ip,:] += np.mean(outputs.varGDUnbiased,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarPDnum[idit,ig,ip,:] += np.mean(outputs.varPDnum,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarPDdenom[idit,ig,ip,:] += np.mean(outputs.varPDdenom,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarGDdenom[idit,ig,ip,:] += np.mean(outputs.varGDdenom,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    VarGDdenomUnbiased[idit,ig,ip,:] += np.mean(outputs.varGDdenomUnbiased,axis=0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
-                    Vmod[idit,ig,ip,:] = np.real(ct.NB2NIN(np.abs(simu.VisibilityObject[indWLOfTrack])))
-                    Vangle[idit,ig,ip,:] = np.real(ct.NB2NIN(np.angle(simu.VisibilityObject[indWLOfTrack])))
+                    Vmod[idit,ig,ip,:] = np.real(ct.NB2NIN(np.abs(outputs.VisibilityObject[indWLOfTrack])))
+                    Vangle[idit,ig,ip,:] = np.real(ct.NB2NIN(np.angle(outputs.VisibilityObject[indWLOfTrack])))
             
                     ThresholdGDs[idit,ig,ip,:] = config.FT['ThresholdGD'] # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
@@ -473,7 +473,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
 
     """
     
-    from . import simu
+    from . import outputs
     from . import config
     import pandas as pd
     
@@ -579,7 +579,7 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
     # if ThrownFrames[idit] > 0.05*LengthOfKeptSequence[idit]:
     #     NewIntegrationTimes.remove(IntegrationTimes[idit])
             
-    simu.DITsForPerformance = newDITs
+    outputs.DITsForPerformance = newDITs
     Ndit = len(newDITs)
     
     time0 = time.time() ; LoopNumber = 0
@@ -682,45 +682,45 @@ def OptimGainsTogether_multiDITs(GainsPD=[],GainsGD=[],DITs=np.logspace(0,500,20
             
                     
                     # Initialise the comparison tables
-                    VarOPD[:,ig,ip,:] += simu.VarOPD/Nfiles
-                    VarCP[:,ig,ip,:] += simu.VarCPD/Nfiles
-                    VarGDRes[:,ig,ip,:] += simu.VarGDRes/Nfiles
-                    VarPDRes[:,ig,ip,:] += simu.VarPDRes/Nfiles
-                    VarGDEst[:,ig,ip,:] += simu.VarGDEst/Nfiles
-                    VarPDEst[:,ig,ip,:] += simu.VarPDEst/Nfiles
+                    VarOPD[:,ig,ip,:] += outputs.VarOPD/Nfiles
+                    VarCP[:,ig,ip,:] += outputs.VarCPD/Nfiles
+                    VarGDRes[:,ig,ip,:] += outputs.VarGDRes/Nfiles
+                    VarPDRes[:,ig,ip,:] += outputs.VarPDRes/Nfiles
+                    VarGDEst[:,ig,ip,:] += outputs.VarGDEst/Nfiles
+                    VarPDEst[:,ig,ip,:] += outputs.VarPDEst/Nfiles
     
-                    SNRSI[:,ig,ip,:] += simu.SNR_E/Nfiles
-                    FCArray[:,ig,ip,:] += np.mean(simu.FringeContrast,axis=1)/Nfiles
-                    LockedRatio[:,ig,ip,:] += simu.LockedRatio/Nfiles
+                    SNRSI[:,ig,ip,:] += outputs.SNR_E/Nfiles
+                    FCArray[:,ig,ip,:] += np.mean(outputs.FringeContrast,axis=1)/Nfiles
+                    LockedRatio[:,ig,ip,:] += outputs.LockedRatio/Nfiles
     
-                    LR2[:,ig,ip,:] += simu.LR2/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    LR3[:,ig,ip,:] += simu.LR3/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    LR2[:,ig,ip,:] += outputs.LR2/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    LR3[:,ig,ip,:] += outputs.LR3/Nfiles # Doesn't depend on the integration time but need DIT dimension for dataframe
                 
-                    Vmod[:,ig,ip,:] = np.repeat(np.real(ct.NB2NIN(np.abs(simu.VisibilityObject[indWLOfTrack])))[np.newaxis,:],NDIT,0)
-                    Vangle[:,ig,ip,:] = np.repeat(np.real(ct.NB2NIN(np.angle(simu.VisibilityObject[indWLOfTrack])))[np.newaxis,:],NDIT,0)
+                    Vmod[:,ig,ip,:] = np.repeat(np.real(ct.NB2NIN(np.abs(outputs.VisibilityObject[indWLOfTrack])))[np.newaxis,:],NDIT,0)
+                    Vangle[:,ig,ip,:] = np.repeat(np.real(ct.NB2NIN(np.angle(outputs.VisibilityObject[indWLOfTrack])))[np.newaxis,:],NDIT,0)
             
                     ThresholdGDs[:,ig,ip,:] = np.repeat(config.FT['ThresholdGD'][np.newaxis,:],NDIT,0) # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    InstVarPD[:,ig,ip,:] += np.repeat(np.mean(simu.varPD,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                    InstVarGD[:,ig,ip,:] += np.repeat(np.mean(simu.varGD,axis=0)[np.newaxis,:],NDIT,0)/Nfiles
+                    InstVarPD[:,ig,ip,:] += np.repeat(np.mean(outputs.varPD,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                    InstVarGD[:,ig,ip,:] += np.repeat(np.mean(outputs.varGD,axis=0)[np.newaxis,:],NDIT,0)/Nfiles
     
-                    VarPiston[:,ig,ip,:] += simu.VarPiston/Nfiles
-                    VarPistonGD[:,ig,ip,:] += simu.VarPistonGD/Nfiles
-                    VarPistonPD[:,ig,ip,:] += simu.VarPistonPD/Nfiles
+                    VarPiston[:,ig,ip,:] += outputs.VarPiston/Nfiles
+                    VarPistonGD[:,ig,ip,:] += outputs.VarPistonGD/Nfiles
+                    VarPistonPD[:,ig,ip,:] += outputs.VarPistonPD/Nfiles
     
                     if criterias!='light':
                         
-                        WLockedRatio[:,ig,ip,:] += simu.WLockedRatio/Nfiles
+                        WLockedRatio[:,ig,ip,:] += outputs.WLockedRatio/Nfiles
                 
                         # These values don't have DIT dimension, so we must repeat it over
                         # this dimension for inserting it in dataframe.
                         
                         # Average of the estimated instantaneous variance. (has a 
                         # signification only in open loop)
-                        InstVarGDUnbiased[:,ig,ip,:] += np.repeat(np.mean(simu.varGDUnbiased,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                        VarPDnum[:,ig,ip,:] += np.repeat(np.mean(simu.varPDnum,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                        VarPDdenom[:,ig,ip,:] += np.repeat(np.mean(simu.varPDdenom,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                        VarGDdenom[:,ig,ip,:] += np.repeat(np.mean(simu.varGDdenom,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
-                        VarGDdenomUnbiased[:,ig,ip,:] += np.repeat(np.mean(simu.varGDdenomUnbiased,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                        InstVarGDUnbiased[:,ig,ip,:] += np.repeat(np.mean(outputs.varGDUnbiased,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                        VarPDnum[:,ig,ip,:] += np.repeat(np.mean(outputs.varPDnum,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                        VarPDdenom[:,ig,ip,:] += np.repeat(np.mean(outputs.varPDdenom,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                        VarGDdenom[:,ig,ip,:] += np.repeat(np.mean(outputs.varGDdenom,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
+                        VarGDdenomUnbiased[:,ig,ip,:] += np.repeat(np.mean(outputs.varGDdenomUnbiased,axis=0)[np.newaxis,:],NDIT,0)/Nfiles  # Doesn't depend on the integration time but need DIT dimension for dataframe
                     
                         
             IDs.append(config.SimuTimeID)
@@ -1018,7 +1018,7 @@ def calcRMS(startframe):
         DESCRIPTION.
 
     """
-    from .simu import OPDTrue
+    from .outputs import OPDTrue
     
     rmsOPD = np.std(OPDTrue[startframe:,:],axis=0)
     

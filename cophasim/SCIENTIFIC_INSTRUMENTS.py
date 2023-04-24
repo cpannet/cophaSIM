@@ -248,12 +248,12 @@ def SPICAVIS(CoherentFluxObject,ResidualOPDs, spectra,DIT=100,R=140):
     SNR_E_perSC = np.empty([MW,NIN])*np.nan
     
     try:
-        from . import simu
-        simu.SNRnum=np.zeros([MW,NIN])*np.nan
-        simu.PhNoise=np.zeros([MW,NIN])*np.nan
-        simu.RNoise=np.zeros([NIN])*np.nan
-        simu.CTerms=np.zeros([MW,NIN])*np.nan
-        simu.var_cf=np.zeros([MW,NIN])*np.nan
+        from . import outputs
+        outputs.SNRnum=np.zeros([MW,NIN])*np.nan
+        outputs.PhNoise=np.zeros([MW,NIN])*np.nan
+        outputs.RNoise=np.zeros([NIN])*np.nan
+        outputs.CTerms=np.zeros([MW,NIN])*np.nan
+        outputs.var_cf=np.zeros([MW,NIN])*np.nan
     
     except:
         pass
@@ -317,13 +317,13 @@ def SPICAVIS(CoherentFluxObject,ResidualOPDs, spectra,DIT=100,R=140):
             SNR_E[ib] = np.mean(EnergyPicFrange*Gab_tilde,axis=0) / np.sqrt(np.mean(var_cf))
             SNR_E_perSC[:,ib] = EnergyPicFrange / np.sqrt(var_cf)
             
-            # simu.VisiSquared[:,ib] = EnergyPicFrange/(P1*P2)
+            # outputs.VisiSquared[:,ib] = EnergyPicFrange/(P1*P2)
             try:
-                simu.SNRnum[:,ib] = EnergyPicFrange*Gab_tilde
-                simu.PhNoise[:,ib]=PhotonNoise
-                simu.var_cf[:,ib] = var_cf
-                simu.RNoise[ib] = ReadNoise
-                simu.CTerms[:,ib] = CoupledTerms
+                outputs.SNRnum[:,ib] = EnergyPicFrange*Gab_tilde
+                outputs.PhNoise[:,ib]=PhotonNoise
+                outputs.var_cf[:,ib] = var_cf
+                outputs.RNoise[ib] = ReadNoise
+                outputs.CTerms[:,ib] = CoupledTerms
             except:
                 pass
 

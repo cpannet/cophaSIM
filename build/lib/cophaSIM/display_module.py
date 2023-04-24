@@ -196,7 +196,7 @@ to {baselines[iLastBase]}")
         
         ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
         
-        ax3.set_xlabel('Time [s]', labelpad=0) ; ax8.set_xlabel('Time [s]', labelpad=0)
+        ax3.set_xlabel('Time [ms]', labelpad=0) ; ax8.set_xlabel('Time [ms]', labelpad=0)
         ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
 
         
@@ -215,18 +215,15 @@ to {baselines[iLastBase]}")
     plt.rcParams.update(plt.rcParamsDefault)
 
 
-
-def simpleplot(timestamps, obs,rmsObs,generalTitle,plotObs,
-               NameObs='PD',display=True,filename='',ext='pdf',infos={"details":''},
+def simpleplot_bases(timestamps, obs,rmsObs,generalTitle,plotObs,
+               NameObs='PD [µm]',display=True,filename='',ext='pdf',infos={"details":''},
                verbose=False):
     
-    global telescopes, baselines, closures, stationaryregim,wl,NINtodisplay#,TelNameLength,\
-        #PlotTel,PlotTelOrigin,PlotBaselineNIN,PlotBaseline,PlotClosure
-            # PlotBaselineIndex,PlotBaselineNINIndex
+    global baselines, stationaryregim,wl,NAtodisplay
         
     plt.rcParams.update(rcParamsForBaselines)
     
-    # Each figure only shows 15 baselines, distributed on two subplots
+    # Each figure only shows up to 15 baselines, distributed on two subplots
     # If there are more than 15 baselines, multiple figures will be created 
     # If there are less than 6 baselines, only one axe is plotted.
     # In between, two axes on a unique figure are plotted.
@@ -306,7 +303,7 @@ to {baselines[iLastBase]}")
             p2=ax4.bar(baselines[SecondSet],rmsObs[SecondSet], color=barbasecolors[len1:])
             ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
             ct.setaxelim(ax1, ydata=obs, ymargin=0.4,ymin=0)
-            if NameObs=='PD':
+            if 'pd'.casefold() in NameObs.casefold():
                 ax4.set_ylim([0,wl])
             else:
                 ct.setaxelim(ax4, ydata=rmsObs,ymin=0)
@@ -314,7 +311,7 @@ to {baselines[iLastBase]}")
             
             ax4.bar_label(p2,label_type='edge',fmt='%.2f')
             
-            ax3.set_xlabel("Time [s]")
+            ax3.set_xlabel("Time [ms]")
             ax4.set_xlabel("Baselines")
             ax4.set_anchor('S')
             ax2.set_box_aspect(1/6) ; ax4.set_box_aspect(1/6)
@@ -322,9 +319,9 @@ to {baselines[iLastBase]}")
             
         ct.setaxelim(ax1,ydata=[obs[:,iBase] for iBase in plotObsIndex])
         ct.setaxelim(ax2,ydata=list(rmsObs)+[wl/2], ymin=0)
-        ax1.set_ylabel(f'{NameObs} [µm]')
-        ax1.set_xlabel("Time [s]") ; 
-        ax2.set_ylabel('RMS [µm]')
+        ax1.set_ylabel(NameObs)
+        ax1.set_xlabel("Time [ms]") ; 
+        ax2.set_ylabel('RMS')
         ax2.set_xlabel("Baselines") ; 
         ax2.set_anchor('S')
         
@@ -342,99 +339,129 @@ to {baselines[iLastBase]}")
             else:
                 plt.savefig(filename+f"_{rangeBases}.{ext}")
                 
-        # figname = '_'.join(title.split(' ')[:3])
-        # figname = f"SNRonly"
-        # if display:
-        #     if pause:
-        #         plt.pause(0.1)
-        #     else:
-        #         plt.show()  
                 
-        # if len(savedir):
-        #     fig.savefig(savedir+f"Simulation{TimeID}_opd.{ext}")
-            
-        #     if isinstance(ext,list):
-        #         for extension in ext:
-        #             plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
-        #     else:
-        #         plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
-            
-        #     if figsave:
-        #         prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
-        #         if isinstance(ext,list):
-        #             for extension in ext:
-        #                 plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
-        #         else:
-        #             plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
-        #     fig.show()
-            
-            
-            
-    # OneAxe = False ; NbOfBaselinesToPlot = np.sum(PlotBaseline)
-    # if NbOfBaselinesToPlot < 8:
-    #     OneAxe=True
-    #     ax1, ax2 = fig.subplots(nrows=2,ncols=1, gridspec_kw={"height_ratios":[3,1]})
-    # else:
-    #     len1 = NbOfBaselinesToPlot//2 ; len2 = NbOfBaselinesToPlot%2
-    #     (ax1,ax3),(ax2,ax4) = fig.subplots(nrows=2,ncols=2, gridspec_kw={"height_ratios":[3,1]})
-    #     ax1.set_title("First serie of baselines")
-    #     ax3.set_title("Second serie of baselines")
+def simpleplot_tels(timestamps, obs,rmsObs,generalTitle,plotObs,
+               NameObs='PD [µm]',display=True,filename='',ext='pdf',infos={"details":''},
+               verbose=False):
     
-    # setaxelim(ax1, ydata=1/averagePdVar[:,PlotBaseline], ymargin=0.2, ymin=0)
-    # setaxelim(ax2, ydata=MeanSquaredSNR[PlotBaseline]+RMSSquaredSNR[PlotBaseline], ymargin=0.2,ymin=0)
-
-    # ax1.set_xlabel("Time (s)")
-    # ax1.set_ylabel('SNR²')
-    # ax2.set_ylabel('<SNR²>')
+    global telescopes, stationaryregim,wl,NINtodisplay
+        
+    plt.rcParams.update(rcParamsForBaselines)
     
-    # if OneAxe:
-    #     baselinestemp = [baselines[iBase] for iBase in PlotBaselineIndex]
-    #     basecolorstemp = basecolors[:NbOfBaselinesToPlot]
-    #     barbasecolors = ['grey']*NIN
+    # Each figure only shows up to 10 telescopes, distributed on two subplots
+    # If there are more than 10 baselines, multiple figures will be created 
+    # If there are less than 6 baselines, only one axe is plotted.
+    # In between, two axes on a unique figure are plotted.
+
+    NbOfObsToPlot = np.sum(plotObs)
+
+    plotObsIndex = np.argwhere(plotObs).ravel()
+    for iFig in range(NbOfTelFigures):
+
+        NAtodisplay=NAdisp
+        if iFig == NbOfTelFigures-1:
+            if (NA%NAdisp < NAdisp) and (NA%NAdisp != 0):
+                NAtodisplay = NA%NAdisp
+                
+        iFirstTel= NAdisp*iFig                         # Index of first baseline to display
+        iLastTel= iFirstTel + NAtodisplay - 1          # Index of last baseline to display
         
-    #     ax2.set_anchor('S')
-    #     ax2.set_box_aspect(1/15)
         
-    #     k=0
-    #     for iBase in PlotBaselineIndex:   # First serie
-    #         ax1.plot(t[timerange],1/averagePdVar[timerange,iBase],color=basecolorstemp[k])
-    #         barbasecolors[iBase] = basecolorstemp[k]
-    #         k+=1
+    
+        rangeTels= f"{telescopes[iFirstTel]}-{telescopes[iLastTel]}"
+        title=f'{generalTitle}: {rangeTels}'
+        plt.close(title)
+        fig=plt.figure(title, clear=True)
+    
+        if len(infos["details"]):
+            fig.suptitle(title)
+
+        OneAxe = False
+        if NbOfObsToPlot <= 6:
             
-    #     p1=ax2.bar(baselines,MeanSquaredSNR, color=barbasecolors, yerr=RMSSquaredSNR)
+            OneAxe=True
+
+        if OneAxe:
+            telcolors = colors[:NbOfObsToPlot]
+            ax1,ax2 = fig.subplots(nrows=2,gridspec_kw={"height_ratios":[3,1]})
+            telcolorstemp = telcolors[:NbOfObsToPlot]
+            telescopestemp = [telescopes[iTel] for iTel in plotObsIndex]
+            
+            iColor=0
+            for iTel in plotObsIndex:
+                ax1.plot(timestamps,obs[:,iTel],color=telcolorstemp[iColor],label=telescopes[iTel])
+                iColor+=1                
+            
+            p1=ax2.bar(telescopestemp,[rmsObs[iTel] for iTel in plotObsIndex], color=telcolorstemp)
+            
+            ax2.set_box_aspect(1/20)
+            ax1.legend()
     
-    # else:    
-    #     for iBase in range(len1):   # First serie
-    #         if PlotBaseline[iBase]:
-    #             ax1.plot(t[timerange],1/averagePdVar[timerange,iBase],color=basecolors[iBase])
-
-    #     for iBase in range(len1,NIN):   # Second serie
-    #         if PlotBaseline[iBase]:
-    #             ax3.plot(t[timerange],1/averagePdVar[timerange,iBase],color=basecolors[iBase])
+        else:
+            len2 = NAtodisplay//2 ; len1 = NAtodisplay-len2
+            telcolors = colors[:len1]+colors[:len2]
+            telcolors = np.array(telcolors)
+            (ax1,ax3),(ax2,ax4) = fig.subplots(nrows=2,ncols=2, sharey='row',gridspec_kw={"height_ratios":[3,1]})
+            ax1.set_title(f"From {telescopes[iFirstTel]} \
+to {telescopes[iFirstTel+len1-1]}")
+            ax3.set_title(f"From {telescopes[iFirstTel+len1]} \
+to {telescopes[iLastTel]}")
+            
+            FirstSet = range(iFirstTel,iFirstTel+len1)
+            SecondSet = range(iFirstTel+len1,iLastTel+1)
+            NbOfObs = len(FirstSet)+len(SecondSet)
+            barcolors = ['grey']*NbOfObs
+            
+            iColor=0
+            for iTel in FirstSet:   # First serie
+                if PlotTel[iTel]:
+                    ax1.plot(timestamps,obs[:,iTel],color=telcolors[iColor])
+                    barcolors[iColor] = telcolors[iColor]
+                iColor+=1
+                
+            for iTel in SecondSet:   # Second serie
+                if PlotTel[iTel]:
+                    ax3.plot(timestamps,obs[:,iTel],color=telcolors[iColor])
+                    barcolors[iColor] = telcolors[iColor]
+                iColor+=1
+                
+            p1=ax2.bar(telescopes[FirstSet],rmsObs[FirstSet], color=barcolors[:len1])
+            p2=ax4.bar(telescopes[SecondSet],rmsObs[SecondSet], color=barcolors[len1:])
+            ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
+            ct.setaxelim(ax1, ydata=obs, ymargin=0.4,ymin=0)
+            if 'pd'.casefold() in NameObs.casefold():
+                ax4.set_ylim([0,wl])
+            else:
+                ct.setaxelim(ax4, ydata=rmsObs,ymin=0)
+                
+            
+            ax4.bar_label(p2,label_type='edge',fmt='%.2f')
+            
+            ax3.set_xlabel("Time [ms]")
+            ax4.set_xlabel("Telescopes")
+            ax4.set_anchor('S')
+            ax2.set_box_aspect(1/6) ; ax4.set_box_aspect(1/6)
+            
+            
+        ct.setaxelim(ax1,ydata=[obs[:,iTel] for iTel in plotObsIndex])
+        ct.setaxelim(ax2,ydata=list(rmsObs)+[wl/2], ymin=0)
+        ax1.set_ylabel(NameObs)
+        ax1.set_xlabel("Time [ms]") ; 
+        ax2.set_ylabel('RMS')
+        ax2.set_xlabel("Telescopes") ; 
+        ax2.set_anchor('S')
         
-    #     p1=ax2.bar(baselines[:len1],MeanSquaredSNR[:len1], color=basecolors[:len1], yerr=RMSSquaredSNR[:len1])
-    #     p2=ax4.bar(baselines[len1:],MeanSquaredSNR[len1:], color=basecolors[len1:], yerr=RMSSquaredSNR[len1])
-
-    #     ax3.sharex(ax1)
-    #     ax3.sharey(ax1) ; ax3.tick_params(labelleft=False)
-    #     ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
-    #     ax4.bar_label(p2,label_type='edge',fmt='%.2f')
-    #     ax3.set_xlabel("Time (s)")#, labelpad=xlabelpad)
-    #     ax2.set_anchor('S') ; ax4.set_anchor('S')
-    #     ax2.set_box_aspect(1/8) ; ax4.set_box_aspect(1/8)
-
-    # ax2.bar_label(p1,label_type='edge',fmt='%.2f')
-
-
-    # figname = '_'.join(title.split(' ')[:3])
-    # figname = f"SNRonly"
-    # if figsave:
-    #     if isinstance(ext,list):
-    #         for extension in ext:
-    #             plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
-    #     else:
-    #         plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
-    # fig.show()
-
-
+        ax2.bar_label(p1,label_type='edge',fmt='%.2f')
+    
+        if display:
+            fig.show()
+            
+        if len(filename):
+            if verbose:
+                print("Saving perftable figure.")
+            if isinstance(ext,list):
+                for extension in ext:
+                    plt.savefig(filename+f"_{rangeTels}.{extension}")
+            else:
+                plt.savefig(filename+f"_{rangeTels}.{ext}")
 

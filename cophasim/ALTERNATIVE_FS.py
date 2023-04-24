@@ -8,8 +8,8 @@ INPUT: oversampled true coherent flux [NW,NB]
 OUTPUT: macrosampled measured coherent flux [MW,NB]
 
 Calculated and stored observables:
-    - Photometries: simu.PhotometryEstimated [MW,NA]
-    - Visibilities: simu.Visibility [MW,NIN]
+    - Photometries: outputs.PhotometryEstimated [MW,NA]
+    - Visibilities: outputs.Visibility [MW,NIN]
 
 """
 
@@ -760,12 +760,12 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
 
 
     from .config import NA, NW, OW, FS
-    from . import simu
+    from . import outputs
     
     NBmes, NINmes = config.FS['NBmes'], config.FS['NINmes']
     active_ich = config.FS['active_ich']
     
-    it = simu.it
+    it = outputs.it
     
     iow = 0
     imw=0
@@ -780,7 +780,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         Modulation = FS['V2PM_r'][iw,:,:]
         image_iw = np.real(np.dot(Modulation,currCfTrue_r[iw,:]))*config.FS['T']
         
-        simu.MacroImages[it,imw,:] += image_iw
+        outputs.MacroImages[it,imw,:] += image_iw
         
         iow += 1
         if iow == OW:
@@ -790,13 +790,13 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
     
     if config.noise:
         from .skeleton import addnoise
-        if np.min(simu.MacroImages[it,:,:])<0:
+        if np.min(outputs.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
-            simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+            outputs.MacroImages[it,:,:] = np.abs(outputs.MacroImages[it,:,:])
             
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
+        outputs.MacroImages[it,:,:] = addnoise(outputs.MacroImages[it,:,:])
     
-    # if np.min(simu.MacroImages[it]) < 0:
+    # if np.min(outputs.MacroImages[it]) < 0:
     #     print(f'Negative image value at t={it}')
         
     if config.FS['Modulation']=='ABCD':
@@ -804,7 +804,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         currCfEstimated = np.zeros([FS['MW'],NBmes])*1j
         for imw in range(FS['MW']):
             Demodulation = config.FS['MacroP2VM_r'][imw,:,:]
-            currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
+            currCfEstimated[imw,:] = np.dot(Demodulation,outputs.MacroImages[it,imw,:])
             
         
     elif config.FS['Modulation']=='AC':  # Necessary patch for AC demodulation
@@ -812,7 +812,7 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         specialCf = np.zeros([FS['MW'],NBmes])*1j
         for imw in range(FS['MW']):
             Demodulation = config.FS['MacroP2VM_r'][imw,:,:]
-            specialCf[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
+            specialCf[imw,:] = np.dot(Demodulation,outputs.MacroImages[it,imw,:])
             
         currCfEstimated = np.zeros([FS['MW'],NBmes])*1j
         for ia in range(NA):
@@ -848,7 +848,7 @@ def ALLINONE(*args,init=False, T=1, spectra=[], spectraM=[], NA=2,
     USED OBSERVABLES/PARAMETERS:
         - config.FS
     UPDATED OBSERVABLES/PARAMETERS:
-        - simu.MacroImages: [NT,MW,NIN] Estimated PD before subtraction of the reference
+        - outputs.MacroImages: [NT,MW,NIN] Estimated PD before subtraction of the reference
         
     SUBROUTINES:
         - skeleton.add_camera_noise
@@ -1056,9 +1056,9 @@ given in config ({NA}).")
         return
     
     from .config import NA, NB
-    from . import simu
+    from . import outputs
     
-    it = simu.it
+    it = outputs.it
     
     iow = 0
     imw=0
@@ -1071,7 +1071,7 @@ given in config ({NA}).")
         Modulation = config.FS['V2PM'][iw,:,:]
         image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
-        simu.MacroImages[it,imw,:] += image_iw
+        outputs.MacroImages[it,imw,:] += image_iw
         
         iow += 1
         if iow == config.OW:
@@ -1081,17 +1081,17 @@ given in config ({NA}).")
     
     if config.noise:
         from .skeleton import addnoise
-        if np.min(simu.MacroImages[it,:,:])<0:
+        if np.min(outputs.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
-            simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+            outputs.MacroImages[it,:,:] = np.abs(outputs.MacroImages[it,:,:])
             
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
+        outputs.MacroImages[it,:,:] = addnoise(outputs.MacroImages[it,:,:])
     
     # estimates coherences
     currCfEstimated = np.zeros([config.FS['MW'],NB])*1j
     for imw in range(config.FS['MW']):
         Demodulation = config.FS['MacroP2VM'][imw,:,:]
-        currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
+        currCfEstimated[imw,:] = np.dot(Demodulation,outputs.MacroImages[it,imw,:])
     
     return currCfEstimated
 
@@ -1114,9 +1114,9 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
     USED OBSERVABLES/PARAMETERS:
         - config.FS
     UPDATED OBSERVABLES/PARAMETERS:
-        - simu.MacroImages: [NT,MW,NIN] Estimated PD before subtraction of the reference
-        - simu.GD_: [NT,MW,NIN] Estimated GD before subtraction of the reference
-        - simu.CommandODL: Piston Command to send       [NT,NA]
+        - outputs.MacroImages: [NT,MW,NIN] Estimated PD before subtraction of the reference
+        - outputs.GD_: [NT,MW,NIN] Estimated GD before subtraction of the reference
+        - outputs.CommandODL: Piston Command to send       [NT,NA]
         
     SUBROUTINES:
         - skeleton.add_camera_noise
@@ -1222,9 +1222,9 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         return
     
     from .config import NA, NB, NW, MW, OW
-    from . import simu
+    from . import outputs
     
-    it = simu.it
+    it = outputs.it
     
     iow = 0
     imw=0
@@ -1237,7 +1237,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         Modulation = config.FS['V2PM'][iw,:,:]
         image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
-        simu.MacroImages[it,imw,:] += image_iw
+        outputs.MacroImages[it,imw,:] += image_iw
         
         iow += 1
         if iow == OW:
@@ -1247,16 +1247,16 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
     
     if config.noise:
         from .skeleton import addnoise
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
+        outputs.MacroImages[it,:,:] = addnoise(outputs.MacroImages[it,:,:])
     
-    # if np.min(simu.MacroImages[it]) < 0:
+    # if np.min(outputs.MacroImages[it]) < 0:
     #     print(f'Negative image value at t={it}')
     
     # estimates coherences
     currCfEstimated = np.zeros([MW,NB])*1j
     for imw in range(MW):
         Demodulation = config.FS['MacroP2VM'][imw,:,:]
-        currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
+        currCfEstimated[imw,:] = np.dot(Demodulation,outputs.MacroImages[it,imw,:])
     
     return currCfEstimated
 

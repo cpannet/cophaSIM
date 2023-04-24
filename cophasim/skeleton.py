@@ -375,8 +375,8 @@ def update_config(verbose=False,**kwargs):
         config.timestamps = np.arange(config.NT)*config.dt
         from . import outputs
         outputs.timestamps = np.copy(config.timestamps)
-        config.FT['state'] = np.zeros(config.NT)
-        config.FT['usaw'] = np.zeros(config.NT)
+        # config.FT['state'][ = config.FT['state']
+        # config.FT['usaw'] = np.zeros(config.NT)
         if verbose:
             print(' - New NT not equal to len(timestamps) so we change timestamps.')
             
@@ -400,6 +400,12 @@ def updateFTparams(verbose=False,**kwargs):
             config.FT['ThresholdGD'] = np.ones(config.FS['NINmes'])*value
         else:
             config.FT[key] = value
+            if (key == 'search'):
+                if value==True:
+                    config.FT['state'][0] = 2
+                else:
+                    config.FT['state'] = np.zeros(config.NT)
+                
         if verbose:
             if isinstance(value,str):
                 if "/" in value:
@@ -750,7 +756,7 @@ Longueur timestamps: {len(timestamps)}")
             # outputs.FreqSampling = freqfft[freqfft>=0]
 
         elif 'new' in kwargs.keys():        # Correct: The DSP are true DSP
-
+            
             if 'baselines' in kwargs.keys():
                 baselines = kwargs['baselines']
             else:
@@ -851,7 +857,7 @@ Longueur timestamps: {len(timestamps)}")
                 motif = motif0[keeptime]
     
                 # calibmotif = motif/np.std(motif0[stdtime])
-    
+                
                 PistonDisturbance[:,ia] = motif#rmsPiston*calibmotif
                 
                 # PistonDisturbance[:,ia] = PistonDisturbance[:,ia] - PistonDisturbance[startframe,ia]
@@ -1245,7 +1251,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     return
 
 
-def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
+def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             Pistondetails=False,OPDdetails=False,withsnr=True,
             OneTelescope=True, pause=False, display=True,verbose=False,
             start_pd_tracking = 0,UsedTelemetries='simu',
@@ -1412,26 +1418,26 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     
     TelConventionalArrangement = InterfArray.TelNames
     if 'TelescopeArrangement' in infos.keys():
-        tels = infos['TelescopeArrangement']
+        telescopes = infos['TelescopeArrangement']
     else:
-        tels = TelConventionalArrangement
-        
+        telescopes = TelConventionalArrangement
+    display_module.telescopes = telescopes
         
     beam_patches = []
     for ia in range(NA):
-        beam_patches.append(mpatches.Patch(color=telcolors[ia],label=tels[ia]))
+        beam_patches.append(mpatches.Patch(color=telcolors[ia],label=telescopes[ia]))
         
     display_module.beam_patches = beam_patches
     # Tel2Beam = np.zeros([NA,NA])
     # for ia in range(NA):
-    #     tel = tels[ia] ; tel0 = TelConventionalArrangement[ia]
-    #     pos = np.argwhere(np.array(tels)==tel0)[0][0]
+    #     tel = telescopes[ia] ; tel0 = TelConventionalArrangement[ia]
+    #     pos = np.argwhere(np.array(telescopes)==tel0)[0][0]
     #     Tel2Beam[pos,ia]=1
     
     baselinesNIN = []
     itel=0
-    for tel1 in tels:
-        for tel2 in tels[itel+1:]:
+    for tel1 in telescopes:
+        for tel2 in telescopes[itel+1:]:
             baselinesNIN.append(f'{tel1}{tel2}')
         itel+=1
     baselinesNIN = np.array(baselinesNIN) 
@@ -1442,7 +1448,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     itel=0
     for ib in range(NINmes):
         ia, iap = int(ich[ib][0])-1,int(ich[ib][1])-1
-        tel1,tel2 = tels[ia],tels[iap]
+        tel1,tel2 = telescopes[ia],telescopes[iap]
         baselines.append(f'{tel1}{tel2}')
         
     baselines = np.array(baselines)
@@ -1450,12 +1456,12 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     
     
     closures = []
-    tel1=tels[0] ; itel1=0 
-    for tel1 in tels:
+    tel1=telescopes[0] ; itel1=0 
+    for tel1 in telescopes:
         itel2 = itel1+1
-        for tel2 in tels[itel1+1:]:
+        for tel2 in telescopes[itel1+1:]:
             itel3=itel2+1
-            for tel3 in tels[itel2+1:]:
+            for tel3 in telescopes[itel2+1:]:
                 closures.append(f'{tel1}{tel2}{tel3}')
                 ib = ct.poskfai(itel1,itel2, itel3, NA)
                 itel3+=1
@@ -1473,7 +1479,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     if 'TelsToDisplay' in infos.keys():
         TelsToDisplay = infos['TelsToDisplay']
         for ia in range(NA):
-            tel = tels[ia] ; tel2 = TelConventionalArrangement[ia]
+            tel = telescopes[ia] ; tel2 = TelConventionalArrangement[ia]
             if tel in TelsToDisplay:
                 PlotTel[ia]=True
             if tel2 in TelsToDisplay:
@@ -1506,7 +1512,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     if 'BaselinesToDisplay' in infos.keys():
         BaselinesToDisplay = infos['BaselinesToDisplay']
         for ia in range(NA):
-            tel = tels[ia] ; tel2 = TelConventionalArrangement[ia]
+            tel = telescopes[ia] ; tel2 = TelConventionalArrangement[ia]
             if tel in "".join(BaselinesToDisplay):
                 PlotTel[ia]=True
             if tel2 in "".join(BaselinesToDisplay):  
@@ -1534,7 +1540,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     if 'ClosuresToDisplay' in infos.keys():
         ClosuresToDisplay = infos['ClosuresToDisplay']
         for ia in range(NA):
-            tel = tels[ia] ; tel2 = TelConventionalArrangement[ia]
+            tel = telescopes[ia] ; tel2 = TelConventionalArrangement[ia]
             if tel in "".join(ClosuresToDisplay):
                 PlotTel[ia]=True
             if tel2 in "".join(ClosuresToDisplay):
@@ -1650,10 +1656,44 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     """"""""  NOW YOU CAN DISPLAY  """"""""
     """""""""""""""""""""""""""""""""""""""
 
+    if len(outputsData):
+        
+        for obsname in outputsData:
+            if not (obsname in vars(outputs)):     # case-insensitive test
+                print(f"{obsname} not in outputs module, I can't plot it")
+                continue
+
+            obs = getattr(outputs, obsname)
+            rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+            
+            generaltitle = obsname
+            typeobs = obsname
+            if len(savedir):
+                filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            else:
+                filename=''
+            
+            if "pis".casefold() in obsname.casefold():
+                display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
+                                          NameObs=obsname,
+                                          display=True,filename=filename,ext='pdf',infos={"details":''},
+                                          verbose=verbose)
+                
+            elif ("opd".casefold() in obsname.casefold())\
+                or ("snr".casefold() in obsname.casefold()):
+                display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
+                                          NameObs=obsname,
+                                          display=True,filename=filename,ext='pdf',infos={"details":''},
+                                          verbose=verbose)
+            else:
+                print(f"Impossible to determine the type of the observable {obsname}. I try with OPD-type.")
+                display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
+                                          NameObs='OPD',
+                                          display=True,filename=filename,ext='pdf',infos={"details":''},
+                                          verbose=verbose)
+
     """ PISTON SPACE """
 
-
-        
     if displayall or ('disturbances' in args):
         
         pis_max = 1.1*np.max([np.max(np.abs(outputs.PistonDisturbance)),wl/2])
@@ -1937,7 +1977,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename= savedir+f"Simulation{TimeID}_{typeobs}"
         else:
             filename=''
-            
+        
         GDobs = GDerrmic2
         PDobs = PDerrmic2
         
@@ -1991,8 +2031,8 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         obs = outputs.OPDTrue
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
-                                  NameObs='OPD',
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
+                                  NameObs='OPD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
@@ -2007,8 +2047,8 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
         obs = PDmic
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='PD',
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+                                  NameObs='PD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
     
@@ -2022,8 +2062,8 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''
             
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='PD',
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+                                  NameObs='PD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
@@ -2038,8 +2078,8 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             
         obs = GDmic
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='GD',
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+                                  NameObs='GD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
@@ -2053,8 +2093,8 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             
         obs = GDmic2
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='GD2',
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+                                  NameObs='GD2 [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
@@ -2069,7 +2109,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             
         obs = SNR
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='SNR',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
@@ -2087,7 +2127,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         obs = SNR_pd
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='SNR',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
@@ -2102,7 +2142,7 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             
         obs = SNR_gd
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
                                   NameObs='SNR',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
@@ -2117,8 +2157,8 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             
         obs = outputs.GDCommand[:-1]
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='Commands',
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+                                  NameObs='Commands [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
@@ -2133,11 +2173,41 @@ def display(*args, wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             
         obs = outputs.PDCommand[:-1]
         rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='Commands',
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+                                  NameObs='Commands [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
+        
+    if displayall or ('OPDcmd' in args):
+        generaltitle = 'OPD Commands'
+        typeobs="OPDCmd"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''     
+            
+        obs = outputs.OPDCommand[:-1]
+        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
+                                  NameObs='Commands [µm]',
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
+                                  verbose=False)
+        
+    if displayall or ('piscmd' in args):
+        generaltitle = 'Piston Commands'
+        typeobs="pisCmd"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''     
+            
+        obs = outputs.CommandODL[:-1]
+        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
+                                  NameObs='Commands [µm]',
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
+                                  verbose=False)
     # if displayall or ('piscmds' in args):
     #     obs = outputs.GDCommand[:-1]
     #     rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)

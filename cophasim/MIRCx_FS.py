@@ -10,8 +10,8 @@ INPUT: oversampled true coherent flux [NW,NB]
 OUTPUT: macrosampled measured coherent flux [MW,NB]
 
 Calculated and stored observables:
-    - Photometries: simu.PhotometryEstimated [MW,NA]
-    - Visibilities: simu.Visibility [MW,NIN]
+    - Photometries: outputs.PhotometryEstimated [MW,NA]
+    - Visibilities: outputs.Visibility [MW,NIN]
 
 """
 
@@ -40,7 +40,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
     USED OBSERVABLES/PARAMETERS:
         - config.FS
     UPDATED OBSERVABLES/PARAMETERS:
-        - simu.MacroImages: [NT,MW,NIN] Estimated PD before subtraction of the reference
+        - outputs.MacroImages: [NT,MW,NIN] Estimated PD before subtraction of the reference
         
     SUBROUTINES:
         - skeleton.add_camera_noise
@@ -251,9 +251,9 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         return
     
     from .config import NA, NB
-    from . import simu
+    from . import outputs
     
-    it = simu.it
+    it = outputs.it
     
     iow = 0
     imw=0
@@ -266,7 +266,7 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
         Modulation = config.FS['V2PM'][iw,:,:]
         image_iw = np.real(np.dot(Modulation,currCfTrue[iw,:]))
         
-        simu.MacroImages[it,imw,:] += image_iw
+        outputs.MacroImages[it,imw,:] += image_iw
         
         iow += 1
         if iow == config.OW:
@@ -277,17 +277,17 @@ def MIRCxFS(*args,init=False, T=1, spectra=[], spectraM=[], posi=[], MFD=0.254,
     if config.noise:
         from .skeleton import addnoise
         
-        if np.min(simu.MacroImages[it,:,:])<0:
+        if np.min(outputs.MacroImages[it,:,:])<0:
             print(f"Negative value on image at t={it}, before noise.\nI take absolue value.")
-            simu.MacroImages[it,:,:] = np.abs(simu.MacroImages[it,:,:])
+            outputs.MacroImages[it,:,:] = np.abs(outputs.MacroImages[it,:,:])
         
-        simu.MacroImages[it,:,:] = addnoise(simu.MacroImages[it,:,:])
+        outputs.MacroImages[it,:,:] = addnoise(outputs.MacroImages[it,:,:])
     
     # estimates coherences
     currCfEstimated = np.zeros([config.FS['MW'],NB])*1j
     for imw in range(config.FS['MW']):
         Demodulation = config.FS['MacroP2VM'][imw,:,:]
-        currCfEstimated[imw,:] = np.dot(Demodulation,simu.MacroImages[it,imw,:])
+        currCfEstimated[imw,:] = np.dot(Demodulation,outputs.MacroImages[it,imw,:])
     
     return currCfEstimated
 

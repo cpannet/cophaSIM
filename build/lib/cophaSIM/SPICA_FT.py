@@ -24,7 +24,8 @@ from . import config
 from .skeleton import updateFTparams
 
 def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
-            relock=True,SMdelay=1e3,Sweep0=20, Sweep30s=10, maxVelocity=0.300, Vfactors = [], 
+            relock=True,SMdelay=1e3,sweep0=20, sweep30s=10, commonRatio=1.1, maxVelocity=0.300, 
+            relock_vfactors = [], search_vfactors=[],searchThreshGD=3,Nsearch=50,searchSNR='gd',
             CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
             cmdOPD=True, switch=1, continu=True,whichSNR='gd',
             ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,
@@ -78,9 +79,9 @@ def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, N
         DESCRIPTION. The default is True.
     SMdelay: FLOAT, optional
         Time to wait after losing a telescope for triggering the SEARCH command.
-    Sweep0 : TYPE, optional
+    sweep0 : TYPE, optional
         DESCRIPTION. The default is 20.
-    Sweep30s : TYPE, optional
+    sweep30s : TYPE, optional
         DESCRIPTION. The default is 10.
     maxVelocity : TYPE, optional
         DESCRIPTION. The default is 6.
@@ -128,7 +129,7 @@ def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, N
         config.FT['Ngd'] = Ngd
         config.FT['GainGD'] = GainGD
         config.FT['GainPD'] = GainPD
-        config.FT['state'] = np.zeros(NT)
+        config.FT['state'] = np.zeros(NT+1)
         if search:
             config.FT['state'][0] = 2
             
@@ -173,11 +174,16 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         config.FT['whichSNR'] = whichSNR
         
         # RELOCK command parameters
-        config.FT['relock'] = relock
+        config.FT['relock'] = relock            # If True, the fringe-tracker can eneter in RELOCK state. If False, it never enters this state (for debugging only).
+        config.FT['search'] = search            # If True, the simulation begins with SEARCH state. If False, no SEARCH state, directly TRACK state."
         config.FT['SMdelay'] = SMdelay          # Waiting time before launching relock
-        config.FT['Sweep0'] = Sweep0            # Starting sweep in seconds
-        config.FT['Sweep30s'] = Sweep30s        # Sweep at 30s in seconds
+        config.FT['sweep0'] = sweep0            # Starting sweep in seconds
+        config.FT['sweep30s'] = sweep30s        # Sweep at 30s in seconds
+        config.FT['commonRatio'] = commonRatio  # Common ratio of the geometrical sequence
         config.FT['maxVelocity'] = maxVelocity  # Maximal slope given in µm/frame
+        config.FT['searchThreshGD'] = searchThreshGD*config.wlOfTrack    # Maximal value of GD for considering fringe found.
+        config.FT['Nsearch'] = Nsearch
+        config.FT['searchSNR'] = searchSNR
         
         # Version usaw vector
         config.FT['usaw'] = np.zeros([NT,NA])
@@ -185,10 +191,11 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         config.FT['it_last'] = np.zeros(NA)
         config.FT['it0'] = np.zeros(NA)
         config.FT['eps'] = np.ones(NA)
+        config.FT['nbChanges'] = np.ones(NA)
 
         # Version usaw float
         # config.FT['usaw'] = np.zeros([NT])
-        # config.FT['urelock'] = np.zeros([NT,NA])
+        # config.FT['uRelock'] = np.zeros([NT,NA])
         # config.FT['LastPosition'] = np.zeros([NT+1,NA])
         # config.FT['it_last'] = 0
         # config.FT['it0'] = 0
@@ -197,20 +204,38 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         
         config.FT['ThresholdPhot'] = ThresholdPhot      # Minimal photometry SNR for launching relock
 
-        if len(Vfactors) != 0:
-            config.FT['Vfactors'] = np.array(Vfactors)
-        elif NA==10:
-            config.FT['Vfactors'] = np.array([-24.9, -23.9, -18.9, -14.9,
-                                              -1.9,   1.1,   9.1,  16.1,
-                                              28.1, 30.1])
-        elif NA==6:
-            config.FT['Vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])/8.75
-            
-        elif NA==7: # Fake values
-            config.FT['Vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75, 10])
-            
-        config.FT['Velocities'] = config.FT['Vfactors']/np.ptp(config.FT['Vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
+        if (len(relock_vfactors) == 0) and (len(relock_vfactors) == NA):
+            config.FT['relock_vfactors'] = np.array(relock_vfactors)
+        else:
+            if verbose:
+                print("No or bad relock_vfactors given. I create one.")
+
+            if NA==6:
+                config.FT['relock_vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])
+                
+            elif NA==7: # Fake values
+                config.FT['relock_vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75, 10])
+                
+            elif NA==10:
+                config.FT['relock_vfactors'] = np.array([-24.9, -23.9, -18.9, -14.9,
+                                                  -1.9,   1.1,   9.1,  16.1,
+                                                  28.1, 30.1])
         
+        if (len(search_vfactors) == 0) and (len(search_vfactors) == NA):
+            config.FT['search_vfactors'] = np.array(search_vfactors)
+        else:
+            if verbose:
+                print("No or bad search_vfactors given. I create one.")
+                
+            config.FT['search_vfactors'] = np.arange(NA)-NA//2+1
+            
+        if search==True:
+            config.FT['Vfactors'] = config.FT['search_vfactors']
+        else:
+            config.FT['Vfactors'] = config.FT['relock_vfactors']
+            
+        config.FT['relock_vfactors'] = config.FT['relock_vfactors']/np.ptp(config.FT['relock_vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
+        config.FT['search_vfactors'] = config.FT['search_vfactors']/np.ptp(config.FT['search_vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
         
         return
 
@@ -223,11 +248,7 @@ I set ThresholdRELOCK to the {NINmes} first values."))
                 print(f" - {key}: {getattr(config.FT, key, value)}")
 
         return
-        
-    from . import outputs
 
-    it = outputs.it
-    
     currCfEstimated = args[0]
 
     CfPD, CfGD = ReadCf(currCfEstimated)
@@ -242,7 +263,7 @@ def SearchState(CophasedGroups=[]):
     
     from . import outputs,config
     
-    from config import wlOfTrack, NA, FS, FT
+    from .config import wlOfTrack, NA, FS, FT
     it=outputs.it 
     
     searchThreshGD = FT['searchThreshGD']
@@ -265,8 +286,8 @@ def SearchState(CophasedGroups=[]):
         
     outputs.SearchSNR[it] = np.sqrt(np.nan_to_num(1/np.mean(varSignal,axis=0)))
     
-    SNR_movingaverage = np.sqrt(np.nan_to_num(1/varSignal[timerange]))
-    GradSNR = np.grad(SNR_movingaverage,outputs.CommandSearch[timerange])
+    # SNR_movingaverage = np.sqrt(np.nan_to_num(1/varSignal))
+    GradSNR = np.gradient(outputs.SearchSNR[timerange],axis=0)
     
     # Current Group-Delay
     NINmes = FS['NINmes'] ; Ncross = FT['Ncross']
@@ -282,11 +303,12 @@ def SearchState(CophasedGroups=[]):
     MaxSNRCondition = (np.mean(GradSNR[:Nsearch//2],axis=0)*np.mean(GradSNR[Nsearch//2:],axis=0) < 0) # Sign change in first derivative
 
     #MaxSNRCondition = (np.mean(outputs.SearchSNR[it-Nsearch:it-Nsearch//2],axis=0)-outputs.SearchSNR[it-1]<0)
+    snrHigherThanThreshold = (outputs.SearchSNR[it] > config.FT['ThresholdGD'])
     
     GDNullCondition = (np.abs(currGD) < searchThreshGD*wlOfTrack)  # C'est pas bon car latence dans les mesures
     NoRecentChange = (config.FT['it_last'][0] < it-Nsearch)
     
-    Ws = outputs.SearchSNR[it] * (MaxSNRCondition and GDNullCondition and NoRecentChange)
+    Ws = outputs.SearchSNR[it] * (snrHigherThanThreshold * MaxSNRCondition * GDNullCondition * NoRecentChange)
         
     for ib in range(NINmes):
         ia = int(config.FS['ich'][ib][0])-1
@@ -325,38 +347,39 @@ def SearchState(CophasedGroups=[]):
         
         uSearch = np.dot(FS['OPD2Piston'],outputs.GDEstimated[it])
          
-        outputs.CommandSearch[it] = uSearch
-        outputs.CommandRelock[it] = uSearch         # Patch to propagate the command to the fringe-tracker commands
+        outputs.CommandSearch[it+1] = uSearch
+        outputs.CommandRelock[it+1] = uSearch         # Patch to propagate the command to the fringe-tracker commands
+        config.FT['Vfactors'] = config.FT['relock_vfactors']    # Set Vfactors to the RELOCK values since it will never come back to SEARCH state.
         
-        return uSearch
-    
+        # Reinitialise parameters for sawtooth function
+        config.FT['eps'] = np.ones(NA)
+        config.FT['nbChanges'] = np.ones(NA)
+        
     else:
-        
         config.FT['state'][it+1] = 2    # Remain in SEARCH state
         
         # newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
         # TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
         # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
         
-#        TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
+        # TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
 
         if it>=1:
             if config.FT['state'][it-1] != 2:
                 config.FT['eps'] = np.ones(NA)
                 config.FT['it0'] = np.ones(NA)*it
                 config.FT['it_last'] = np.ones(NA)*it
-            
-        Velocities = config.FT['Velocities']
-        
-        Increment = relockfunction_inc_sylvain_gestioncophased(it, Velocities, CophasedGroups)
+                    
+        Increment = relockfunction_inc_sylvain_gestioncophased(it, config.FT['search_vfactors'], CophasedGroups)
     
         #You should send command only on telescope with flux
         #outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
         #Increment = np.dot(outputs.NoPhotometryFiltration[it],Increment)
+        outputs.CommandSearch[it+1] = outputs.CommandSearch[it] + Increment
         
-        uSearch = outputs.CommandSearch[it] + Increment
+        uSearch = outputs.CommandSearch[it+1]
         
-        return uSearch
+    return uSearch
 
 
 
@@ -529,9 +552,10 @@ def CommandCalc(CfPD,CfGD):
     """
     
     if config.FT['state'][it] == 2:
-        CommandODL = SearchState()
+        uSearch = SearchState()
+        CommandODL = uSearch
+        CommandODL = np.zeros(NA)
         return CommandODL
-    
     
     """
     WEIGHTING MATRIX
@@ -815,7 +839,7 @@ def CommandCalc(CfPD,CfGD):
     outputs.IgdRank[it] = IgdRank
     
     
-    if NotCophased:
+    if NotCophased and config.FT['relock']:
         outputs.time_since_loss[it]=outputs.time_since_loss[it-1]+config.dt
         
         # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_rank(outputs.Igd[it-1]))
@@ -859,14 +883,14 @@ def CommandCalc(CfPD,CfGD):
                     config.FT['it0'] = np.ones(NA)*it
                     config.FT['it_last'] = np.ones(NA)*it
                 
-                Velocities = np.dot(Kernel,config.FT['Velocities'])
+                Velocities = np.dot(Kernel,config.FT['relock_vfactors'])
                 Increment = relockfunction_inc_sylvain_gestioncophased(it, Velocities, CophasedGroups)
             
                 #You should send command only on telescope with flux
                 outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
                 Increment = np.dot(outputs.NoPhotometryFiltration[it],Increment)
                 
-                urelock = outputs.CommandRelock[it] + Increment
+                uRelock = outputs.CommandRelock[it] + Increment
                 
             else:
                     Increment = np.zeros(NA)
@@ -878,11 +902,12 @@ def CommandCalc(CfPD,CfGD):
         outputs.time_since_loss[it] = 0
         Increment = np.zeros(NA)
             
-    Increment = config.FT['relock']*Increment
+    Increment = Increment
     
-    urelock = outputs.CommandRelock[it] + Increment
+    outputs.CommandRelock[it+1] = outputs.CommandRelock[it] + Increment
+    
     # The command is sent at the next time, that's why we note it+1
-    outputs.CommandRelock[it+1] = urelock
+    uRelock = outputs.CommandRelock[it+1]
     
     
         
@@ -1027,7 +1052,7 @@ def CommandCalc(CfPD,CfGD):
     #         config.mode == 'track'
     #     else:
     #         usaw = relockfunction(NA,Sweep_,Slope_,it-trelock_)
-    #         urelock = Vfactors_*usaw
+    #         uRelock = Vfactors_*usaw
         
     
     """
@@ -1041,7 +1066,7 @@ def CommandCalc(CfPD,CfGD):
     It is the addition of the GD, PD, SEARCH and modulation functions
     """
     
-    CommandODL = uPD + uGD + urelock
+    CommandODL = uPD + uGD + uRelock
     
     # if config.TELref !=-1:
     #     CommandODL = CommandODL - CommandODL[config.TELref]
@@ -1260,9 +1285,10 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
         # Initialize the fringe tracker with the gain
         from cophasim.SPICA_FT import SPICAFT, updateFTparams
         #SPICAFT(init=True, GainPD=0, GainGD=0,relock=False)
-        gainPD,gainGD,relock=config.FT['GainPD'],config.FT['GainGD'],config.FT['relock']
-        updateFTparams(GainPD=0, GainGD=0, relock=False, verbose=verbose)
+        gainPD,gainGD,relock,state=config.FT['GainPD'],config.FT['GainGD'],config.FT['relock'],config.FT['state']
+        updateFTparams(GainPD=0, GainGD=0, relock=False,search=False, verbose=verbose)
         
+        config.FT['state'] = np.zeros(NT+1)
         # Launch the scan
         sk.loop(verbose=verbose)
         
@@ -1308,15 +1334,17 @@ def SetThreshold(TypeDisturbance="CophasedThenForeground",
             
             config.FT['ThresholdGD'] = newThresholdGD
             config.FT['ThresholdPD'] = newThresholdPD
+            config.FT['state'] = state
 
             sk.display('opd','snr','detector',wlOfTrack=1.6, pause=True,display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)
-        updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock, 
+        updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock,
                        ThresholdGD=newThresholdGD,ThresholdPD=newThresholdPD,
                        verbose=verbose)
-    
+        
+
     return newThresholdGD
 
 
@@ -1343,8 +1371,8 @@ def relockfunction(usaw):
     for ia in range(NA):
         it0 = config.FT['it0'][ia] ; it_last = config.FT['it_last'][ia]
         
-        a = config.FT['Sweep30s']/30
-        sweep = config.FT['Sweep0'] + a*(it-it0)*config.dt
+        a = config.FT['sweep30s']/30
+        sweep = config.FT['sweep0'] + a*(it-it0)*config.dt
         
         time_since_last_change = (it-it_last)*config.dt     # depends on ia
         
@@ -1369,8 +1397,8 @@ def relockfunction(usaw):
 
 def relockfunction_basical(usaw,it):
     
-    a = config.FT['Sweep30s']/30000
-    sweep = config.FT['Sweep0'] + a*(it-config.FT['it0'])*config.dt
+    a = config.FT['sweep30s']/30000
+    sweep = config.FT['sweep0'] + a*(it-config.FT['it0'])*config.dt
     
     time_since_last_change = (it-config.FT['it_last'])*config.dt
     
@@ -1390,8 +1418,8 @@ def relockfunction_basical(usaw,it):
 
 def relockfunction3(usaw,it):
     
-    a = config.FT['Sweep30s']/30000
-    sweep = config.FT['Sweep0'] + a*(it-config.FT['it0'])*config.dt
+    a = config.FT['sweep30s']/30000
+    sweep = config.FT['sweep0'] + a*(it-config.FT['it0'])*config.dt
     
     time_since_last_change = (it-config.FT['it_last'])*config.dt
     
@@ -1430,10 +1458,10 @@ def relockfunction_inc_basical(it):
     it_last=config.FT['it_last']; it0=config.FT['it0'] ; eps=config.FT['eps']
     
     # Coefficient directeur de la fonction d'augmentation du temps avant saut.
-    a = config.FT['Sweep30s']/30000
+    a = config.FT['sweep30s']/30000
     
     # Temps avant saut de frange
-    sweep = config.FT['Sweep0'] + a*(it-it0)*config.dt
+    sweep = config.FT['sweep0'] + a*(it-it0)*config.dt
     
     # Temps passé depuis dernier saut.
     time_since_last_change = (it-it_last)*config.dt
@@ -1480,10 +1508,10 @@ def relockfunction_inc_sylvain(it, v):
         it_last=config.FT['it_last'][ia]; it0=config.FT['it0'][ia] ; eps=config.FT['eps'][ia]
         
         # Coefficient directeur de la fonction d'augmentation du temps avant saut.
-        a = config.FT['Sweep30s']/30000
+        a = config.FT['sweep30s']/30000
         
         # Temps avant saut de frange
-        sweep = config.FT['Sweep0'] + a*(it-it0)*config.dt
+        sweep = config.FT['sweep0'] + a*(it-it0)*config.dt
         
         # Temps passé depuis dernier saut.
         time_since_last_change = (it-it_last)*config.dt
@@ -1527,12 +1555,14 @@ def relockfunction_inc_sylvain_gestioncophased(it, v, CophasedGroups):
     for ia in range(NA):
     
         it_last=config.FT['it_last'][ia]; it0=config.FT['it0'][ia] ; eps=config.FT['eps'][ia]
+        nbChanges = config.FT['nbChanges'][ia]
         
         # Coefficient directeur de la fonction d'augmentation du temps avant saut.
-        a = config.FT['Sweep30s']/30000
+        a = config.FT['sweep30s']/30000
         
         # Temps avant saut de frange
-        sweep = config.FT['Sweep0'] + a*(it-it0)*config.dt
+        # sweep = config.FT['sweep0'] + a*(it-it0)*config.dt
+        sweep = config.FT['sweep0']*config.FT['commonRatio']**nbChanges
         
         # Temps passé depuis dernier saut.
         time_since_last_change = (it-it_last)*config.dt
@@ -1546,6 +1576,7 @@ def relockfunction_inc_sylvain_gestioncophased(it, v, CophasedGroups):
             change=True
             config.FT['eps'][ia] = -config.FT['eps'][ia]
             config.FT['it_last'][ia] = it
+            config.FT['nbChanges'][ia] += 1
             move[ia] = -config.FT['LastPosition'][ia]
             tel=ia+1
             for CophasedGroup in CophasedGroups:
@@ -1584,8 +1615,8 @@ def relockfunction_incind(it):
     for ia in range(NA):
         it_last=config.FT['it_last'][ia]; it0=config.FT['it0'][ia] ; eps=config.FT['eps'][ia]
         
-        a = config.FT['Sweep30s']/30000  # Coefficient directeur de la fonction d'augmentation du temps avant saut.
-        sweep = config.FT['Sweep0'] + a*(it-it0)*config.dt
+        a = config.FT['sweep30s']/30000  # Coefficient directeur de la fonction d'augmentation du temps avant saut.
+        sweep = config.FT['sweep0'] + a*(it-it0)*config.dt
         
         time_since_last_change = (it-it_last)*config.dt
         

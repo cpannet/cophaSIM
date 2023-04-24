@@ -93,6 +93,7 @@ GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
 
 # Search state
 diffOffsets = np.zeros([NT,NINmes])                 # Differential offsets (p1-p2) where the fringes are found
+SearchSNR = np.zeros([NT,NINmes])                   # Differential offsets (p1-p2) where the fringes are found
 
 
 """Piston-space observables [NA]"""
