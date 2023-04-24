@@ -268,8 +268,6 @@ def SearchState(CophasedGroups=[]):
     
     searchThreshGD = FT['searchThreshGD']
     
-    varcurrPD, varcurrGD = getvar()
-    
     Nsearch = FT['Nsearch']
     timerange = range(it+1-Nsearch, it+1) 
         
@@ -308,7 +306,7 @@ def SearchState(CophasedGroups=[]):
     GDNullCondition = (np.abs(currGD) < R/np.pi*searchThreshGD)  # C'est pas ouf car latence dans les mesures
     NoRecentChange = (config.FT['it_last'][0] < it-Nsearch)
     
-    Ws = outputs.SearchSNR[it] * (snrHigherThanThreshold * MaxSNRCondition * GDNullCondition * NoRecentChange)
+    Ws = outputs.SearchSNR[it] * (snrHigherThanThreshold * GDNullCondition * NoRecentChange)# * MaxSNRCondition)
         
     for ib in range(NINmes):
         ia = int(config.FS['ich'][ib][0])-1
@@ -567,7 +565,7 @@ def CommandCalc(CfPD,CfGD):
     if config.FT['state'][it] == 2:
         uSearch = SearchState()
         CommandODL = uSearch
-        CommandODL = np.zeros(NA)
+        # CommandODL = np.zeros(NA)
         return CommandODL
     
     """

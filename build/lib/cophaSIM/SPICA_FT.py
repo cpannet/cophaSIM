@@ -290,7 +290,7 @@ def SearchState(CophasedGroups=[]):
     GradSNR = np.gradient(outputs.SearchSNR[timerange],axis=0)
     
     # Current Group-Delay
-    NINmes = FS['NINmes'] ; Ncross = FT['Ncross']
+    NINmes = FS['NINmes'] ; R = FS['R'] ; Ncross = FT['Ncross']
     currGD = np.zeros(NINmes)
     for ib in range(NINmes):
         cfGDlmbdas = outputs.CfGD[it,:-Ncross,ib]*np.conjugate(outputs.CfGD[it,Ncross:,ib])
@@ -305,7 +305,7 @@ def SearchState(CophasedGroups=[]):
     #MaxSNRCondition = (np.mean(outputs.SearchSNR[it-Nsearch:it-Nsearch//2],axis=0)-outputs.SearchSNR[it-1]<0)
     snrHigherThanThreshold = (outputs.SearchSNR[it] > config.FT['ThresholdGD'])
     
-    GDNullCondition = (np.abs(currGD) < searchThreshGD*wlOfTrack)  # C'est pas bon car latence dans les mesures
+    GDNullCondition = (np.abs(currGD) < R/np.pi*searchThreshGD)  # C'est pas ouf car latence dans les mesures
     NoRecentChange = (config.FT['it_last'][0] < it-Nsearch)
     
     Ws = outputs.SearchSNR[it] * (snrHigherThanThreshold * MaxSNRCondition * GDNullCondition * NoRecentChange)
@@ -546,6 +546,19 @@ def CommandCalc(CfPD,CfGD):
 
     varcurrPD, varcurrGD = getvar()
     
+    timerange = range(it+1-Ngd, it+1)
+    outputs.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(outputs.varPD[timerange], axis=0))
+    outputs.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(outputs.varGD[timerange], axis=0))
+    outputs.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(outputs.varGDUnbiased[timerange], axis=0))
+    
+    outputs.TemporalVariancePD[it] = np.var(outputs.PDEstimated[timerange], axis=0)
+    outputs.TemporalVarianceGD[it] = np.var(outputs.GDEstimated[timerange], axis=0)
+    
+    if config.FT['whichSNR'] == 'pd':
+        outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAveragePD[it]
+    else:
+        outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAverageGD[it]
+        
     
     """
     SEARCH State
@@ -565,19 +578,6 @@ def CommandCalc(CfPD,CfGD):
         
         # Raw Weighting matrix in the OPD-space
         
-        timerange = range(it+1-Ngd, it+1)
-        outputs.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(outputs.varPD[timerange], axis=0))
-        outputs.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(outputs.varGD[timerange], axis=0))
-        outputs.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(outputs.varGDUnbiased[timerange], axis=0))
-        
-        outputs.TemporalVariancePD[it] = np.var(outputs.PDEstimated[timerange], axis=0)
-        outputs.TemporalVarianceGD[it] = np.var(outputs.GDEstimated[timerange], axis=0)
-        
-        if config.FT['whichSNR'] == 'pd':
-            outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAveragePD[it]
-        else:
-            outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAverageGD[it]
-            
         reliablebaselines = (outputs.SquaredSNRMovingAverage[it] >= FT['ThresholdGD']**2)
         
         outputs.TrackedBaselines[it] = reliablebaselines
