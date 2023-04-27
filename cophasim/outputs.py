@@ -93,6 +93,7 @@ GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
 
 # Search state
 diffOffsets = np.zeros([NT,NINmes])                 # Differential offsets (p1-p2) where the fringes are found
+diffOffsets_best = np.zeros([NT,NINmes])
 SearchSNR = np.zeros([NT,NINmes])                   # Differential offsets (p1-p2) where the fringes are found
 
 
@@ -145,6 +146,10 @@ time_since_loss=np.zeros(NT)                        # Time since the loss of one
 NoPhotometryFiltration = np.zeros([NT,NA,NA])       # Matrix that filters telescopes which have no photometry
 LostTelescopes = np.zeros([NT,NA])                  # Lost telescopes
 noSignal_on_T = np.zeros([NT,NA])                   # No photometry on telescopes
+
+Is = np.ones([NT,NA,NA])
+rankIs = np.zeros(NT)
+Ws = np.zeros([NT,NINmes])
 
 """
 Performance Observables will be introduced and processed when the function 

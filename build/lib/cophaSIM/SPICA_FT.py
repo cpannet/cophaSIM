@@ -24,7 +24,7 @@ from . import config
 from .skeleton import updateFTparams
 
 def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
-            relock=True,SMdelay=1e3,sweep0=20, sweep30s=10, commonRatio=1.1, maxVelocity=0.300, 
+            relock=True,SMdelay=1e3,sweep0=20, sweep30s=10, commonRatio=1.1, covering=10, maxVelocity=0.300, searchMinGD=500,
             relock_vfactors = [], search_vfactors=[],searchThreshGD=3,Nsearch=50,searchSNR='gd',
             CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
             cmdOPD=True, switch=1, continu=True,whichSNR='gd',
@@ -180,11 +180,16 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         config.FT['sweep0'] = sweep0            # Starting sweep in seconds
         config.FT['sweep30s'] = sweep30s        # Sweep at 30s in seconds
         config.FT['commonRatio'] = commonRatio  # Common ratio of the geometrical sequence
+        config.FT['covering'] = covering        # Covering of the sawtooth function in microns
         config.FT['maxVelocity'] = maxVelocity  # Maximal slope given in µm/frame
         config.FT['searchThreshGD'] = searchThreshGD*config.wlOfTrack    # Maximal value of GD for considering fringe found.
-        config.FT['Nsearch'] = Nsearch
-        config.FT['searchSNR'] = searchSNR
-        
+        config.FT['Nsearch'] = Nsearch          
+        config.FT['searchSNR'] = searchSNR      
+        config.FT['searchMinGD'] = np.ones(NINmes)*searchMinGD  # Value of minimal reached value of GD during search
+        config.FT['diffOffsets_best'] = np.zeros(NINmes)        # Vector that will contain the offsets of the fringes.
+        config.FT['Ws'] = np.zeros(NINmes)        # Vector that will contain the offsets of the fringes.
+        config.FT['searchMaxSnr'] = np.zeros(NINmes)        # Vector that will contain the offsets of the fringes.
+            
         # Version usaw vector
         config.FT['usaw'] = np.zeros([NT,NA])
         config.FT['LastPosition'] = np.zeros(NA)
@@ -268,9 +273,7 @@ def SearchState(CophasedGroups=[]):
     
     searchThreshGD = FT['searchThreshGD']
     
-    varcurrPD, varcurrGD = getvar()
-    
-    Nsearch = FT['Nsearch']
+    Nsearch = FT['Nsearch'] ; Ngd = FT['Ngd']
     timerange = range(it+1-Nsearch, it+1) 
         
     if FT['searchSNR'] == 'pd':
@@ -299,27 +302,46 @@ def SearchState(CophasedGroups=[]):
         currGD[ib] = np.angle(cfGDmoy*np.exp(-1j*outputs.GDref[it,ib]))
         
     outputs.GDEstimated[it] = currGD
+    GDmic = currGD *R*wlOfTrack/(2*np.pi)
     
     MaxSNRCondition = (np.mean(GradSNR[:Nsearch//2],axis=0)*np.mean(GradSNR[Nsearch//2:],axis=0) < 0) # Sign change in first derivative
 
     #MaxSNRCondition = (np.mean(outputs.SearchSNR[it-Nsearch:it-Nsearch//2],axis=0)-outputs.SearchSNR[it-1]<0)
-    snrHigherThanThreshold = (outputs.SearchSNR[it] > config.FT['ThresholdGD'])
+    # snrHigherThanThreshold = (outputs.SearchSNR[it] > config.FT['ThresholdGD'])
+    SNR = np.sqrt(outputs.SquaredSNRMovingAverage[it])
     
-    GDNullCondition = (np.abs(currGD) < R/np.pi*searchThreshGD)  # C'est pas ouf car latence dans les mesures
-    NoRecentChange = (config.FT['it_last'][0] < it-Nsearch)
+    snrHigherThanThreshold = (SNR > FT['ThresholdGD'])
+    lowEnoughGD = (np.abs(GDmic) < searchThreshGD)  # C'est pas ouf car latence dans les mesures
+    lowerGD = (np.abs(GDmic) < FT['searchMinGD'])
+    higherSnr = (SNR > FT['searchMaxSnr'])
+    NoRecentChange = (config.FT['it_last'][0] < it-Ngd)
     
-    Ws = outputs.SearchSNR[it] * (snrHigherThanThreshold * MaxSNRCondition * GDNullCondition * NoRecentChange)
+    
+    # Ws = outputs.SearchSNR[it] * snrHigherThanThreshold * NoRecentChange * lowEnoughGD# * MaxSNRCondition)
+    Ws = SNR * snrHigherThanThreshold * NoRecentChange * lowEnoughGD# * GDNullCondition# * GDNullCondition)# * NoRecentChange)# * MaxSNRCondition)
         
     for ib in range(NINmes):
-        ia = int(config.FS['ich'][ib][0])-1
-        iap = int(config.FS['ich'][ib][1])-1
+        ia = int(FS['ich'][ib][0])-1
+        iap = int(FS['ich'][ib][1])-1
         if Ws[ib] != 0:
             outputs.diffOffsets[it,ib] = outputs.EffectiveMoveODL[it,ia]-outputs.EffectiveMoveODL[it,iap]
     
+            if higherSnr[ib]:
+                FT['searchMinGD'][ib] = GDmic[ib]
+                FT['diffOffsets_best'][ib] = outputs.diffOffsets[it,ib]
+                FT['Ws'][ib] = Ws[ib]
+        
+    outputs.diffOffsets_best[it] = config.FT['diffOffsets_best']
+    outputs.Ws[it] = config.FT['Ws']
+                
     # Transpose the W matrix in the Piston-space
-    Is = np.dot(config.FS['OPD2Piston_r'],np.dot(np.diag(Ws),config.FS['Piston2OPD_r']))
+    Is = np.dot(config.FS['OPD2Piston_r'],np.dot(np.diag(FT['Ws']),config.FS['Piston2OPD_r']))
+    outputs.Is[it] = Is
     
-    allTelFound = (np.linalg.matrix_rank(Is) == NA-1)
+    rankIs = np.linalg.matrix_rank(Is)
+    outputs.rankIs[it] = rankIs
+    
+    allTelFound = (rankIs == NA-1)
     
     if allTelFound:
         config.FT['state'][it+1] = 0    # Set SPICA-FT to TRACK state
@@ -341,14 +363,14 @@ def SearchState(CophasedGroups=[]):
         # Come back to the OPD-space        
         VSdagUt = np.dot(V, np.dot(Sdag,Ut))
         
-        Igd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], Ws)))
+        Igd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], np.diag(FT['Ws']))))
         
-        outputs.GDEstimated[it] = np.dot(Igd,outputs.diffOffsets[it])
+        uSearchOpd = np.dot(Igd,config.FT['diffOffsets_best'])
         
-        uSearch = np.dot(FS['OPD2Piston'],outputs.GDEstimated[it])
+        uSearch = np.dot(FS['OPD2Piston'],uSearchOpd)
          
         outputs.CommandSearch[it+1] = uSearch
-        outputs.CommandRelock[it+1] = uSearch         # Patch to propagate the command to the fringe-tracker commands
+        # outputs.CommandRelock[it+1] = uSearch         # Patch to propagate the command to the fringe-tracker commands
         config.FT['Vfactors'] = config.FT['relock_vfactors']    # Set Vfactors to the RELOCK values since it will never come back to SEARCH state.
         
         # Reinitialise parameters for sawtooth function
@@ -370,7 +392,7 @@ def SearchState(CophasedGroups=[]):
                 config.FT['it0'] = np.ones(NA)*it
                 config.FT['it_last'] = np.ones(NA)*it
                     
-        Increment = relockfunction_inc_sylvain_gestioncophased(it, config.FT['search_vfactors'], CophasedGroups)
+        Increment = relockfunction_inc_sylvain_gestioncophased(it, config.FT['search_vfactors'], config.FT['covering'], CophasedGroups)
     
         #You should send command only on telescope with flux
         #outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
@@ -567,8 +589,11 @@ def CommandCalc(CfPD,CfGD):
     if config.FT['state'][it] == 2:
         uSearch = SearchState()
         CommandODL = uSearch
-        CommandODL = np.zeros(NA)
+        # CommandODL = np.zeros(NA)
         return CommandODL
+    else:
+        outputs.CommandSearch[it+1] = outputs.CommandSearch[it]
+        uSearch = outputs.CommandSearch[it+1]
     
     """
     WEIGHTING MATRIX
@@ -884,7 +909,7 @@ def CommandCalc(CfPD,CfGD):
                     config.FT['it_last'] = np.ones(NA)*it
                 
                 Velocities = np.dot(Kernel,config.FT['relock_vfactors'])
-                Increment = relockfunction_inc_sylvain_gestioncophased(it, Velocities, CophasedGroups)
+                Increment = relockfunction_inc_sylvain_gestioncophased(it, Velocities, config.FT['covering'], CophasedGroups)
             
                 #You should send command only on telescope with flux
                 outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
@@ -1066,7 +1091,7 @@ def CommandCalc(CfPD,CfGD):
     It is the addition of the GD, PD, SEARCH and modulation functions
     """
     
-    CommandODL = uPD + uGD + uRelock
+    CommandODL = uPD + uGD + uRelock + uSearch
     
     # if config.TELref !=-1:
     #     CommandODL = CommandODL - CommandODL[config.TELref]
@@ -1188,26 +1213,99 @@ def getvar():
     return varPD, varGD
 
 
-def SetThreshold(TypeDisturbance="CophasedThenForeground",
+def SetThreshold(TypeDisturbance="CophasedThenForeground",nbSigma=0,
                  manual=False, scan=False,display=False,
                  verbose=True,scanned_tel=6):
     """
-    This function enables to estimate the threshold GD for the state-machine.
-    It scans the coherence envelop of the FS and displays the estimated SNR².
-    It then asks for the user to choose a smart threshold.
+    Estimate the threshold GD.
+    Different way of doing this, depending on parameters:
+        - nbSigma: if a non-null float is given, LAR are sent to foreground \
+and ThresholdGD = mean(SNR) + nBsigma * rms(SNR)
+        - TypeDisturbance:
+            - if CophaseThenForeground: compare SNR in presence and absence \
+of fringes and ThresholdGD = SNR_foreground + 0.2 * (SNR_cophased - SNR_foreground)
+
+        - manual: if True, scans the coherence envelop of the FS and displays the estimated SNR².
+Then asks for the user to choose a smart threshold.
+
+    Parameters
+    ----------
+    TypeDisturbance : TYPE, optional
+        DESCRIPTION. The default is "CophasedThenForeground".
+    nbSigma : TYPE, optional
+        DESCRIPTION. The default is 0.
+    manual : TYPE, optional
+        DESCRIPTION. The default is False.
+    scan : TYPE, optional
+        DESCRIPTION. The default is False.
+    display : TYPE, optional
+        DESCRIPTION. The default is False.
+    verbose : TYPE, optional
+        DESCRIPTION. The default is True.
+    scanned_tel : TYPE, optional
+        DESCRIPTION. The default is 6.
 
     Returns
     -------
-    INPUT
-        The user can choose the value to return regarding the SNR evolution.
+    Modify values of ThresholdGD and ThresholdPD.
 
     """
+
     from cophasim import skeleton as sk
     from cophasim import config
+    from cophasim import outputs
 
     NINmes = config.FS['NINmes']
 
-    if scan:
+    if nbSigma:
+        
+        NT=200
+            
+        InitNT = sk.config.NT
+        
+        foreground = 5*config.FS['R']*config.wlOfTrack*np.arange(config.NA)
+        
+        sk.update_config(foreground=foreground, NT = NT, verbose=verbose)
+        
+        # Initialize the fringe tracker with the gain
+        from cophasim.SPICA_FT import SPICAFT, updateFTparams
+        #SPICAFT(init=True, GainPD=0, GainGD=0,relock=False)
+        gainPD,gainGD,relock,state=config.FT['GainPD'],config.FT['GainGD'],config.FT['relock'],config.FT['state']
+        updateFTparams(GainPD=0, GainGD=0, relock=False,search=False, verbose=verbose)
+        
+        config.FT['state'] = np.zeros(NT+1)
+        # Launch the scan
+        sk.loop(verbose=verbose)
+        
+        StartComputing = 50
+        newThresholdGD = np.ones(NINmes)
+
+        for ib in range(NINmes):
+            SNRfg = np.mean(np.sqrt(outputs.SquaredSNRMovingAverage[StartComputing:,ib]))
+            fgstd = np.std(np.sqrt(outputs.SquaredSNRMovingAverage[StartComputing:,ib]))
+            
+            # Set threshold to mean(SNR) + nBsigma * rms(SNR)
+            newThresholdGD[ib] = SNRfg + nbSigma*fgstd
+            
+            if newThresholdGD[ib] ==0:
+                newThresholdGD[ib] = 10
+                
+        
+        newThresholdPD = 1e-3#np.min(newThresholdGD)/2
+        
+        config.FT['ThresholdGD'] = newThresholdGD
+        config.FT['ThresholdPD'] = newThresholdPD
+        config.FT['state'] = state
+
+        sk.display('opd','snr','detector',wlOfTrack=1.6, pause=True,display=display)
+        
+        sk.update_config(NT=InitNT,foreground=[],verbose=verbose)
+        updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock,
+                       ThresholdGD=newThresholdGD,ThresholdPD=newThresholdPD,
+                       verbose=verbose)
+
+
+    elif scan:
 
         datadir2 = "data/"
     
@@ -1532,7 +1630,7 @@ def relockfunction_inc_sylvain(it, v):
     return move
 
 
-def relockfunction_inc_sylvain_gestioncophased(it, v, CophasedGroups):
+def relockfunction_inc_sylvain_gestioncophased(it, v, covering, CophasedGroups):
     """
     Incremental sawtooth function working.
     It returns +1 or -1 depending on the tooth on which it is, and add a delta only at the change of tooth.
@@ -1578,14 +1676,28 @@ def relockfunction_inc_sylvain_gestioncophased(it, v, CophasedGroups):
             config.FT['it_last'][ia] = it
             config.FT['nbChanges'][ia] += 1
             move[ia] = -config.FT['LastPosition'][ia]
+            
+            # Add some covering to prevent from missing fringes
+            if np.abs(move[ia]) < 2*covering:
+                coveringtemp = 0
+            else:
+                coveringtemp = covering
+            if move[ia] > 0:
+                move[ia] -= coveringtemp
+            if move[ia] < 0:
+                move[ia] += coveringtemp
+                
+            coveringtemp = covering
+            
+            # Cophased telescopes remain together when jumping
             tel=ia+1
             for CophasedGroup in CophasedGroups:
                 l = [move[itel-1] for itel in CophasedGroup]
                 generalmove = max(set(l), key = l.count)
                 
                 if tel in CophasedGroup:
-                    move[ia] = generalmove
-                    
+                    move[ia] = generalmove            
+            
             config.FT['LastPosition'][ia] = move[ia]
     
     return move

@@ -46,15 +46,15 @@ rcParamsForBaselines = {"font.size":SS,
 # plt.rc('text', usetex = True)
 
 def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5, 
-               ND=1, 
+               ND=1,
                spectra = [], spectraM=[],wlOfTrack=0, spectrum = [],
                mode = 'search',
                fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigmap=[],imsky=[],
                ft = 'integrator', state = 0,
-               noise=True,ron=0, qe=0.5, phnoise = 0, G=1, enf=1.5, M=1,
-               seedph=100, seedron=100, seeddist=100,
+               noise=True, phnoise = 0, noiseParams = {},
+               seedPh=100, seedRon=100, seedDist=100,seedDark=100,
                starttracking=50, latencytime=0,
-               piston_average=0,display=False,
+               piston_average=0, foreground=[], display=False,
                checktime=True, checkperiod=10):
     """
     
@@ -117,11 +117,11 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5,
         DESCRIPTION. The default is 1.5.
     M : TYPE, optional
         DESCRIPTION. The default is 1.
-    seedph : TYPE, optional
+    seedPh : TYPE, optional
         DESCRIPTION. The default is 100.
-    seedron : TYPE, optional
+    seedRon : TYPE, optional
         DESCRIPTION. The default is 100.
-    seeddist : TYPE, optional
+    seedDist : TYPE, optional
         DESCRIPTION. The default is 100.
     starttracking : TYPE, optional
         DESCRIPTION. The default is 50.
@@ -236,10 +236,6 @@ SOURCE:
     
     if wlOfTrack==0:
         wlOfTrack = np.median(spectraM) 
-        
-
-    if type(qe) == float:
-        qe=qe*np.ones(MW)
 
     # Disturbance Pattern
     
@@ -269,6 +265,7 @@ SOURCE:
     config.NT=NT
     config.OT=OT
     config.timestamps = timestamps
+    config.foreground = foreground
  
     # Fringe Sensor parameters
     config.NW=NW
@@ -277,12 +274,19 @@ SOURCE:
     config.NX=0
     config.NY=0
     config.ND=ND
-    config.dt=dt                    # ms
+    config.dt=dt   # ms
 
     # Noises
-    config.qe = qe.reshape([MW,1])
     config.noise=noise
-    config.ron=ron
+    if len(noiseParams):
+        print("Update noise parameters of the fringe-sensor:")
+        for key, value in zip(list(noiseParams.keys()),list(noiseParams.values())):
+            oldval=config.FS[key]
+            if key == 'qe':
+                if isinstance(value, float):
+                    value=value*np.ones([MW,1])
+            config.FS[key] = value
+            print(f' - Parameter "{key}" changed from {oldval} to {value}')
     
     if imsky:
         config.FS['imsky'] = imsky
@@ -290,13 +294,10 @@ SOURCE:
         config.FS['sigmap'] = sigmap
     
     if noise:
-        np.random.seed(seedron+60)
-        config.FS['sigmap'] = np.random.randn(MW,config.FS['NP'])*ron
+        np.random.seed(seedRon+60)
+        config.FS['sigmap'] = np.random.randn(MW,config.FS['NP'])*config.FS['ron']
     
     config.phnoise=phnoise
-    config.G = G
-    config.enf=enf
-    config.M=M
 
     if latencytime == 0:
         config.latency = config.dt
@@ -305,9 +306,9 @@ SOURCE:
     
     
     # Random Statemachine seeds
-    config.seedph=seedph
-    config.seedron=seedron
-    config.seeddist=seeddist
+    config.seedPh=seedPh
+    config.seedRon=seedRon
+    config.seedDist=seedDist
     
     # Fringe tracker
     config.starttracking = starttracking
@@ -375,20 +376,33 @@ def update_config(verbose=False,**kwargs):
         config.timestamps = np.arange(config.NT)*config.dt
         from . import outputs
         outputs.timestamps = np.copy(config.timestamps)
-        # config.FT['state'][ = config.FT['state']
-        # config.FT['usaw'] = np.zeros(config.NT)
+
         if verbose:
             print(' - New NT not equal to len(timestamps) so we change timestamps.')
             
-    if 'ron' in kwargs.keys():
-        ron = kwargs['ron']
+    if "noiseParams" in kwargs.keys():
+        ron = config.FS['ron']
         config.noise=True
         config.FS['sigmap'] = np.random.randn(config.MW,config.FS['NP'])*ron
         if verbose:
             print(f' - Updated sigmap for ron={ron}.')
-        
+            
     return
 
+def updateFSparams(verbose=False,**kwargs):
+    
+    if verbose:
+        print("Update fringe-sensor parameters:")
+    for key, value in zip(list(kwargs.keys()),list(kwargs.values())):
+        oldval=config.FS[key]
+        config.FS[key] = value
+        
+        if verbose:
+            if isinstance(value,str):
+                if "/" in value:
+                    oldval = oldval.split("/")[-1]
+                    value = value.split("/")[-1]
+            print(f' - Parameter "{key}" changed from {oldval} to {value}')
 
 def updateFTparams(verbose=False,**kwargs):
     
@@ -1109,7 +1123,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     
     from . import outputs
 
-    from .config import NT, NA, NW,timestamps, spectra, OW, MW, checktime, checkperiod
+    from .config import NT, NA, NW,timestamps, spectra, OW, MW, checktime, checkperiod, foreground
     
     outputs.TimeID=time.strftime("%Y%m%d-%H%M%S")
     
@@ -1152,7 +1166,8 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     outputs.VisibilityObject = VisObj
     
     # Importation of the disturbance
-    CfDist, PistonDist, TransmissionDist = ct.get_CfDisturbance(config.DisturbanceFile, spectra, timestamps,verbose=verbose)
+    CfDist, PistonDist, TransmissionDist = ct.get_CfDisturbance(config.DisturbanceFile,spectra, timestamps,
+                                                                foreground=foreground,verbose=verbose)          
     
     outputs.CfDisturbance = CfDist
     outputs.PistonDisturbance = PistonDist
@@ -1397,16 +1412,16 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         print(f'First fig is Figure {config.newfig}')
     
     displayall = False
-    if len(args)==0:
+    if (len(args)==0) and (len(outputsData)==0):
         displayall = True
         
-    from matplotlib.ticker import AutoMinorLocator
+    # from matplotlib.ticker import AutoMinorLocator
     
     # Each figure only shows 15 baselines, distributed on two subplots
     # If there are more than 15 baselines, multiple figures will be created
-    NINdisp = 15
-    NumberOfBaseFiguresNIN = 1+NIN//NINdisp - 1*(NIN % NINdisp==0)
-    NumberOfBaseFigures = 1+NINmes//NINdisp - 1*(NINmes % NINdisp==0)
+    # NINdisp = 15
+    # NumberOfBaseFiguresNIN = 1+NIN//NINdisp - 1*(NIN % NINdisp==0)
+    # NumberOfBaseFigures = 1+NINmes//NINdisp - 1*(NINmes % NINdisp==0)
     
     NAdisp = 10
     NumberOfTelFigures = 1+NA//NAdisp - 1*(NA % NAdisp==0)
@@ -1664,6 +1679,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                 continue
 
             obs = getattr(outputs, obsname)
+                
             rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
             
             generaltitle = obsname
@@ -1685,6 +1701,13 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                           NameObs=obsname,
                                           display=True,filename=filename,ext='pdf',infos={"details":''},
                                           verbose=verbose)
+            elif "Command".casefold() in obsname.casefold():
+                obs = obs[:-1] ; rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+                display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
+                                          NameObs=obsname,
+                                          display=True,filename=filename,ext='pdf',infos={"details":''},
+                                          verbose=verbose)
+                
             else:
                 print(f"Impossible to determine the type of the observable {obsname}. I try with OPD-type.")
                 display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
@@ -1692,208 +1715,6 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                           display=True,filename=filename,ext='pdf',infos={"details":''},
                                           verbose=verbose)
 
-    """ PISTON SPACE """
-
-    if displayall or ('disturbances' in args):
-        
-        pis_max = 1.1*np.max([np.max(np.abs(outputs.PistonDisturbance)),wl/2])
-        pis_min = -pis_max
-        ylim = [pis_min,pis_max]
-        
-        fig = plt.figure("Disturbances")
-        
-        if not hasattr(outputs, 'FreqSampling'):
-            ax1 = fig.subplots(nrows=1,ncols=1)
-            for ia in range(NA):
-                # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-                ax1.plot(timestamps, outputs.PistonDisturbance[:,ia],color=telcolors[ia])
-            
-            ax1.set_xlabel('Time (ms)')
-            ax1.set_ylabel('Piston [µm]')
-            ax1.set_ylim(ylim)
-            ax1.grid()
-            ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
-            ax1.legend(handles=beam_patches)
-
-        else:
-            ax1,ax2,ax3 = fig.subplots(nrows=3,ncols=1)
-            
-            ax1 = fig.subplots(nrows=1,ncols=1)
-            for ia in range(NA):
-                # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
-                ax1.plot(timestamps, outputs.PistonDisturbance[:,ia],color=telcolors[ia])
-            
-            ax1.set_xlabel('Time (ms)')
-            ax1.set_ylabel('Piston [µm]')
-            ax1.set_ylim(ylim)
-            ax1.grid()
-            ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
-            ax1.legend(handles=beam_patches)
-            
-            if outputs.FreqSampling.size == outputs.DisturbancePSD.size:
-                ax2.plot(outputs.FreqSampling, outputs.DisturbancePSD)
-                ax2.set_title('Power spectral distribution of the last pupil \
-            (same shape for all)')
-                ax2.set_xlabel('Frequency [Hz]')             
-                ax2.set_xscale('log')
-                ax2.set_yscale('log')
-                
-                ax3.plot(outputs.FreqSampling, outputs.DisturbanceFilter)
-                ax3.set_title('Filter')
-                ax3.set_xlabel('Frequency [Hz]')             
-                ax3.set_xscale('log')
-                ax3.set_yscale('log')    
-        
-        if display:
-            plt.show()
-        config.newfig+=1    
-        
-        
-    if displayall or ('phot' in args):
-        s=(0,1.1*np.max(outputs.PhotometryEstimated))
-        linestyles=[]
-        linestyles.append(mlines.Line2D([], [], color='black',
-                                        linestyle='solid',label='Estimated'))    
-        linestyles.append(mlines.Line2D([], [], color='black',
-                                        linestyle='dashed',label='Disturbance'))
-        linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking'))
-    
-    
-        plt.figure("Photometries")
-        plt.suptitle('Photometries in the spectral channel containing {:.2f}µm'.format(wl))
-        
-        for ia in range(NA):
-            plt.plot(t[timerange], np.sum(outputs.PhotometryDisturbance[:,OW*WLIndex:OW*(WLIndex+1),ia],axis=1),
-                     color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
-            plt.plot(t[timerange], outputs.PhotometryEstimated[:,WLIndex,ia],
-                     color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
-            
-        plt.vlines(config.starttracking*dt*ms,s[0],s[1],
-                   color='k', linestyle=':')
-        plt.legend(handles=beam_patches+linestyles)
-        plt.grid()
-        plt.xlabel('Time [s]')
-        plt.ylim(s[0],s[1])
-        if display:
-            plt.show()    
-        config.newfig+=1    
-        
-    
-    if displayall or ('piston' in args):
-        """
-        PISTONS
-        """
-        
-        linestyles=[]
-        linestyles.append(mlines.Line2D([], [], color='black',
-                                        linestyle='solid',label='Estimated'))    
-        linestyles.append(mlines.Line2D([], [], color='black',
-                                        linestyle='dashed',label='Disturbance'))
-        linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking'))
-        # linestyles.append(mlines.Line2D([], [], color='black',
-        #                                 linestyle='dotted',label='Command'))
-        
-        ax2ymax = np.max([np.max(np.abs(outputs.PistonTrue)),wl/2])
-        ax2ylim = [-ax2ymax,ax2ymax]
-        fig = plt.figure("Pistons")
-        plt.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
-        ax1,axText = fig.subplots(ncols=2,gridspec_kw={"width_ratios":[4,1]})
-        axText.axis("off")
-        ax2 = ax1.twinx()
-        
-        if config.TELref:
-            iTELref = config.TELref - 1
-            PistonRef=outputs.PistonTrue[:,iTELref]
-            PistonDistRef = outputs.PistonDisturbance[:,iTELref]
-        else:
-            PistonRef=0#np.mean(outputs.PistonTrue, axis=1)
-            PistonDistRef = 0
-        
-        for ia in range(NA):
-            
-            ax1.plot(timestamps, outputs.PistonDisturbance[:,ia]-PistonDistRef,
-                      color=telcolors[ia],linestyle='dashed')
-            ax2.plot(timestamps, outputs.PistonTrue[:,ia]-PistonRef,
-                     color=telcolors[ia],linestyle='solid')
-            
-            axText.text(0.3,.9-ia*.05,f"$\sigma_{{{ia+1}}}={int(np.sqrt(outputs.VarPiston[ia])*1e3)}$nm")
-        
-        ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle=':')
-        # ax2.vlines(config.starttracking*dt,ax2ylim[0],ax2ylim[1],
-        #                color='k', linestyle=':')
-        ax2.set_ylabel('True Pistons [µm]')
-        ax2.set_ylim(ax2ylim)
-        ax1.set_ylabel('Disturbance Pistons [µm]')
-        ax1.set_ylim(ylim)
-        plt.xlabel('Time (ms)')
-        axText.legend(handles=beam_patches+linestyles,loc="lower right")
-        ax2.grid(True)
-        if display:
-            plt.show()
-        config.newfig+=1
-    
-        if len(savedir):
-            fig.savefig(savedir+f"Simulation{TimeID}_piston.{ext}")
-    
-    
-    if displayall or ('Pistondetails' in args):
-        
-        linestyles=[]
-        # linestyles.append(mlines.Line2D([], [], color=colors[0],
-        #                                 linestyle='solid',label='Estimated'))    
-        linestyles.append(mlines.Line2D([], [], color=colors[0],
-                                        label='Disturbance'))
-        linestyles.append(mlines.Line2D([], [], color=colors[1],
-                                        label='Total Command'))
-        linestyles.append(mlines.Line2D([], [], color=colors[2],
-                                        label='PD Command'))
-        linestyles.append(mlines.Line2D([], [], color=colors[3],
-                                        label='GD Command'))
-        linestyles.append(mlines.Line2D([], [], color=colors[4],
-                                        label='Search Command'))
-        linestyles.append(mlines.Line2D([],[], color='black',
-                                        linestyle=':', label='Start tracking'))
-        # linestyles.append(mlines.Line2D([], [], color=colors[5],
-        #                                 label='Modulation Command'))
-    
-    
-        fig = plt.figure("Piston details")
-        fig.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
-        axes = fig.subplots(nrows=NA,ncols=1, sharex=True)
-        ax2ymax = np.max(np.abs(outputs.PistonTrue))
-        ax2ylim = [-ax2ymax,ax2ymax]
-        for ia in range(NA):
-            ax = axes[ia]
-            ax.plot(timestamps, outputs.PistonDisturbance[:,ia],
-                     color=colors[0])
-            ax.plot(timestamps, outputs.CommandODL[:-1,ia],
-                     color=colors[1])
-            ax.plot(timestamps, outputs.PistonPDCommand[:-1,ia],
-                     color=colors[2])
-            ax.plot(timestamps, outputs.PistonGDCommand[:-1,ia],
-                     color=colors[3])
-            ax.plot(timestamps, outputs.SearchCommand[:-1,ia],
-                     color=colors[4])
-            # ax2 = ax.twinx()
-            # ax2.plot(timestamps, outputs.PistonTrue[:,ia],
-            #          color='blue',linestyle='solid')
-            ax.set_ylim(ylim)
-            # ax2.set_ylim(ax2ylim)
-            ax.set_ylabel(f'Tel {ia+1} \n[µm]')
-            # ax2.set_ylabel(f'Residual Piston {ia+increment} [µm]')
-            ax.grid()
-        
-            ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                   color='k', linestyle=':')
-
-        plt.xlabel('Time (ms)')
-        plt.legend(handles=linestyles)
-        if display:
-            plt.show()
-        config.newfig+=1
 
 
 
@@ -2115,7 +1936,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                   verbose=False)
                 
         
-    if displayall or ('snrpd' in args):
+    if displayall or ('snrPd' in args):
 
         generaltitle = 'SNR PD'
         typeobs="SNRPD"
@@ -2132,7 +1953,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
                 
-    if displayall or ('snrgd' in args):
+    if displayall or ('snrGd' in args):
         generaltitle = 'SNR GD'
         typeobs="SNRGD"
         if len(savedir):
@@ -2147,7 +1968,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
-    if displayall or ('gdcmd' in args):
+    if displayall or ('gdCmd' in args):
         generaltitle = 'GD Commands'
         typeobs="GDCmd"
         if len(savedir):
@@ -2163,7 +1984,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                   verbose=False)
         
         
-    if displayall or ('pdcmd' in args):
+    if displayall or ('pdCmd' in args):
         generaltitle = 'PD Commands'
         typeobs="PDCmd"
         if len(savedir):
@@ -2179,7 +2000,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                   verbose=False)
         
         
-    if displayall or ('OPDcmd' in args):
+    if displayall or ('cmdOpd' in args):
         generaltitle = 'OPD Commands'
         typeobs="OPDCmd"
         if len(savedir):
@@ -2194,7 +2015,25 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
-    if displayall or ('piscmd' in args):
+        
+    """ PISTONS """    
+    
+    if displayall or ('distPis' in args):
+        generaltitle = 'Piston Disturbances'
+        typeobs="pisDist"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+        else:
+            filename=''     
+            
+        obs = outputs.PistonDisturbance
+        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
+                                  NameObs='Disturbances [µm]',
+                                  display=True,filename=filename,ext='pdf',infos={"details":''},
+                                  verbose=False)
+        
+    if displayall or ('cmdPis' in args):
         generaltitle = 'Piston Commands'
         typeobs="pisCmd"
         if len(savedir):
@@ -2584,7 +2423,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
                   linestyle='--',label='Threshold GD')
         
-        ax2.plot(timestamps, config.FT['state'], 
+        ax2.plot(timestamps, config.FT['state'][:-1], 
                 color='blue', label='State-machine')
         ax2.plot(timestamps, outputs.IgdRank, 
                 color='k', label='Rank')
@@ -2609,7 +2448,209 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     pass
     
         
+    # """ PISTON SPACE """
+
+    # if displayall or ('disturbances' in args):
         
+    #     pis_max = 1.1*np.max([np.max(np.abs(outputs.PistonDisturbance)),wl/2])
+    #     pis_min = -pis_max
+    #     ylim = [pis_min,pis_max]
+        
+    #     fig = plt.figure("Disturbances")
+        
+    #     if not hasattr(outputs, 'FreqSampling'):
+    #         ax1 = fig.subplots(nrows=1,ncols=1)
+    #         for ia in range(NA):
+    #             # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
+    #             ax1.plot(timestamps, outputs.PistonDisturbance[:,ia],color=telcolors[ia])
+            
+    #         ax1.set_xlabel('Time (ms)')
+    #         ax1.set_ylabel('Piston [µm]')
+    #         ax1.set_ylim(ylim)
+    #         ax1.grid()
+    #         ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
+    #         ax1.legend(handles=beam_patches)
+
+    #     else:
+    #         ax1,ax2,ax3 = fig.subplots(nrows=3,ncols=1)
+            
+    #         ax1 = fig.subplots(nrows=1,ncols=1)
+    #         for ia in range(NA):
+    #             # plt.subplot(NA,1,ia+1), plt.title('Beam {}'.format(ia+increment))
+    #             ax1.plot(timestamps, outputs.PistonDisturbance[:,ia],color=telcolors[ia])
+            
+    #         ax1.set_xlabel('Time (ms)')
+    #         ax1.set_ylabel('Piston [µm]')
+    #         ax1.set_ylim(ylim)
+    #         ax1.grid()
+    #         ax1.set_title('Disturbance scheme at {:.2f}µm'.format(wl))
+    #         ax1.legend(handles=beam_patches)
+            
+    #         if outputs.FreqSampling.size == outputs.DisturbancePSD.size:
+    #             ax2.plot(outputs.FreqSampling, outputs.DisturbancePSD)
+    #             ax2.set_title('Power spectral distribution of the last pupil \
+    #         (same shape for all)')
+    #             ax2.set_xlabel('Frequency [Hz]')             
+    #             ax2.set_xscale('log')
+    #             ax2.set_yscale('log')
+                
+    #             ax3.plot(outputs.FreqSampling, outputs.DisturbanceFilter)
+    #             ax3.set_title('Filter')
+    #             ax3.set_xlabel('Frequency [Hz]')             
+    #             ax3.set_xscale('log')
+    #             ax3.set_yscale('log')    
+        
+    #     if display:
+    #         plt.show()
+    #     config.newfig+=1    
+        
+        
+    # if displayall or ('phot' in args):
+    #     s=(0,1.1*np.max(outputs.PhotometryEstimated))
+    #     linestyles=[]
+    #     linestyles.append(mlines.Line2D([], [], color='black',
+    #                                     linestyle='solid',label='Estimated'))    
+    #     linestyles.append(mlines.Line2D([], [], color='black',
+    #                                     linestyle='dashed',label='Disturbance'))
+    #     linestyles.append(mlines.Line2D([],[], color='black',
+    #                                     linestyle=':', label='Start tracking'))
+    
+    
+    #     plt.figure("Photometries")
+    #     plt.suptitle('Photometries in the spectral channel containing {:.2f}µm'.format(wl))
+        
+    #     for ia in range(NA):
+    #         plt.plot(t[timerange], np.sum(outputs.PhotometryDisturbance[:,OW*WLIndex:OW*(WLIndex+1),ia],axis=1),
+    #                  color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
+    #         plt.plot(t[timerange], outputs.PhotometryEstimated[:,WLIndex,ia],
+    #                  color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
+            
+    #     plt.vlines(config.starttracking*dt*ms,s[0],s[1],
+    #                color='k', linestyle=':')
+    #     plt.legend(handles=beam_patches+linestyles)
+    #     plt.grid()
+    #     plt.xlabel('Time [s]')
+    #     plt.ylim(s[0],s[1])
+    #     if display:
+    #         plt.show()    
+    #     config.newfig+=1    
+        
+    
+    # if displayall or ('piston' in args):
+    #     """
+    #     PISTONS
+    #     """
+        
+    #     linestyles=[]
+    #     linestyles.append(mlines.Line2D([], [], color='black',
+    #                                     linestyle='solid',label='Estimated'))    
+    #     linestyles.append(mlines.Line2D([], [], color='black',
+    #                                     linestyle='dashed',label='Disturbance'))
+    #     linestyles.append(mlines.Line2D([],[], color='black',
+    #                                     linestyle=':', label='Start tracking'))
+    #     # linestyles.append(mlines.Line2D([], [], color='black',
+    #     #                                 linestyle='dotted',label='Command'))
+        
+    #     ax2ymax = np.max([np.max(np.abs(outputs.PistonTrue)),wl/2])
+    #     ax2ylim = [-ax2ymax,ax2ymax]
+    #     fig = plt.figure("Pistons")
+    #     plt.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
+    #     ax1,axText = fig.subplots(ncols=2,gridspec_kw={"width_ratios":[4,1]})
+    #     axText.axis("off")
+    #     ax2 = ax1.twinx()
+        
+    #     if config.TELref:
+    #         iTELref = config.TELref - 1
+    #         PistonRef=outputs.PistonTrue[:,iTELref]
+    #         PistonDistRef = outputs.PistonDisturbance[:,iTELref]
+    #     else:
+    #         PistonRef=0#np.mean(outputs.PistonTrue, axis=1)
+    #         PistonDistRef = 0
+        
+    #     for ia in range(NA):
+            
+    #         ax1.plot(timestamps, outputs.PistonDisturbance[:,ia]-PistonDistRef,
+    #                   color=telcolors[ia],linestyle='dashed')
+    #         ax2.plot(timestamps, outputs.PistonTrue[:,ia]-PistonRef,
+    #                  color=telcolors[ia],linestyle='solid')
+            
+    #         axText.text(0.3,.9-ia*.05,f"$\sigma_{{{ia+1}}}={int(np.sqrt(outputs.VarPiston[ia])*1e3)}$nm")
+        
+    #     ax1.vlines(config.starttracking*dt,ylim[0],ylim[1],
+    #                color='k', linestyle=':')
+    #     # ax2.vlines(config.starttracking*dt,ax2ylim[0],ax2ylim[1],
+    #     #                color='k', linestyle=':')
+    #     ax2.set_ylabel('True Pistons [µm]')
+    #     ax2.set_ylim(ax2ylim)
+    #     ax1.set_ylabel('Disturbance Pistons [µm]')
+    #     ax1.set_ylim(ylim)
+    #     plt.xlabel('Time (ms)')
+    #     axText.legend(handles=beam_patches+linestyles,loc="lower right")
+    #     ax2.grid(True)
+    #     if display:
+    #         plt.show()
+    #     config.newfig+=1
+    
+    #     if len(savedir):
+    #         fig.savefig(savedir+f"Simulation{TimeID}_piston.{ext}")
+    
+    
+    # if displayall or ('Pistondetails' in args):
+        
+    #     linestyles=[]
+    #     # linestyles.append(mlines.Line2D([], [], color=colors[0],
+    #     #                                 linestyle='solid',label='Estimated'))    
+    #     linestyles.append(mlines.Line2D([], [], color=colors[0],
+    #                                     label='Disturbance'))
+    #     linestyles.append(mlines.Line2D([], [], color=colors[1],
+    #                                     label='Total Command'))
+    #     linestyles.append(mlines.Line2D([], [], color=colors[2],
+    #                                     label='PD Command'))
+    #     linestyles.append(mlines.Line2D([], [], color=colors[3],
+    #                                     label='GD Command'))
+    #     linestyles.append(mlines.Line2D([], [], color=colors[4],
+    #                                     label='Search Command'))
+    #     linestyles.append(mlines.Line2D([],[], color='black',
+    #                                     linestyle=':', label='Start tracking'))
+    #     # linestyles.append(mlines.Line2D([], [], color=colors[5],
+    #     #                                 label='Modulation Command'))
+    
+    
+    #     fig = plt.figure("Piston details")
+    #     fig.suptitle('Piston time evolution at {:.2f}µm'.format(wl))
+    #     axes = fig.subplots(nrows=NA,ncols=1, sharex=True)
+    #     ax2ymax = np.max(np.abs(outputs.PistonTrue))
+    #     ax2ylim = [-ax2ymax,ax2ymax]
+    #     for ia in range(NA):
+    #         ax = axes[ia]
+    #         ax.plot(timestamps, outputs.PistonDisturbance[:,ia],
+    #                  color=colors[0])
+    #         ax.plot(timestamps, outputs.CommandODL[:-1,ia],
+    #                  color=colors[1])
+    #         ax.plot(timestamps, outputs.PistonPDCommand[:-1,ia],
+    #                  color=colors[2])
+    #         ax.plot(timestamps, outputs.PistonGDCommand[:-1,ia],
+    #                  color=colors[3])
+    #         ax.plot(timestamps, outputs.SearchCommand[:-1,ia],
+    #                  color=colors[4])
+    #         # ax2 = ax.twinx()
+    #         # ax2.plot(timestamps, outputs.PistonTrue[:,ia],
+    #         #          color='blue',linestyle='solid')
+    #         ax.set_ylim(ylim)
+    #         # ax2.set_ylim(ax2ylim)
+    #         ax.set_ylabel(f'Tel {ia+1} \n[µm]')
+    #         # ax2.set_ylabel(f'Residual Piston {ia+increment} [µm]')
+    #         ax.grid()
+        
+    #         ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+    #                color='k', linestyle=':')
+
+    #     plt.xlabel('Time (ms)')
+    #     plt.legend(handles=linestyles)
+    #     if display:
+    #         plt.show()
+    #     config.newfig+=1
+
         
 #     if displayall or ('opd' in args):
 #         plt.rcParams.update(rcParamsForBaselines)
@@ -5271,17 +5312,18 @@ def addnoiseADU(inputADU):
 
     """
     
-    from .config import ron, G, enf
+    from .config import FS
     from .outputs import it
     
-    (seedph, seedron) = (config.seedph+1,config.seedron+1)
+    ron, G, enf = config.FS['ron'],config.FS['G'],config.FS['enf']
+    (seedPh, seedRon) = (config.seedPh+1,config.seedRon+1)
     
     # Add SHOT noise
-    rs = np.random.RandomState(seedph*it)
+    rs = np.random.RandomState(seedPh*it)
     photonADU = rs.poisson(inputADU/enf, size=inputADU.shape)*enf
     
     # Add DARK noise.
-    rs = np.random.RandomState(seedron*it)
+    rs = np.random.RandomState(seedRon*it)
     ronADU = rs.normal(scale=ron/G, size=photonADU.shape) + photonADU
         
     # Quantify ADU
@@ -5313,29 +5355,87 @@ def addnoise(inPhotons):
 
     """
     
-    from .config import ron, enf, qe
     from .outputs import it
     
-    (seedph, seedron) = (config.seedph+1,config.seedron+1)
+    ron, enf, qe, = config.FS['ron'], config.FS['enf'], config.FS['qe']
+    
+    (seedPh, seedRon) = (config.seedPh+1,config.seedRon+1)
     
     # Add SHOT noise (in the space of photons)
-    rs = np.random.RandomState(seedph*it)
+    rs = np.random.RandomState(seedPh*it)
     photons = rs.poisson(inPhotons/enf, size=inPhotons.shape)*enf
     
     # Converts photons to electrons
     electrons = photons*qe  # Works when qe is float and when qe is array of length MW
     
-    # Add DARK noise: here we assume DARK noise is only readout noise, so dark current is null.
+    # Add readout noise: here we assume DARK noise is only readout noise, so dark current is null.
     # That's why it can be modelised as a Gaussian noise.
-    rs = np.random.RandomState(seedron*it)
+    rs = np.random.RandomState(seedRon*it)
     electrons_with_darknoise = electrons + rs.normal(scale=ron, size=electrons.shape)
-        
-    # Quantify ADU
-    # ronADU = ron*G
-    # roundADU = np.round(ronADU)
-    # electrons_with_darknoise_and_quantification = roundADU/G
     
+    # Convert back to photons
     outPhotons = electrons_with_darknoise/qe
+    
+    return outPhotons
+
+
+
+def addnoise_morecomplex(inPhotons):
+    """
+    Add Noise to photon image
+    /!\/!\ For using this function, the value of the parameter "ron"
+    account for it real value before gains subtraction /!\/!\
+
+    Parameters
+    ----------
+    inputADU : TYPE
+        DESCRIPTION.
+    sensitivity : TYPE, optional
+        DESCRIPTION. The default is 5.88.
+    dark_noise : TYPE, optional
+        DESCRIPTION. The default is 2.
+    floor : TYPE, optional
+        DESCRIPTION. The default is 3.
+
+    Returns
+    -------
+    image : TYPE
+        DESCRIPTION.
+
+    """
+    
+    from .outputs import it
+    
+    ron, enf, qe, = config.FS['ron'], config.FS['enf'], config.FS['qe']
+    darkCurrent = config.FS['darkCurrent'] ; G = config.FS['G']
+    
+    seedPh, seedRon, seedDark = config.seedPh+1,config.seedRon+1,config.seedDark+1
+    
+    # Add SHOT noise (in the space of photons)
+    rs = np.random.RandomState(seedPh*it)
+    photons = rs.poisson(inPhotons/enf, size=inPhotons.shape)*enf
+    
+    # Converts photons to electrons
+    electrons = photons*qe  # Works when qe is float and when qe is array of length MW
+    
+    # Add DARK noise: Poisson noise of parameter darkCurrent
+    rs = np.random.RandomState(seedDark*it)
+    electrons_with_darknoise = electrons + rs.poisson(darkCurrent, size=electrons.shape)
+        
+    # Convert to ADU
+    signalADU = electrons_with_darknoise * G
+    
+    # Add readout noise: Gaussian noise of parameter ron. 
+    # /!\ ron value must account for value before gains subtraction /!\
+    rs = np.random.RandomState(seedRon*it)
+    signalADU_withron = signalADU + rs.normal(scale=ron, size=electrons.shape)
+    
+    # Quantification
+    roundADU = np.round(signalADU_withron)
+    electrons_with_dark_ron_and_quantification = roundADU/G
+    
+    # Convert back to photons
+    outPhotons = electrons_with_dark_ron_and_quantification/qe
     
     return outPhotons
 

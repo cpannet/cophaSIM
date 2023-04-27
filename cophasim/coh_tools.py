@@ -1295,7 +1295,7 @@ def get_infos(file,verbose=False):
     return filetimestamps,filelmbdas, piston, transmission, FreqSampling, PSD, Filter,hdr
     
     
-def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=False):
+def get_CfDisturbance(DisturbanceFile, spectra, timestamps,foreground=[], verbose=False):
     
     from .config import piston_average,NA,NB
     NT = len(timestamps) ; NW = len(spectra)
@@ -1353,6 +1353,9 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps,verbose=False):
         if verbose:
             print("We subtract to the piston of each telescope its temporal average.")
         PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance, axis=0)
+        
+    if len(foreground):     # Add a huge piston to be sure being far from fringes
+        PistonDisturbance = PistonDisturbance + np.array(foreground)
         
     CfDisturbance = np.zeros([NT,NW,NB])*1j
     from cophasim import skeleton

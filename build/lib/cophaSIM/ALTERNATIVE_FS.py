@@ -484,7 +484,6 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         config.FS['ABCDind'] = ModulationIndices
         config.FS['NMod'] = NMod
         config.FS['NP'] = NP
-        config.FS['T'] = T
         config.FS['ichdetails'] = ichdetails
         config.FS['NINmes'] = NINmes            # Number of measured baselines
         config.FS['NBmes'] = NA+2*NINmes        # phot + cos + sin
@@ -578,6 +577,24 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
                     config.FS['OPD2Piston_moy_r'][:,k] = config.FS['OPD2Piston_moy'][:,ib]
                     k+=1
             
+            
+        # Noise parameters (C-RED ONE -> cf article lanthermann 2019 & thesis Lanthermann)
+        config.FS['enf'] = 1.47     # article (vs 1.49 in thesis iv.3.7)
+        config.FS['Gsys'] = 0.49    # thesis iv.1.1
+        config.FS['Gav'] = 150      # article up to 200, but thesis = correct model up to 150
+        config.FS['G'] = config.FS['Gav'] * config.FS['Gsys']    
+        config.FS['T'] = 0.81       # Filters transmission (81%) 
+        config.FS['qe'] = 0.7       # Quantum efficiency (70%) (iv.2.3)
+        config.FS['ron'] = 0.5      # article
+        
+        print(f"Camera C-RED ONE set to gain 150 and noises parameters as follow (from Lanthermann 2019 and its thesis):\n\
+              - Readout noise: {config.FS['ron']} e/pix\n\
+              - Excess Noise Factor: {config.FS['enf']}\n\
+              - Optics transmission: {config.FS['T']}\n\
+              - Quantum efficiency: {config.FS['qe']}\n\
+              - System gain: {config.FS['Gsys']} ADU/e\n\
+              - Avalanche gain: {config.FS['Gav']}\n\
+              - Total gain: {config.FS['G']} ADU/e")
         
         """
         FOR DARK BACKGROUND POWERPOINT --> WHITE FONT COLORS AND TRANSPARENT PNG BACKGROUND
@@ -1053,6 +1070,25 @@ given in config ({NA}).")
             config.FS['OPD2Piston'] = config.FS['OPD2Piston'] - L_ref
         
         
+        # Noise parameters (C-RED ONE -> cf article lanthermann 2019 & thesis Lanthermann)
+        config.FS['enf'] = 1.47     # article (vs 1.49 in thesis iv.3.7)
+        config.FS['Gsys'] = 0.49    # thesis iv.1.1
+        config.FS['Gav'] = 150      # article up to 200, but thesis = correct model up to 150
+        config.FS['G'] = config.FS['Gav'] * config.FS['Gsys']    
+        config.FS['T'] = 0.81       # Filters transmission (81%) 
+        config.FS['qe'] = 0.7       # Quantum efficiency (70%) (iv.2.3)
+        config.FS['ron'] = 0.5      # article
+        
+        print(f"Camera C-RED ONE set to gain 150 and noises parameters as follow (from Lanthermann 2019 and its thesis):\n\
+              - Readout noise: {config.FS['ron']} e/pix\n\
+              - Excess Noise Factor: {config.FS['enf']}\n\
+              - Optics transmission: {config.FS['T']}\n\
+              - Quantum efficiency: {config.FS['qe']}\n\
+              - System gain: {config.FS['Gsys']} ADU/e\n\
+              - Avalanche gain: {config.FS['Gav']}\n\
+              - Total gain: {config.FS['G']} ADU/e")
+        
+        
         return
     
     from .config import NA, NB
@@ -1178,9 +1214,7 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         for ib in range(NIN):
             for k in range(NMod):
                 OrderingIndex[ib*NMod+k] = ichorder[ib]*NMod+ABCDind[k]
-                
-        config.FS['T'] = T
-        
+                        
         # Build the A2P of SPICA
         
         M_spica = np.zeros([NP,NA])*1j
@@ -1218,6 +1252,25 @@ def SPICAFS_PERFECT(*args,T=1, init=False, spectra=[], spectraM=[]):
         config.FS['V2PMgrav'] = ct.simu2GRAV(config.FS['V2PM'])
         config.FS['P2VMgrav'] = ct.simu2GRAV(config.FS['P2VM'], direction='p2vm')
         config.FS['MacroP2VMgrav'] = ct.simu2GRAV(config.FS['MacroP2VM'], direction='p2vm')
+        
+        
+        # Noise parameters (C-RED ONE -> cf article lanthermann 2019 & thesis Lanthermann)
+        config.FS['enf'] = 1.47     # article (vs 1.49 in thesis iv.3.7)
+        config.FS['Gsys'] = 0.49    # thesis iv.1.1
+        config.FS['Gav'] = 150      # article up to 200, but thesis = correct model up to 150
+        config.FS['G'] = config.FS['Gav'] * config.FS['Gsys']    
+        config.FS['T'] = 0.81       # Filters transmission (81%) 
+        config.FS['qe'] = 0.7       # Quantum efficiency (70%) (iv.2.3)
+        config.FS['ron'] = 0.5      # article
+        
+        print(f"Camera C-RED ONE set to gain 150 and noises parameters as follow (from Lanthermann 2019 and its thesis):\n\
+              - Readout noise: {config.FS['ron']} e/pix\n\
+              - Excess Noise Factor: {config.FS['enf']}\n\
+              - Optics transmission: {config.FS['T']}\n\
+              - Quantum efficiency: {config.FS['qe']}\n\
+              - System gain: {config.FS['Gsys']} ADU/e\n\
+              - Avalanche gain: {config.FS['Gav']}\n\
+              - Total gain: {config.FS['G']} ADU/e")
         
         return
     
