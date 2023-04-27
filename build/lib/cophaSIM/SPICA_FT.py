@@ -18,12 +18,12 @@ Calculated and stored observables:
 
 import numpy as np
 
-from .coh_tools import posk, poskfai,NB2NIN
+from .coh_tools import posk, poskfai
 
 from . import config
-from .skeleton import updateFTparams
 
-def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, Ngd=50, roundGD='round', Ncross=1,
+def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, 
+            Ngd=40, Nsnr=40, roundGD='round', Ncross=1,
             relock=True,SMdelay=1e3,sweep0=20, sweep30s=10, commonRatio=1.1, covering=10, maxVelocity=0.300, searchMinGD=500,
             relock_vfactors = [], search_vfactors=[],searchThreshGD=3,Nsearch=50,searchSNR='gd',
             CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
@@ -127,6 +127,7 @@ def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, N
         config.FT['Name'] = 'SPICAfromGRAVITY'
         config.FT['func'] = SPICAFT
         config.FT['Ngd'] = Ngd
+        config.FT['Nsnr'] = Nsnr
         config.FT['GainGD'] = GainGD
         config.FT['GainPD'] = GainPD
         config.FT['state'] = np.zeros(NT+1)
@@ -290,7 +291,7 @@ def SearchState(CophasedGroups=[]):
     outputs.SearchSNR[it] = np.sqrt(np.nan_to_num(1/np.mean(varSignal,axis=0)))
     
     # SNR_movingaverage = np.sqrt(np.nan_to_num(1/varSignal))
-    GradSNR = np.gradient(outputs.SearchSNR[timerange],axis=0)
+    # GradSNR = np.gradient(outputs.SearchSNR[timerange],axis=0)
     
     # Current Group-Delay
     NINmes = FS['NINmes'] ; R = FS['R'] ; Ncross = FT['Ncross']
@@ -304,7 +305,7 @@ def SearchState(CophasedGroups=[]):
     outputs.GDEstimated[it] = currGD
     GDmic = currGD *R*wlOfTrack/(2*np.pi)
     
-    MaxSNRCondition = (np.mean(GradSNR[:Nsearch//2],axis=0)*np.mean(GradSNR[Nsearch//2:],axis=0) < 0) # Sign change in first derivative
+    # MaxSNRCondition = (np.mean(GradSNR[:Nsearch//2],axis=0)*np.mean(GradSNR[Nsearch//2:],axis=0) < 0) # Sign change in first derivative
 
     #MaxSNRCondition = (np.mean(outputs.SearchSNR[it-Nsearch:it-Nsearch//2],axis=0)-outputs.SearchSNR[it-1]<0)
     # snrHigherThanThreshold = (outputs.SearchSNR[it] > config.FT['ThresholdGD'])
@@ -312,7 +313,7 @@ def SearchState(CophasedGroups=[]):
     
     snrHigherThanThreshold = (SNR > FT['ThresholdGD'])
     lowEnoughGD = (np.abs(GDmic) < searchThreshGD)  # C'est pas ouf car latence dans les mesures
-    lowerGD = (np.abs(GDmic) < FT['searchMinGD'])
+    # lowerGD = (np.abs(GDmic) < FT['searchMinGD'])
     higherSnr = (SNR > FT['searchMaxSnr'])
     NoRecentChange = (config.FT['it_last'][0] < it-Ngd)
     
@@ -431,7 +432,7 @@ def ReadCf(currCfEstimated):
     
     from . import outputs
     
-    from .config import NA,NC
+    from .config import NA
     from .config import MW
     
     it = outputs.it            # Time
@@ -495,8 +496,7 @@ def ReadCf(currCfEstimated):
                          Need several wavelengths for group delay')              # Group-delay calculation
     
     Ngd = config.FT['Ngd']                 # Group-delay DIT
-    Ncross = config.FT['Ncross']           # Distance between wavelengths channels for GD calculation
-    
+
     if it < Ngd:
         Ngd = it+1
     
@@ -548,16 +548,13 @@ def CommandCalc(CfPD,CfGD):
     
     NINmes = config.FS['NINmes']
     ich_pos = config.FS['active_ich']
-    
-                
-    Ngd = FT['Ngd']
-    if it < FT['Ngd']:
-        Ngd = it+1
+            
+    Nsnr = FT['Nsnr']
+    if it < FT['Nsnr']:
+        Nsnr = it+1
     
     Ncross = config.FT['Ncross']  # Distance between wavelengths channels for GD calculation
-    
     R = config.FS['R']
-    
     
     """
     Signal-to-noise ratio of the fringes ("Phase variance")
@@ -567,8 +564,11 @@ def CommandCalc(CfPD,CfGD):
     """
 
     varcurrPD, varcurrGD = getvar()
+    outputs.SquaredSnrPD[it] = np.nan_to_num(1/varcurrPD)
+    outputs.SquaredSnrGD[it] = np.nan_to_num(1/varcurrGD)
+    outputs.SquaredSnrGDUnbiased[it] = np.nan_to_num(1/outputs.varGDUnbiased[it])
     
-    timerange = range(it+1-Ngd, it+1)
+    timerange = range(it+1-Nsnr, it+1)
     outputs.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(outputs.varPD[timerange], axis=0))
     outputs.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(outputs.varGD[timerange], axis=0))
     outputs.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(outputs.varGDUnbiased[timerange], axis=0))
@@ -578,8 +578,10 @@ def CommandCalc(CfPD,CfGD):
     
     if config.FT['whichSNR'] == 'pd':
         outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAveragePD[it]
+        outputs.SquaredSNR[it] = outputs.SquaredSnrPD[it]
     else:
         outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAverageGD[it]
+        outputs.SquaredSNR[it] = outputs.SquaredSnrGD[it]
         
     
     """
@@ -897,11 +899,11 @@ def CommandCalc(CfPD,CfGD):
             if not outputs.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
                 config.FT['state'][it] = 1
                 
-                newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
-                TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
+                # newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
+                # TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
                 # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
                 
-                TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
+                # TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
 
                 if config.FT['state'][it-1] != 1:
                     config.FT['eps'] = np.ones(NA)
@@ -1125,7 +1127,7 @@ def getvar():
     
     from . import outputs
     
-    from .config import NA, NIN,MW
+    from .config import NA, MW
     
     from .outputs import it
     # from .coh_tools import simu2GRAV, NB2NIN
@@ -1164,7 +1166,7 @@ def getvar():
     if it < Nvar:
         Nvar = it+1
         
-    varNum = np.zeros([MW,NINmes]) ; varNum2 = np.zeros([MW,NINmes])
+    varNum = np.zeros([MW,NINmes]) #; varNum2 = np.zeros([MW,NINmes])
     varPhot = np.zeros([MW,NA])         # Variance of the photometry measurement
     CohFlux = np.zeros([MW,NINmes])*1j
     
@@ -1254,35 +1256,42 @@ Then asks for the user to choose a smart threshold.
     from cophasim import skeleton as sk
     from cophasim import config
     from cophasim import outputs
-
+    
     NINmes = config.FS['NINmes']
+    Nsnr = config.FT['Nsnr']
 
     if nbSigma:
         
-        NT=200
-            
-        InitNT = sk.config.NT
+        NT=200 ;
+
+        InitNT = config.NT
         
-        foreground = 5*config.FS['R']*config.wlOfTrack*np.arange(config.NA)
+        foreground = 3*config.FS['R']*config.wlOfTrack*np.arange(config.NA)
+        
+#         underSampling = (np.ptp(foreground) >= config.nyquistCriterion)
+#         if underSampling:
+#             print(f"/!\  ATTENTION: one or more OPD value(s) doesn't respect Nyquist criterion \
+# (OPD<{config.nyquistCriterion}µm).\n\
+# The simulation must experience aliasing and the SNR values won't be correct. /!\ ")
         
         sk.update_config(foreground=foreground, NT = NT, verbose=verbose)
         
         # Initialize the fringe tracker with the gain
-        from cophasim.SPICA_FT import SPICAFT, updateFTparams
-        #SPICAFT(init=True, GainPD=0, GainGD=0,relock=False)
         gainPD,gainGD,relock,state=config.FT['GainPD'],config.FT['GainGD'],config.FT['relock'],config.FT['state']
-        updateFTparams(GainPD=0, GainGD=0, relock=False,search=False, verbose=verbose)
+        sk.updateFTparams(GainPD=0, GainGD=0, relock=False,search=False, verbose=verbose)
         
         config.FT['state'] = np.zeros(NT+1)
+        
         # Launch the scan
         sk.loop(verbose=verbose)
         
-        StartComputing = 50
+        startComputing = 50
         newThresholdGD = np.ones(NINmes)
 
+        timerange = range(startComputing,startComputing+Nsnr)
         for ib in range(NINmes):
-            SNRfg = np.mean(np.sqrt(outputs.SquaredSNRMovingAverage[StartComputing:,ib]))
-            fgstd = np.std(np.sqrt(outputs.SquaredSNRMovingAverage[StartComputing:,ib]))
+            SNRfg = np.mean(np.sqrt(outputs.SquaredSNR[timerange,ib]))
+            fgstd = np.std(np.sqrt(outputs.SquaredSNR[timerange,ib]))
             
             # Set threshold to mean(SNR) + nBsigma * rms(SNR)
             newThresholdGD[ib] = SNRfg + nbSigma*fgstd
@@ -1299,8 +1308,8 @@ Then asks for the user to choose a smart threshold.
 
         sk.display('opd','snr','detector',wlOfTrack=1.6, pause=True,display=display)
         
-        sk.update_config(NT=InitNT,foreground=[],verbose=verbose)
-        updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock,
+        sk.update_config(NT=InitNT, foreground=[],verbose=verbose)
+        sk.updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock,
                        ThresholdGD=newThresholdGD,ThresholdPD=newThresholdPD,
                        verbose=verbose)
 
@@ -1318,15 +1327,14 @@ Then asks for the user to choose a smart threshold.
             DisturbanceFile = datadir2 + 'EtudeThreshold/scan240micron_tel6.fits'
             NT=1000
             
-        InitialDisturbanceFile,InitNT = sk.config.DisturbanceFile, sk.config.NT
+        InitialDisturbanceFile,InitNT = config.DisturbanceFile, config.NT
         
         sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT,verbose=verbose)
         
         # Initialize the fringe tracker with the gain
-        # from cophasim.SPICA_FT_r import SPICAFT, updateFTparams
         #SPICAFT(init=True, GainPD=0, GainGD=0,relock=False)
         gainPD,gainGD,relock=config.FT['GainPD'],config.FT['GainGD'],config.FT['relock']
-        updateFTparams(GainPD=0, GainGD=0, relock=False, verbose=verbose)
+        sk.updateFTparams(GainPD=0, GainGD=0, relock=False, verbose=verbose)
         
         # Launch the scan
         sk.loop(verbose)
@@ -1365,7 +1373,7 @@ Then asks for the user to choose a smart threshold.
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)
-        updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock, 
+        sk.updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock, 
                        ThresholdGD=newThresholdGD,
                        verbose=verbose)
     
@@ -1381,10 +1389,9 @@ Then asks for the user to choose a smart threshold.
         sk.update_config(DisturbanceFile=DisturbanceFile, NT = NT, verbose=verbose)
         
         # Initialize the fringe tracker with the gain
-        from cophasim.SPICA_FT import SPICAFT, updateFTparams
         #SPICAFT(init=True, GainPD=0, GainGD=0,relock=False)
         gainPD,gainGD,relock,state=config.FT['GainPD'],config.FT['GainGD'],config.FT['relock'],config.FT['state']
-        updateFTparams(GainPD=0, GainGD=0, relock=False,search=False, verbose=verbose)
+        sk.updateFTparams(GainPD=0, GainGD=0, relock=False,search=False, verbose=verbose)
         
         config.FT['state'] = np.zeros(NT+1)
         # Launch the scan
@@ -1411,9 +1418,9 @@ Then asks for the user to choose a smart threshold.
                 newThresholdGD = np.array([np.max([2,x*0.2]) for x in np.sqrt(outputs.SquaredSNRMovingAverage[ind,:])])
  
             elif TypeDisturbance == 'CophasedThenForeground':
-                CophasedInd = 50 ; ForegroundInd = 180
-                CophasedRange = range(50,100)
-                ForegroundRange = range(160,200)
+                CophasedInd = 50 ; ForegroundInd = 150
+                CophasedRange = range(CophasedInd,CophasedInd+Nsnr)
+                ForegroundRange = range(ForegroundInd,ForegroundInd+Nsnr)
                 newThresholdGD = np.ones(NINmes)
 
                 for ib in range(NINmes):
@@ -1438,7 +1445,7 @@ Then asks for the user to choose a smart threshold.
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)
-        updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock,
+        sk.updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock,
                        ThresholdGD=newThresholdGD,ThresholdPD=newThresholdPD,
                        verbose=verbose)
         

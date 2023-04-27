@@ -1355,8 +1355,9 @@ def get_CfDisturbance(DisturbanceFile, spectra, timestamps,foreground=[], verbos
         PistonDisturbance = PistonDisturbance-np.mean(PistonDisturbance, axis=0)
         
     if len(foreground):     # Add a huge piston to be sure being far from fringes
+        PistonDisturbance -= np.mean(PistonDisturbance,axis=0)  # Subtract to the piston of each telescope its temporal average.
         PistonDisturbance = PistonDisturbance + np.array(foreground)
-        
+    
     CfDisturbance = np.zeros([NT,NW,NB])*1j
     from cophasim import skeleton
     for it in range(NT):

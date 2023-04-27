@@ -243,6 +243,7 @@ SOURCE:
     if OW != NW/MW:
         raise ValueError('Oversampling might be integer.')
     
+    nyquistCriterion = config.FS['R']*wlOfTrack*OW/2
 
     # CONFIG PARAMETERS
     
@@ -271,6 +272,7 @@ SOURCE:
     config.NW=NW
     config.MW=MW
     config.OW=OW
+    config.nyquistCriterion=nyquistCriterion
     config.NX=0
     config.NY=0
     config.ND=ND
@@ -1259,6 +1261,13 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
                 Lc = config.FS['R']*spectra[iow*OW]
                 outputs.VisibilityTrue[:,iow,ib] = Iaap/np.sqrt(Ia*Iap)*np.abs(GammaObject)*np.sinc(outputs.OPDTrue[:,ib]/Lc)*np.exp(1j*2*np.pi*outputs.OPDTrue[:,ib]/spectra[iow*OW])
     
+    # Check if one of all OPD values is higher than R*lmbda*OW/2 (Nyquist criterion)
+    underSampling = (np.abs(outputs.OPDTrue) >= config.nyquistCriterion).any()
+    if underSampling:
+        print(f"\n /!\  ATTENTION : one or more OPD value(s) doesn't respect Nyquist criterion \
+(OPD<{config.nyquistCriterion:.0f}µm).\n\
+The simulation must experience aliasing. /!\\n")
+    
     if len(args):
         filepath = args[0]+f"results_{outputs.TimeID}.fits"
         save_data(outputs, config, filepath, LightSave=LightSave, overwrite=overwrite, verbose=verbose)
@@ -1673,46 +1682,46 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
     if len(outputsData):
         
-        for obsname in outputsData:
-            if not (obsname in vars(outputs)):     # case-insensitive test
-                print(f"{obsname} not in outputs module, I can't plot it")
+        for obsName in outputsData:
+            if not (obsName in vars(outputs)):     # case-insensitive test
+                print(f"{obsName} not in outputs module, I can't plot it")
                 continue
 
-            obs = getattr(outputs, obsname)
+            obs = getattr(outputs, obsName)
                 
-            rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+            obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
             
-            generaltitle = obsname
-            typeobs = obsname
+            generaltitle = obsName
+            obsType = obsName
             if len(savedir):
-                filename= savedir+f"Simulation{TimeID}_{typeobs}"
+                filename= savedir+f"Simulation{TimeID}_{obsType}"
             else:
                 filename=''
             
-            if "pis".casefold() in obsname.casefold():
-                display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
-                                          NameObs=obsname,
+            if "pis".casefold() in obsName.casefold():
+                display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+                                          obsName=obsName,
                                           display=True,filename=filename,ext='pdf',infos={"details":''},
                                           verbose=verbose)
                 
-            elif ("opd".casefold() in obsname.casefold())\
-                or ("snr".casefold() in obsname.casefold()):
-                display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
-                                          NameObs=obsname,
+            elif ("opd".casefold() in obsName.casefold())\
+                or ("snr".casefold() in obsName.casefold()):
+                display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+                                          obsName=obsName,
                                           display=True,filename=filename,ext='pdf',infos={"details":''},
                                           verbose=verbose)
                 
-            elif "Command".casefold() in obsname.casefold():
-                obs = obs[:-1] ; rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-                display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
-                                          NameObs=obsname,
+            elif "Command".casefold() in obsName.casefold():
+                obs = obs[:-1] ; obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+                display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+                                          obsName=obsName,
                                           display=True,filename=filename,ext='pdf',infos={"details":''},
                                           verbose=verbose)
                 
             else:
-                print(f"Impossible to determine the type of the observable {obsname}. I try with OPD-type.")
-                display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
-                                          NameObs=obsname,
+                print(f"Impossible to determine the type of the observable {obsName}. I try with OPD-type.")
+                display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+                                          obsName=obsName,
                                           display=True,filename=filename,ext='pdf',infos={"details":''},
                                           verbose=verbose)
 
@@ -1724,9 +1733,9 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
     if displayall or ('perftable' in args) :
         generaltitle = "GD and PD estimated"
-        typeobs = "GDPDest"
+        obsType = "GDPDest"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
         
@@ -1747,9 +1756,9 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         
     if displayall or ('perftable2' in args) :
         generaltitle = "GD and PD estimated, after patch"
-        typeobs = "GDPDest2"
+        obsType = "GDPDest2"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
             
@@ -1771,9 +1780,9 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         
     if displayall or ('perftableres' in args) :
         generaltitle = "GD and PD residuals"
-        typeobs = "GDPDres"
+        obsType = "GDPDres"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
             
@@ -1794,9 +1803,9 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         
     if displayall or ('perftableres2' in args) :
         generaltitle = "GD and PD residuals, after least square"
-        typeobs = "GDPDres2"
+        obsType = "GDPDres2"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
         
@@ -1817,9 +1826,9 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
     if displayall or ('GDPDcmd' in args) :
         generaltitle = "GD and PD commands in OPD-space"
-        typeobs = "GDPDcmd"
+        obsType = "GDPDcmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
             
@@ -1844,95 +1853,95 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
     if displayall or ('opd' in args):
         generaltitle = 'True OPDs'
-        typeobs = "OPDtrue"
+        obsType = "OPDtrue"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
             
         obs = outputs.OPDTrue
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaselineNIN,
-                                  NameObs='OPD [µm]',
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+                                  obsName='OPD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     
     if displayall or ('pd' in args):
         generaltitle = 'Phase-delays'
-        typeobs='PD'
+        obsType='PD'
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
 
         obs = PDmic
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='PD [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='PD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
     
     if displayall or ('pd2' in args):      
         generaltitle = 'Phase-delays 2'
-        typeobs = "PD2"
+        obsType = "PD2"
         obs = PDmic2
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''
             
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='PD [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='PD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     if displayall or ('gd' in args):
 
         generaltitle = 'Group-delays'
-        typeobs = "GD"
+        obsType = "GD"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''        
             
         obs = GDmic
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='GD [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='GD [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     if displayall or ('gd2' in args):
         generaltitle = 'Group-delays 2'
-        typeobs = "GD2"
+        obsType = "GD2"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''        
             
         obs = GDmic2
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='GD2 [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='GD2 [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
         
     if displayall or ('snr' in args):
         generaltitle = 'SNR'
-        typeobs = "SNR"
+        obsType = "SNR"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''        
             
         obs = SNR
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='SNR',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='SNR',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
                 
@@ -1940,79 +1949,79 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     if displayall or ('snrPd' in args):
 
         generaltitle = 'SNR PD'
-        typeobs="SNRPD"
+        obsType="SNRPD"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''     
             
         obs = SNR_pd
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='SNR',
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='SNR',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
                 
     if displayall or ('snrGd' in args):
         generaltitle = 'SNR GD'
-        typeobs="SNRGD"
+        obsType="SNRGD"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''     
             
         obs = SNR_gd
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='SNR',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='SNR',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     if displayall or ('gdCmd' in args):
         generaltitle = 'GD Commands'
-        typeobs="GDCmd"
+        obsType="GDCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.GDCommand[:-1]
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='Commands [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='Commands [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
         
     if displayall or ('pdCmd' in args):
         generaltitle = 'PD Commands'
-        typeobs="PDCmd"
+        obsType="PDCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.PDCommand[:-1]
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='Commands [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='Commands [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
         
     if displayall or ('cmdOpd' in args):
         generaltitle = 'OPD Commands'
-        typeobs="OPDCmd"
+        obsType="OPDCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.OPDCommand[:-1]
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-                                  NameObs='Commands [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+                                  obsName='Commands [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
@@ -2021,51 +2030,51 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     
     if displayall or ('distPis' in args):
         generaltitle = 'Piston Disturbances'
-        typeobs="pisDist"
+        obsType="pisDist"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.PistonDisturbance
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
-                                  NameObs='Disturbances [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+                                  obsName='Disturbances [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
         
     if displayall or ('cmdPis' in args):
         generaltitle = 'Piston Commands'
-        typeobs="pisCmd"
+        obsType="pisCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{typeobs}"
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.CommandODL[:-1]
-        rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_tels(timestamps, obs,rmsObs,generaltitle,PlotTel,
-                                  NameObs='Commands [µm]',
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+                                  obsName='Commands [µm]',
                                   display=True,filename=filename,ext='pdf',infos={"details":''},
                                   verbose=False)
     # if displayall or ('piscmds' in args):
     #     obs = outputs.GDCommand[:-1]
-    #     rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+    #     obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
         
     #     generaltitle = 'GD Commands'
-    #     display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-    #                               NameObs='Commands',
+    #     display_module.simpleplot(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+    #                               obsName='Commands',
     #                               display=True,filename='',ext='pdf',infos={"details":''},
     #                               verbose=False)
         
         
     # if displayall or ('pdcmd' in args):
     #     obs = outputs.PDCommand[:-1]
-    #     rmsObs = np.std(obs[start_pd_tracking:,:],axis=0)
+    #     obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
         
     #     generaltitle = 'PD Commands'
-    #     display_module.simpleplot(timestamps, obs,rmsObs,generaltitle,PlotBaseline,
-    #                               NameObs='Commands',
+    #     display_module.simpleplot(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+    #                               obsName='Commands',
     #                               display=True,filename='',ext='pdf',infos={"details":''},
     #                               verbose=False)
         
@@ -3447,7 +3456,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #     if displayall or ('perftable' in args) :
 #         plt.rcParams.update(rcParamsForBaselines)
 #         generaltitle = "GD and PD estimated"
-#         typeobs = "GDPDest"
+#         obsType = "GDPDest"
         
 #         GDobs = GDmic
 #         PDobs = PDmic
@@ -3553,14 +3562,14 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 
 #     if displayall or ('perftable2' in args) :
 #         plt.rcParams.update(rcParamsForBaselines)
 #         generaltitle = "GD and PD after patch"
-#         typeobs = "GDPDest2"
+#         obsType = "GDPDest2"
         
 #         GDobs = GDmic2
 #         PDobs = PDmic2
@@ -3677,7 +3686,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -3685,7 +3694,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #     if displayall or ('perftableres' in args) :
 #         plt.rcParams.update(rcParamsForBaselines)
 #         generaltitle = "GD and PD residuals"
-#         typeobs = "GDPDres"
+#         obsType = "GDPDres"
         
 #         GDobs = GDerrmic
 #         PDobs = PDerrmic
@@ -3802,7 +3811,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -3811,7 +3820,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #     if displayall or ('perftableres2' in args) :
 #         plt.rcParams.update(rcParamsForBaselines)
 #         generaltitle = "GD and PD residuals after least square"
-#         typeobs = "GDPDres2"
+#         obsType = "GDPDres2"
         
 #         GDobs = GDerrmic2
 #         PDobs = PDerrmic2
@@ -3919,7 +3928,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{typeobs}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 

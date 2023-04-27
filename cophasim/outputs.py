@@ -82,7 +82,9 @@ CfGDref = np.ones([NT,NINmes])+0j                   # Phasor of the GDref vector
 # Noise estimations
 varPD = np.zeros([NT,NINmes])                       # Estimated "PD variance" = 1/SNR²
 varGD = np.zeros([NT,NINmes])                       # Estimated "GD variance" = 1/SNR²
+
 SquaredSNRMovingAverage = np.zeros([NT,NINmes])     # Estimated SNR² averaged over N dit
+SquaredSNR = np.zeros([NT,NINmes])                  # Estimated instantaneous SNR²
 TrackedBaselines = np.zeros([NT,NINmes])
 TemporalVariancePD = np.zeros([NT,NINmes])          # Temporal Variance PD estimator
 TemporalVarianceGD = np.zeros([NT,NINmes])          # Temporal Variance GD estimator
@@ -179,8 +181,13 @@ Covariance = np.zeros([NT,MW,NBmes,NBmes])          # Covariances of the real an
 BiasModCf = np.zeros([NT,MW,NINmes])                # Bias on the estimator of the module of the coherent flux.
 varFlux = np.zeros([NT,MW,FS['NP']])                # Variance Flux
 
-SquaredSNRMovingAveragePD = np.zeros([NT,NINmes])           # Estimated SNR
-SquaredSNRMovingAverageGD = np.zeros([NT,NINmes])           # Estimated SNR
+SquaredSnrPD = np.zeros([NT,NINmes])                # Estimated instantaneous SNR PD
+SquaredSnrGD = np.zeros([NT,NINmes])                # Estimated instantaneous SNR GD
+SquaredSnrGDUnbiased = np.zeros([NT,NINmes])                # Estimated instantaneous SNR GD unbiased
+
+SquaredSNRMovingAveragePD = np.zeros([NT,NINmes])           # Averaged estimated SNR PD
+SquaredSNRMovingAverageGD = np.zeros([NT,NINmes])           # Averaged estimated SNR GD
+
 SquaredSNRMovingAverageGDUnbiased = np.zeros([NT,NINmes])
 varPDnum = np.zeros([NT,NINmes])
 varPDnum2 = np.zeros([NT,NINmes])
