@@ -220,7 +220,7 @@ to {baselines[iLastBase]}")
     plt.rcParams.update(plt.rcParamsDefault)
 
 
-def simpleplot_bases(timestamps, obs,rmsObs,generalTitle,plotObs,
+def simpleplot_bases(timestamps, obs,obsRms,generalTitle,plotObs,
                obsName='PD [µm]',display=True,filename='',ext='pdf',infos={"details":''},
                verbose=False):
     """
@@ -229,13 +229,14 @@ def simpleplot_bases(timestamps, obs,rmsObs,generalTitle,plotObs,
     If there are less than 6 baselines, only one axe is plotted.
     In between, two axes on a unique figure are plotted.
 
+
     Parameters
     ----------
     timestamps : TYPE
         DESCRIPTION.
     obs : TYPE
         DESCRIPTION.
-    rmsObs : TYPE
+    obsRms : TYPE
         DESCRIPTION.
     generalTitle : TYPE
         DESCRIPTION.
@@ -316,7 +317,7 @@ def simpleplot_bases(timestamps, obs,rmsObs,generalTitle,plotObs,
                                color=basecolors[iColor], linestyle='dashed')
                 iColor+=1                
             
-            p1=ax2.bar(baselinestemp,[rmsObs[iBase] for iBase in plotObsIndex], color=basecolorstemp)
+            p1=ax2.bar(baselinestemp,[obsRms[iBase] for iBase in plotObsIndex], color=basecolorstemp)
             
             ax2.set_box_aspect(1/20)
     
@@ -353,14 +354,14 @@ to {baselines[iLastBase]}")
 
                 iColor+=1
                 
-            p1=ax2.bar(baselines[FirstSet],rmsObs[FirstSet], color=barbasecolors[:len1])
-            p2=ax4.bar(baselines[SecondSet],rmsObs[SecondSet], color=barbasecolors[len1:])
+            p1=ax2.bar(baselines[FirstSet],obsRms[FirstSet], color=barbasecolors[:len1])
+            p2=ax4.bar(baselines[SecondSet],obsRms[SecondSet], color=barbasecolors[len1:])
             ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
             ct.setaxelim(ax1, ydata=obs, ymargin=0.4,ymin=0)
             if 'pd'.casefold() in obsName.casefold():
                 ax4.set_ylim([0,wl])
             else:
-                ct.setaxelim(ax4, ydata=rmsObs,ymin=0)
+                ct.setaxelim(ax4, ydata=obsRms,ymin=0)
                 
             
             ax4.bar_label(p2,label_type='edge',fmt='%.2f')
@@ -372,7 +373,7 @@ to {baselines[iLastBase]}")
             
             
         ct.setaxelim(ax1,ydata=[obs[:,iBase] for iBase in plotObsIndex])
-        ct.setaxelim(ax2,ydata=list(rmsObs)+[wl/2], ymin=0)
+        ct.setaxelim(ax2,ydata=list(obsRms)+[wl/2], ymin=0)
         ax1.legend(handles=linestyles)
         ax1.set_ylabel(obsName)
         ax1.set_xlabel("Time [ms]") ; 
@@ -395,9 +396,46 @@ to {baselines[iLastBase]}")
                 plt.savefig(filename+f"_{rangeBases}.{ext}")
                 
                 
-def simpleplot_tels(timestamps, obs,rmsObs,generalTitle,plotObs,
+def simpleplot_tels(timestamps, obs,obsRms,generalTitle,plotObs,
                obsName='PD [µm]',display=True,filename='',ext='pdf',infos={"details":''},
                verbose=False):
+    """
+    Each figure only shows up to 10 telescopes, distributed on two subplots
+    If there are more than 10 telescopes, multiple figures will be created 
+    If there are less than 6 telescopes, only one axe is plotted.
+    In between, two axes on a unique figure are plotted.
+
+
+    Parameters
+    ----------
+    timestamps : TYPE
+        DESCRIPTION.
+    obs : TYPE
+        DESCRIPTION.
+    obsRms : TYPE
+        DESCRIPTION.
+    generalTitle : TYPE
+        DESCRIPTION.
+    plotObs : TYPE
+        DESCRIPTION.
+    obsName : TYPE, optional
+        DESCRIPTION. The default is 'PD [µm]'.
+    display : TYPE, optional
+        DESCRIPTION. The default is True.
+    filename : TYPE, optional
+        DESCRIPTION. The default is ''.
+    ext : TYPE, optional
+        DESCRIPTION. The default is 'pdf'.
+    infos : TYPE, optional
+        DESCRIPTION. The default is {"details":''}.
+    verbose : TYPE, optional
+        DESCRIPTION. The default is False.
+
+    Returns
+    -------
+    None.
+
+    """
     
     global telescopes, stationaryregim,wl,NINtodisplay
         
@@ -447,7 +485,7 @@ def simpleplot_tels(timestamps, obs,rmsObs,generalTitle,plotObs,
                 ax1.plot(timestamps,obs[:,iTel],color=telcolorstemp[iColor],label=telescopes[iTel])
                 iColor+=1                
             
-            p1=ax2.bar(telescopestemp,[rmsObs[iTel] for iTel in plotObsIndex], color=telcolorstemp)
+            p1=ax2.bar(telescopestemp,[obsRms[iTel] for iTel in plotObsIndex], color=telcolorstemp)
             
             ax2.set_box_aspect(1/20)
             ax1.legend()
@@ -480,14 +518,14 @@ to {telescopes[iLastTel]}")
                     barcolors[iColor] = telcolors[iColor]
                 iColor+=1
                 
-            p1=ax2.bar(telescopes[FirstSet],rmsObs[FirstSet], color=barcolors[:len1])
-            p2=ax4.bar(telescopes[SecondSet],rmsObs[SecondSet], color=barcolors[len1:])
+            p1=ax2.bar(telescopes[FirstSet],obsRms[FirstSet], color=barcolors[:len1])
+            p2=ax4.bar(telescopes[SecondSet],obsRms[SecondSet], color=barcolors[len1:])
             ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
             ct.setaxelim(ax1, ydata=obs, ymargin=0.4,ymin=0)
             if 'pd'.casefold() in obsName.casefold():
                 ax4.set_ylim([0,wl])
             else:
-                ct.setaxelim(ax4, ydata=rmsObs,ymin=0)
+                ct.setaxelim(ax4, ydata=obsRms,ymin=0)
                 
             
             ax4.bar_label(p2,label_type='edge',fmt='%.2f')
@@ -499,7 +537,7 @@ to {telescopes[iLastTel]}")
             
             
         ct.setaxelim(ax1,ydata=[obs[:,iTel] for iTel in plotObsIndex])
-        ct.setaxelim(ax2,ydata=list(rmsObs)+[wl/2], ymin=0)
+        ct.setaxelim(ax2,ydata=list(obsRms)+[wl/2], ymin=0)
         ax1.set_xlabel("Time [ms]") ; 
         ax2.set_ylabel('RMS')
         ax2.set_xlabel("Telescopes") ; 

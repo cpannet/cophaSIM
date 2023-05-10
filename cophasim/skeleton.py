@@ -449,7 +449,7 @@ def save_config():
         print(a_dict, file=f)
 
 def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
-                            spectra=[], RefLambda=0, NT=1000,dt=1,
+                            spectra=[], RefLambda=0, NT=1000,NTend=0,dt=1,
                             ampl=0, seed=100, dist='step', startframe = 10, 
                             f_fin=200, value_start=0, value_end=0,
                             r0=0.15,t0=10, L0=25, direction=0, d=1,
@@ -718,11 +718,17 @@ Longueur timestamps: {len(timestamps)}")
     elif dist == 'slope':
         if value_end:
             if ampl:
-                print("ATTENTION: You gave 'value_end' and 'ampl', only value_end' is used.")
-            ampl = (value_end-value_start)/NT
-        
+                print("ATTENTION: You gave 'value_end' and 'ampl', only 'value_end' is used.")
+            if NTend:
+                ampl = (value_end-value_start)/NTend
+            else:
+                ampl = (value_end-value_start)/NT
+                
         itel = (tel-1 if tel else 0)
-        PistonDisturbance[:,itel] = value_start + np.arange(NT) * ampl
+        if NTend:
+            PistonDisturbance[:NTend,itel] = value_start + np.arange(NTend) * ampl
+        else:
+            PistonDisturbance[:,itel] = value_start + np.arange(NT) * ampl
         
     # The first telil sees a range of piston from -Lc to Lc
     elif dist == 'browse':
@@ -1266,7 +1272,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     if underSampling:
         print(f"\n /!\  ATTENTION : one or more OPD value(s) doesn't respect Nyquist criterion \
 (OPD<{config.nyquistCriterion:.0f}µm).\n\
-The simulation must experience aliasing. /!\\n")
+The simulation might experience aliasing. /!\\n")
     
     if len(args):
         filepath = args[0]+f"results_{outputs.TimeID}.fits"
@@ -1719,11 +1725,18 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                           verbose=verbose)
                 
             else:
-                print(f"Impossible to determine the type of the observable {obsName}. I try with OPD-type.")
-                display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
-                                          obsName=obsName,
-                                          display=display,filename=filename,ext='pdf',infos={"details":''},
-                                          verbose=verbose)
+                if obs.shape[-1] < 10:
+                    print(f"{obsName} plotted with piston-oriented display.")
+                    display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+                                              obsName=obsName,
+                                              display=display,filename=filename,ext='pdf',infos={"details":''},
+                                              verbose=verbose)
+                else:
+                    print(f"{obsName} plotted with OPD-oriented display.")
+                    display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+                                              obsName=obsName,
+                                              display=display,filename=filename,ext='pdf',infos={"details":''},
+                                              verbose=verbose)
 
 
 
@@ -1851,6 +1864,22 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
     """ PLOT OF A SINGLE OBSERVABLES (PD,GD,OPD,SNR,etc...) IN OPD-SPACE """
 
+    if displayall or ('distOpd' in args):
+        generaltitle = 'OPD Disturbances'
+        obsType = "distOpd"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
+        else:
+            filename=''
+            
+        obs = outputs.OPDDisturbance
+        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        
+        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+                                  obsName='OPD [µm]',
+                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  verbose=verbose)
+        
     if displayall or ('opd' in args):
         generaltitle = 'True OPDs'
         obsType = "OPDtrue"
@@ -2450,10 +2479,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         ax2.legend()
         ax.legend()
         if display:
-            if pause:
-                plt.pause(0.1)
-            else:
-                plt.show()
+            fig.show()
    
     pass
     

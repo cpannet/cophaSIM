@@ -17,6 +17,7 @@ Calculated and stored observables:
 """
 
 import numpy as np
+from scipy import signal
 
 from .coh_tools import posk, poskfai
 
@@ -25,10 +26,10 @@ from . import config
 def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, 
             Ngd=40, Nsnr=40, roundGD='round', Ncross=1,
             relock=True,SMdelay=1e3,sweep0=20, sweep30s=10, commonRatio=1.1, covering=10, maxVelocity=0.300, searchMinGD=500,
-            relock_vfactors = [], search_vfactors=[],searchThreshGD=3,Nsearch=50,searchSNR='gd',
+            relock_vfactors = [], search_vfactors=[],searchThreshGD=3,Nsearch=50,searchSNR='gd',searchSnrThreshold=2,
             CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
             cmdOPD=True, switch=1, continu=True,whichSNR='gd',
-            ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,
+            ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,ratioThreshold=0.2,
             Threshold=True, useWmatrices=True,
             latencytime=1,usecupy=False, verbose=False,
             **kwargs_for_update):
@@ -160,6 +161,8 @@ I set ThresholdRELOCK to the {NINmes} first values."))
                 config.FT['ThresholdRELOCK'] = ThresholdRELOCK[:NINmes]
             
         config.FT['ThresholdPD'] = ThresholdPD
+        config.FT['ratioThreshold'] = ratioThreshold
+        
         config.FT['stdPD'] = stdPD
         config.FT['stdGD'] = stdGD
         config.FT['stdCP'] = stdCP
@@ -188,8 +191,12 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         config.FT['searchSNR'] = searchSNR      
         config.FT['searchMinGD'] = np.ones(NINmes)*searchMinGD  # Value of minimal reached value of GD during search
         config.FT['diffOffsets_best'] = np.zeros(NINmes)        # Vector that will contain the offsets of the fringes.
-        config.FT['Ws'] = np.zeros(NINmes)        # Vector that will contain the offsets of the fringes.
-        config.FT['searchMaxSnr'] = np.zeros(NINmes)        # Vector that will contain the offsets of the fringes.
+        config.FT['globalMaximumSnr'] = np.zeros(NINmes)        # Vector that will contain the maximal SNRs.
+        config.FT['globalMaximumOffsets'] = np.zeros(NINmes)    # Vector that will contain the offsets of the maximal SNRs
+        config.FT['secondMaximumSnr'] = np.zeros(NINmes)    # Vector that will contain the offsets of the maximal SNRs
+        config.FT['expectedOffsetsExplored'] = np.ones(NINmes)*False    # Vector that will contain the offsets of the maximal SNRs      
+        
+        config.FT['searchSnrThreshold'] = searchSnrThreshold            # SNR threshold for SEARCH state
             
         # Version usaw vector
         config.FT['usaw'] = np.zeros([NT,NA])
@@ -314,29 +321,29 @@ def SearchState(CophasedGroups=[]):
     snrHigherThanThreshold = (SNR > FT['ThresholdGD'])
     lowEnoughGD = (np.abs(GDmic) < searchThreshGD)  # C'est pas ouf car latence dans les mesures
     # lowerGD = (np.abs(GDmic) < FT['searchMinGD'])
-    higherSnr = (SNR > FT['searchMaxSnr'])
+    higherSnr = (SNR > FT['searchSnrThreshold'])
     NoRecentChange = (config.FT['it_last'][0] < it-Ngd)
     
     
-    # Ws = outputs.SearchSNR[it] * snrHigherThanThreshold * NoRecentChange * lowEnoughGD# * MaxSNRCondition)
-    Ws = SNR * snrHigherThanThreshold * NoRecentChange * lowEnoughGD# * GDNullCondition# * GDNullCondition)# * NoRecentChange)# * MaxSNRCondition)
+    # globalMaximumSnr = outputs.SearchSNR[it] * snrHigherThanThreshold * NoRecentChange * lowEnoughGD# * MaxSNRCondition)
+    globalMaximumSnr = SNR * snrHigherThanThreshold * NoRecentChange * lowEnoughGD# * GDNullCondition# * GDNullCondition)# * NoRecentChange)# * MaxSNRCondition)
         
     for ib in range(NINmes):
         ia = int(FS['ich'][ib][0])-1
         iap = int(FS['ich'][ib][1])-1
-        if Ws[ib] != 0:
+        if globalMaximumSnr[ib] != 0:
             outputs.diffOffsets[it,ib] = outputs.EffectiveMoveODL[it,ia]-outputs.EffectiveMoveODL[it,iap]
     
             if higherSnr[ib]:
                 FT['searchMinGD'][ib] = GDmic[ib]
                 FT['diffOffsets_best'][ib] = outputs.diffOffsets[it,ib]
-                FT['Ws'][ib] = Ws[ib]
+                FT['globalMaximumSnr'][ib] = globalMaximumSnr[ib]
         
     outputs.diffOffsets_best[it] = config.FT['diffOffsets_best']
-    outputs.Ws[it] = config.FT['Ws']
+    outputs.globalMaximumSnr[it] = config.FT['globalMaximumSnr']
                 
     # Transpose the W matrix in the Piston-space
-    Is = np.dot(config.FS['OPD2Piston_r'],np.dot(np.diag(FT['Ws']),config.FS['Piston2OPD_r']))
+    Is = np.dot(config.FS['OPD2Piston_r'],np.dot(np.diag(FT['globalMaximumSnr']),config.FS['Piston2OPD_r']))
     outputs.Is[it] = Is
     
     rankIs = np.linalg.matrix_rank(Is)
@@ -364,7 +371,7 @@ def SearchState(CophasedGroups=[]):
         # Come back to the OPD-space        
         VSdagUt = np.dot(V, np.dot(Sdag,Ut))
         
-        Igd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], np.diag(FT['Ws']))))
+        Igd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], np.diag(FT['globalMaximumSnr']))))
         
         uSearchOpd = np.dot(Igd,config.FT['diffOffsets_best'])
         
@@ -403,6 +410,309 @@ def SearchState(CophasedGroups=[]):
         uSearch = outputs.CommandSearch[it+1]
         
     return uSearch
+
+
+def SearchState2(CophasedGroups=[]):
+    # import scipy
+    from . import outputs,config
+    from . import skeleton as sk
+    
+    from .config import wlOfTrack, NA, FS, FT
+    it=outputs.it 
+    
+    # searchThreshGD = FT['searchThreshGD']
+    
+    Nsearch = FT['Nsearch']
+    
+    timerange = range(it+1-Nsearch, it+1)
+    if FT['searchSNR'] == 'pd':
+        varSignal = outputs.varPD[timerange]
+    elif FT['searchSNR'] == 'gd':
+        varSignal = outputs.varGD[timerange]
+    elif FT['searchSNR'] == 'pdtemp':
+        varSignal = outputs.TemporalVariancePD[timerange]
+    elif FT['searchSNR'] == 'gdtemp':
+        varSignal = outputs.TemporalVarianceGD[timerange]
+    else:
+        raise ValueError("Parameter 'searchSNR' must be one of the following: [pd,gd,pdtemp,gdtemp]")
+        
+    if it>FT['Nsnr']/2:
+        outputs.SearchSNR[it] = np.sqrt(np.nan_to_num(1/np.mean(varSignal,axis=0)))
+    else:
+        outputs.SearchSNR[it] = 0
+    
+    # Current Group-Delay
+    NINmes = FS['NINmes'] ; R = FS['R'] ; Ncross = FT['Ncross']
+    currGD = np.zeros(NINmes)
+    for ib in range(NINmes):
+        cfGDlmbdas = outputs.CfGD[it,:-Ncross,ib]*np.conjugate(outputs.CfGD[it,Ncross:,ib])
+        cfGDmoy = np.sum(cfGDlmbdas)
+        
+        currGD[ib] = np.angle(cfGDmoy*np.exp(-1j*outputs.GDref[it,ib]))
+        
+    outputs.GDEstimated[it] = currGD
+    coherenceLength = R*wlOfTrack
+    # GDmic = currGD*coherenceLength/(2*np.pi)
+    
+    # scanVelocity = FT['search_vfactors']/np.ptp(FT['search_vfactors'])*FT['maxVelocity']
+    # NTForCoherenceLength = coherenceLength/scanVelocity
+    # waveletWindow = np.arange(NTForCoherenceLength)
+    # snrEvolutionTemp = []
+    # offsetsEvolutionTemp = []
+        
+    for ib in range(NINmes):
+        ia = int(FS['ich'][ib][0])-1
+        iap = int(FS['ich'][ib][1])-1
+        offsetCurrent = outputs.EffectiveMoveODL[it,ia]-outputs.EffectiveMoveODL[it,iap]
+                
+        snrCurrent = outputs.SearchSNR[it,ib]
+
+        snrEvolution = outputs.snrEvolution[ib].copy()
+        offsetsEvolution = outputs.offsetsEvolution[ib].copy()
+        
+        # update the list of snr and offsets with the new snr and offset
+        snrEvolution, offsetsEvolution = updateSnrEvolution(snrEvolution, offsetsEvolution, 
+                                                            snrCurrent, offsetCurrent)
+        
+        outputs.snrEvolution[ib] = snrEvolution.copy()
+        outputs.offsetsEvolution[ib] = offsetsEvolution.copy()
+        
+        offsetSteps = np.abs(FT['search_vfactors'][iap]-FT['search_vfactors'][ia])
+        distance = 4/3*coherenceLength / offsetSteps
+        
+        # return 0,0 if no global max not found yet
+        globalMaximumSnr, globalMaximumOffset, secondMaximumSnr = getGlobalMaximum(snrEvolution, offsetsEvolution, distance)
+
+        if globalMaximumSnr:
+            FT['globalMaximumSnr'][ib] = globalMaximumSnr
+            FT['globalMaximumOffsets'][ib] = globalMaximumOffset
+            FT['secondMaximumSnr'][ib] = secondMaximumSnr
+        
+    outputs.globalMaximumOffset[it] = FT['globalMaximumOffsets']
+    outputs.globalMaximumSnr[it] = FT['globalMaximumSnr']           
+    outputs.secondMaximumSnr[it] = FT['secondMaximumSnr']
+    
+    # Transpose the globalMaximumSnr matrix in the Piston-space for checking rank
+    Is = np.dot(config.FS['OPD2Piston_r'],np.dot(np.diag(FT['globalMaximumSnr']),config.FS['Piston2OPD_r']))
+    outputs.Is[it] = Is
+    
+    rankIs = np.linalg.matrix_rank(Is)
+    outputs.rankIs[it] = rankIs
+    
+    allTelFound = (rankIs == NA-1)
+    
+    if allTelFound:
+        
+        # Singular-Value-Decomposition of the W matrix
+        U, S, Vt = np.linalg.svd(Is)
+        
+        Ut = np.transpose(U)
+        V = np.transpose(Vt)
+        
+        # Compute the least square matrix using the globalMaximumSnr
+        reliablepistons = (S>1e-4)  #True at the positions of S verifying the condition
+        Sdag = np.zeros([NA,NA])
+        Sdag[reliablepistons,reliablepistons] = 1/S[reliablepistons]
+        
+        # Come back to the OPD-space        
+        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
+        
+        Igd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], np.diag(FT['globalMaximumSnr']))))
+        
+        # Compute expected offsets and check if the expected offsets of all baselines have already been explored
+        FT['expectedOffsets'] = np.dot(Igd,FT['globalMaximumOffsets'])
+        for ib in range(NINmes):
+            FT['expectedOffsetsExplored'][ib] = ((FT['expectedOffsets'][ib] <= outputs.offsetsEvolution[ib]).any()\
+                                                        and (FT['expectedOffsets'][ib] >= outputs.offsetsEvolution[ib]).any())
+        allExpectedOffsetsExplored = FT['expectedOffsetsExplored'].all()
+        
+        if allExpectedOffsetsExplored:  # We stop the scan since all offsets have been explored
+            keepScanning = False
+            
+            # Update SNR thresholds
+            newThresholdGD = np.ones(NINmes)*FT['searchSnrThreshold']
+            for ib in range(NINmes):
+                if FT['globalMaximumSnr'][ib]:
+                    newThresholdGD[ib] = FT['secondMaximumSnr'][ib] + FT['ratioThreshold']*(FT['globalMaximumSnr'][ib]-FT['secondMaximumSnr'][ib])
+            sk.updateFTparams(ThresholdGD=newThresholdGD, verbose=True)
+        
+        else:   # Keep scanning until exploring the expected offsets of all baselines
+            keepScanning = True
+        
+    else:   # Not enough independant baselines found, so keep scanning
+        keepScanning = True
+        
+        
+    if keepScanning:
+        FT['state'][it+1] = 2    # Remains in SEARCH state
+              
+        if it>=1:
+            if FT['state'][it-1] != 2:
+                FT['eps'] = np.ones(NA)
+                FT['it0'] = np.ones(NA)*it
+                FT['it_last'] = np.ones(NA)*it
+                    
+        Increment = relockfunction_inc_sylvain_gestioncophased(it, FT['search_vfactors'], FT['covering'], CophasedGroups)
+    
+        outputs.CommandSearch[it+1] = outputs.CommandSearch[it] + Increment
+        
+        uSearch = outputs.CommandSearch[it+1]
+        
+    else:
+        print(FT['globalMaximumOffsets'])
+        print(FT['globalMaximumSnr'])
+        print(FT['secondMaximumSnr'])
+        FT['state'][it+1] = 0    # Go to TRACK state
+        
+        # Set Vfactors to the RELOCK values since it will never come back to SEARCH state.
+        FT['Vfactors'] = FT['relock_vfactors']   
+        
+        # Reinitialise parameters for sawtooth function
+        FT['eps'] = np.ones(NA)
+        FT['nbChanges'] = np.ones(NA)
+        
+        # Compute the final OPD commands
+        uSearchOpd = np.dot(Igd,FT['globalMaximumOffsets'])
+        # Convert it into piston commands
+        outputs.CommandSearch[it+1] = np.dot(FS['OPD2Piston'],uSearchOpd)
+         
+        uSearch = outputs.CommandSearch[it+1]
+        
+    return uSearch
+
+
+def updateSnrEvolution(snrEvolution, offsetsEvolution, 
+                       snrCurrent, offsetCurrent):
+    """
+    Update snrEvolution and offsetsEvolution according to the values of
+    snrCurrent and offsetCurrent.
+    
+    Parameters
+    ----------
+    snrEvolution : LIST
+        Evolution of the SNR.
+    offsetsEvolution : LIST
+        Evolution of the offsets.
+    snrCurrent : FLOAT
+        Current SNR.
+    offsetCurrent : FLOAT
+        Current offset.
+
+    Returns
+    -------
+    snrEvolution : LIST
+        Evolution of the SNR.
+    offsetsEvolution : LIST
+        Evolution of the offsets.
+
+    """
+    # snrEvolution = list(snrEvolution)
+    # offsetsEvolution = list(offsetsEvolution)
+    
+    if len(offsetsEvolution)==0:
+        snrEvolution.append(snrCurrent)
+        offsetsEvolution.append(offsetCurrent)
+    
+    alreadyExploredOffset = (offsetCurrent <= np.array(offsetsEvolution)).any() \
+        and (offsetCurrent >= np.array(offsetsEvolution)).any()
+    
+    if offsetCurrent >=0:
+        # if offsetCurrent <= offsetsEvolution[-1]:
+        if alreadyExploredOffset:
+            sameOffsetIndex = np.argmin(np.abs(np.array(offsetsEvolution)-offsetCurrent))
+            if snrCurrent > snrEvolution[sameOffsetIndex]:
+                snrEvolution[sameOffsetIndex] = snrCurrent
+                offsetsEvolution[sameOffsetIndex] = offsetCurrent
+
+        else:
+            snrEvolution.append(snrCurrent)
+            offsetsEvolution.append(offsetCurrent)
+    
+    else:
+        if alreadyExploredOffset:
+            sameOffsetIndex = np.argmin(np.abs(np.array(offsetsEvolution)-offsetCurrent))
+            if snrCurrent > snrEvolution[sameOffsetIndex]:
+                snrEvolution[sameOffsetIndex] = snrCurrent
+                offsetsEvolution[sameOffsetIndex] = offsetCurrent
+
+        else:
+            # Add current snr to the beginning of the list snrEvolution.
+            Ltemp = snrEvolution[::-1]
+            Ltemp.append(snrCurrent)
+            snrEvolution = Ltemp[::-1]
+            
+            # Add current offsets to the beginning of the list offsetsEvolution.
+            Ltemp = offsetsEvolution[::-1]
+            Ltemp.append(offsetCurrent)
+            offsetsEvolution = Ltemp[::-1]
+    
+    # offsetsEvolution = np.array(offsetsEvolution)
+    # snrEvolution = np.array(snrEvolution)
+    
+    return snrEvolution, offsetsEvolution
+
+
+
+def getGlobalMaximum(snrEvolution, offsetsEvolution, distance):
+    """
+    Compute the maximal value of the SNR and their asociated offsets.
+
+    Parameters
+    ----------
+    snrEvolution : LIST or 1-D ARRAY
+        Evolution of the SNR.
+    offsetsEvolution : LIST or 1D-ARRAY
+        Evolution of the SNR.
+    distance : INTEGER
+        Minimal distance between two local maxima in microns.
+
+    Returns
+    -------
+    globalMaximumSnr : FLOAT
+        Value of the maximal SNR.
+    globalMaximumOffset : FLOAT
+        Value of the offset corresponding to the maximal SNR.
+    secondMaximum
+
+    """
+
+    globalMaximumSnr, globalMaximumOffsets, secondMaximumSnr = 0,0,0
+    
+    if len(snrEvolution) < 2:
+        return globalMaximumSnr, globalMaximumOffsets, secondMaximumSnr
+    
+    elif len(snrEvolution) < 3*distance:
+        return globalMaximumSnr, globalMaximumOffsets, secondMaximumSnr
+    
+    peaks = signal.find_peaks(snrEvolution, distance=distance)[0]
+    
+    localMaximaSnr = np.array(snrEvolution)[peaks]
+    
+    # Set the localMaxima which are under the detection limit (array tooLowSnr)
+    # to the same value (the maximum of their values)
+    # Necessary for removing noise in the first derivative test.
+    tooLowSnrIndex = localMaximaSnr<config.FT['searchSnrThreshold']
+    if tooLowSnrIndex.any():    # Check if there is a peak under detection limit.
+        localMaximaSnr[tooLowSnrIndex] = np.max(localMaximaSnr[tooLowSnrIndex])
+    
+    localMaximaOffsets = np.array(offsetsEvolution)[peaks]
+    
+    # Compute the first derivative of the localMaxima
+    localMaximaSnrDeriv = np.gradient(localMaximaSnr)
+    
+    # If the derivative changes of sign, it means we reached the global maximum
+    if not ((localMaximaSnrDeriv>=0).all() or (localMaximaSnrDeriv<0).all()):
+        globalMaximumIndex = np.argmax(localMaximaSnr)
+        globalMaximumSnr = localMaximaSnr[globalMaximumIndex]
+        globalMaximumOffsets = localMaximaOffsets[globalMaximumIndex]
+        
+        secondMaximumSnr = np.max([localMaximaSnr[globalMaximumIndex+1],localMaximaSnr[globalMaximumIndex-1]])
+    
+    if globalMaximumSnr < config.FT['searchSnrThreshold']:
+        globalMaximumSnr, globalMaximumOffsets, secondMaximumSnr = 0,0,0
+        
+    return globalMaximumSnr, globalMaximumOffsets, secondMaximumSnr
+
 
 
 
@@ -589,7 +899,7 @@ def CommandCalc(CfPD,CfGD):
     """
     
     if config.FT['state'][it] == 2:
-        uSearch = SearchState()
+        uSearch = SearchState2()
         CommandODL = uSearch
         # CommandODL = np.zeros(NA)
         return CommandODL
@@ -828,28 +1138,24 @@ def CommandCalc(CfPD,CfGD):
             
     #     outputs.GDEstimated[it] = currGD
 
-    #     Ws = outputs.SearchSNR[it] * ((outputs.SearchSNR[it]-outputs.SearchSNR[it-1]<0)\
+    #     globalMaximumSnr = outputs.SearchSNR[it] * ((outputs.SearchSNR[it]-outputs.SearchSNR[it-1]<0)\
     #                                   and (np.abs(currGD) < searchThreshGD*wlOfTrack))
         
     #     zgd = [(0,0)]*NIN
     #     for ia in range(NA):
     #         for iap in range(ia+1,NA):
     #             ib = ct.posk(ia,iap,NA)
-    #             if Ws[ib] != 0:
+    #             if globalMaximumSnr[ib] != 0:
     #                 zgd[ib] = (outputs.EffectiveMoveODL[it,ia],outputs.EffectiveMoveODL[it,iap])
         
-    #     Is = np.dot(np.transpose(config.FS['OPD2Piston']),np.dot(np.diag(Ws),config.FS['OPD2piston']))
+    #     Is = np.dot(np.transpose(config.FS['OPD2Piston']),np.dot(np.diag(globalMaximumSnr),config.FS['OPD2piston']))
         
     #     allTelFound = (np.linalg.matrix_rank(Is) < NA-1)
         
     #     if allTelFound:
     #         outputs.SearchState[it+1] = 0
             
-            
-            
-    
-    
-    
+
     
     """
     RELOCK state
@@ -911,6 +1217,7 @@ def CommandCalc(CfPD,CfGD):
                     config.FT['it_last'] = np.ones(NA)*it
                 
                 Velocities = np.dot(Kernel,config.FT['relock_vfactors'])
+                
                 Increment = relockfunction_inc_sylvain_gestioncophased(it, Velocities, config.FT['covering'], CophasedGroups)
             
                 #You should send command only on telescope with flux
@@ -1215,7 +1522,7 @@ def getvar():
     return varPD, varGD
 
 
-def SetThreshold(TypeDisturbance="CophasedThenForeground",nbSigma=0,
+def SetThreshold(TypeDisturbance="CophasedThenForeground",nbSigma=0,minThreshold=0,
                  manual=False, scan=False,display=False,
                  verbose=True,scanned_tel=6):
     """
@@ -1272,7 +1579,7 @@ Then asks for the user to choose a smart threshold.
 #         if underSampling:
 #             print(f"/!\  ATTENTION: one or more OPD value(s) doesn't respect Nyquist criterion \
 # (OPD<{config.nyquistCriterion}µm).\n\
-# The simulation must experience aliasing and the SNR values won't be correct. /!\ ")
+# The simulation might experience aliasing and the SNR values won't be correct. /!\ ")
         
         sk.update_config(foreground=foreground, NT = NT, verbose=verbose)
         
@@ -1295,9 +1602,8 @@ Then asks for the user to choose a smart threshold.
             
             # Set threshold to mean(SNR) + nBsigma * rms(SNR)
             newThresholdGD[ib] = SNRfg + nbSigma*fgstd
-            
-            if newThresholdGD[ib] ==0:
-                newThresholdGD[ib] = 10
+            if minThreshold and (newThresholdGD[ib] < minThreshold):
+                newThresholdGD[ib] = minThreshold
                 
         
         newThresholdPD = 1e-3#np.min(newThresholdGD)/2
@@ -1427,7 +1733,7 @@ Then asks for the user to choose a smart threshold.
                     SNRcophased = np.mean(np.sqrt(outputs.SquaredSNRMovingAverage[CophasedRange,ib]))
                     SNRfg = np.mean(np.sqrt(outputs.SquaredSNRMovingAverage[ForegroundRange,ib]))
                     fgstd = np.std(np.sqrt(outputs.SquaredSNRMovingAverage[ForegroundRange,ib]))
-                    cophasedstd = np.std(np.sqrt(outputs.SquaredSNRMovingAverage[CophasedRange,ib]))
+                    # cophasedstd = np.std(np.sqrt(outputs.SquaredSNRMovingAverage[CophasedRange,ib]))
                     
                     # Set threshold to a value between max and foreground with a lower limit defined by the std of foreground.
                     newThresholdGD[ib] = np.max([1.5,SNRfg + 5*fgstd,SNRfg+0.2*(SNRcophased-SNRfg)])
@@ -1470,7 +1776,7 @@ def relockfunction(usaw):
     """
     
     from . import outputs
-    from .config import NA,dt
+    from .config import NA
     from .outputs import it
     
     for ia in range(NA):
@@ -1659,36 +1965,41 @@ def relockfunction_inc_sylvain_gestioncophased(it, v, covering, CophasedGroups):
     
     for ia in range(NA):
     
-        it_last=config.FT['it_last'][ia]; it0=config.FT['it0'][ia] ; eps=config.FT['eps'][ia]
+        it_last=config.FT['it_last'][ia]; eps=config.FT['eps'][ia]
         nbChanges = config.FT['nbChanges'][ia]
         
-        # Coefficient directeur de la fonction d'augmentation du temps avant saut.
-        a = config.FT['sweep30s']/30000
-        
         # Temps avant saut de frange
-        # sweep = config.FT['sweep0'] + a*(it-it0)*config.dt
         sweep = config.FT['sweep0']*config.FT['commonRatio']**nbChanges
         
         # Temps passé depuis dernier saut.
         time_since_last_change = (it-it_last)*config.dt
         
+        change=False
         if time_since_last_change < sweep:  # Pas de saut
-            change=False
             move[ia] = eps*v[ia]
-            config.FT['LastPosition'][ia]+=move[ia]
             
         else:   # Saut 
             change=True
             config.FT['eps'][ia] = -config.FT['eps'][ia]
             config.FT['it_last'][ia] = it
             config.FT['nbChanges'][ia] += 1
-            move[ia] = -config.FT['LastPosition'][ia]
+            move[ia] = -config.FT['LastPosition'][ia]   # Cancel all moves you did since last change on telescope ia
             
+            # Cophased telescopes remain together when jumping
+            tel=ia+1
+            for CophasedGroup in CophasedGroups:
+                l = [move[itel-1] for itel in CophasedGroup]
+                generalmove = l[0]  #max(set(l), key = l.count)
+                
+                if tel in CophasedGroup:
+                    move[ia] = generalmove
+                    
             # Add some covering to prevent from missing fringes
             if np.abs(move[ia]) < 2*covering:
                 coveringtemp = 0
             else:
                 coveringtemp = covering
+                
             if move[ia] > 0:
                 move[ia] -= coveringtemp
             if move[ia] < 0:
@@ -1696,16 +2007,14 @@ def relockfunction_inc_sylvain_gestioncophased(it, v, covering, CophasedGroups):
                 
             coveringtemp = covering
             
-            # Cophased telescopes remain together when jumping
-            tel=ia+1
-            for CophasedGroup in CophasedGroups:
-                l = [move[itel-1] for itel in CophasedGroup]
-                generalmove = max(set(l), key = l.count)
-                
-                if tel in CophasedGroup:
-                    move[ia] = generalmove            
-            
+            # Starts the new accumulation of commands until next change
             config.FT['LastPosition'][ia] = move[ia]
+            
+    
+    if not change: # If there is no jump, the increment is normalised by the maximal authorized velocity
+        move = move / np.ptp(move) * config.FT['maxVelocity']
+        config.FT['LastPosition'] += move  
+    
     
     return move
 
@@ -1801,3 +2110,8 @@ def JoinOnCommonElements(groups):
         L.append([int(element) for element in list(x)])
             
     return(L)
+
+
+
+
+

@@ -97,7 +97,11 @@ GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
 diffOffsets = np.zeros([NT,NINmes])                 # Differential offsets (p1-p2) where the fringes are found
 diffOffsets_best = np.zeros([NT,NINmes])
 SearchSNR = np.zeros([NT,NINmes])                   # Differential offsets (p1-p2) where the fringes are found
-
+snrEvolution = [[]]*NINmes                 # Will be reshaped (increased) by SEARCH state
+offsetsEvolution = [[]]*NINmes             # Will be reshaped (increased) by SEARCH state
+globalMaximumSnr = np.zeros([NT,NINmes])
+globalMaximumOffset = np.zeros([NT,NINmes])
+secondMaximumSnr = np.zeros([NT,NINmes])
 
 """Piston-space observables [NA]"""
 # The three true piston quantities (signal, correction and residues)
@@ -152,6 +156,8 @@ noSignal_on_T = np.zeros([NT,NA])                   # No photometry on telescope
 Is = np.ones([NT,NA,NA])
 rankIs = np.zeros(NT)
 Ws = np.zeros([NT,NINmes])
+
+
 
 """
 Performance Observables will be introduced and processed when the function 
