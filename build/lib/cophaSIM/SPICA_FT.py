@@ -25,8 +25,10 @@ from . import config
 
 def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, 
             Ngd=40, Nsnr=40, roundGD='round', Ncross=1,
-            relock=True,SMdelay=1e3,sweep0=20, sweep30s=10, commonRatio=1.1, covering=10, maxVelocity=0.300, searchMinGD=500,
-            relock_vfactors = [], search_vfactors=[],searchThreshGD=3,Nsearch=50,searchSNR='gd',searchSnrThreshold=2,
+            relock=True,SMdelay=1e3, sweep30s=10, maxVelocity=0.300, searchMinGD=500,
+            sweepRelock=20,commonRatioRelock=1.2, coveringRelock=10,vfactorsRelock = [],
+            sweepSearch=4000,commonRatioSearch=1, coveringSearch=40,vfactorsSearch=[],
+            searchThreshGD=3,Nsearch=50,searchSNR='gd',searchSnrThreshold=2,
             CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
             cmdOPD=True, switch=1, continu=True,whichSNR='gd',
             ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,ratioThreshold=0.2,
@@ -181,11 +183,13 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         config.FT['relock'] = relock            # If True, the fringe-tracker can eneter in RELOCK state. If False, it never enters this state (for debugging only).
         config.FT['search'] = search            # If True, the simulation begins with SEARCH state. If False, no SEARCH state, directly TRACK state."
         config.FT['SMdelay'] = SMdelay          # Waiting time before launching relock
-        config.FT['sweep0'] = sweep0            # Starting sweep in seconds
         config.FT['sweep30s'] = sweep30s        # Sweep at 30s in seconds
-        config.FT['commonRatio'] = commonRatio  # Common ratio of the geometrical sequence
-        config.FT['covering'] = covering        # Covering of the sawtooth function in microns
-        config.FT['maxVelocity'] = maxVelocity  # Maximal slope given in µm/frame
+        config.FT['sweepRelock'] = sweepRelock            # Starting sweep in seconds
+        config.FT['commonRatioRelock'] = commonRatioRelock  # Common ratio of the geometrical sequence
+        config.FT['coveringRelock'] = coveringRelock        # Covering of the sawtooth function in microns
+        config.FT['sweepSearch'] = sweepSearch            # Starting sweep in seconds
+        config.FT['commonRatioSearch'] = commonRatioSearch  # Common ratio of the geometrical sequence
+        config.FT['coveringSearch'] = coveringSearch        # Covering of the sawtooth function in microns        config.FT['maxVelocity'] = maxVelocity  # Maximal slope given in µm/frame
         config.FT['searchThreshGD'] = searchThreshGD*config.wlOfTrack    # Maximal value of GD for considering fringe found.
         config.FT['Nsearch'] = Nsearch          
         config.FT['searchSNR'] = searchSNR      
@@ -200,7 +204,7 @@ I set ThresholdRELOCK to the {NINmes} first values."))
             
         # Version usaw vector
         config.FT['usaw'] = np.zeros([NT,NA])
-        config.FT['LastPosition'] = np.zeros(NA)
+        config.FT['moveSinceLastChange'] = np.zeros(NA)
         config.FT['it_last'] = np.zeros(NA)
         config.FT['it0'] = np.zeros(NA)
         config.FT['eps'] = np.ones(NA)
@@ -209,7 +213,7 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         # Version usaw float
         # config.FT['usaw'] = np.zeros([NT])
         # config.FT['uRelock'] = np.zeros([NT,NA])
-        # config.FT['LastPosition'] = np.zeros([NT+1,NA])
+        # config.FT['moveSinceLastChange'] = np.zeros([NT+1,NA])
         # config.FT['it_last'] = 0
         # config.FT['it0'] = 0
         # config.FT['eps'] = 1
@@ -217,38 +221,44 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         
         config.FT['ThresholdPhot'] = ThresholdPhot      # Minimal photometry SNR for launching relock
 
-        if (len(relock_vfactors) == 0) and (len(relock_vfactors) == NA):
-            config.FT['relock_vfactors'] = np.array(relock_vfactors)
+        if (len(vfactorsRelock) == 0) and (len(vfactorsRelock) == NA):
+            config.FT['vfactorsRelock'] = np.array(vfactorsRelock)
         else:
             if verbose:
-                print("No or bad relock_vfactors given. I create one.")
+                print("No or bad vfactorsRelock given. I create one.")
 
             if NA==6:
-                config.FT['relock_vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])
+                config.FT['vfactorsRelock'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])
                 
             elif NA==7: # Fake values
-                config.FT['relock_vfactors'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75, 10])
+                config.FT['vfactorsRelock'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75, 10])
                 
             elif NA==10:
-                config.FT['relock_vfactors'] = np.array([-24.9, -23.9, -18.9, -14.9,
+                config.FT['vfactorsRelock'] = np.array([-24.9, -23.9, -18.9, -14.9,
                                                   -1.9,   1.1,   9.1,  16.1,
                                                   28.1, 30.1])
         
-        if (len(search_vfactors) == 0) and (len(search_vfactors) == NA):
-            config.FT['search_vfactors'] = np.array(search_vfactors)
+        if (len(vfactorsSearch) == 0) and (len(vfactorsSearch) == NA):
+            config.FT['vfactorsSearch'] = np.array(vfactorsSearch)
         else:
             if verbose:
-                print("No or bad search_vfactors given. I create one.")
+                print("No or bad vfactorsSearch given. I create one.")
                 
-            config.FT['search_vfactors'] = np.arange(NA)-NA//2+1
+            config.FT['vfactorsSearch'] = np.arange(NA)-NA//2+1
             
         if search==True:
-            config.FT['Vfactors'] = config.FT['search_vfactors']
+            config.FT['Vfactors'] = config.FT['vfactorsSearch']
+            config.FT['sweep0'] = config.FT['sweepSearch']
+            config.FT['covering'] = config.FT['coveringSearch']
+            config.FT['commonRatio'] = config.FT['commonRatioSearch']
         else:
-            config.FT['Vfactors'] = config.FT['relock_vfactors']
+            config.FT['Vfactors'] = config.FT['vfactorsRelock']
+            config.FT['sweep0'] = config.FT['sweepRelock']
+            config.FT['covering'] = config.FT['coveringRelock']
+            config.FT['commonRatio'] = config.FT['commonRatioRelock']
             
-        config.FT['relock_vfactors'] = config.FT['relock_vfactors']/np.ptp(config.FT['relock_vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
-        config.FT['search_vfactors'] = config.FT['search_vfactors']/np.ptp(config.FT['search_vfactors'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
+        config.FT['vfactorsRelock'] = config.FT['vfactorsRelock']/np.ptp(config.FT['vfactorsRelock'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
+        config.FT['vfactorsSearch'] = config.FT['vfactorsSearch']/np.ptp(config.FT['vfactorsSearch'])*maxVelocity     # The maximal OPD velocity is equal to slope/frame
         
         return
 
@@ -272,7 +282,7 @@ I set ThresholdRELOCK to the {NINmes} first values."))
 
 
 
-def SearchState(CophasedGroups=[]):
+def SearchState(coherentGroups=[]):
     
     from . import outputs,config
     
@@ -379,28 +389,34 @@ def SearchState(CophasedGroups=[]):
          
         outputs.CommandSearch[it+1] = uSearch
         # outputs.CommandRelock[it+1] = uSearch         # Patch to propagate the command to the fringe-tracker commands
-        config.FT['Vfactors'] = config.FT['relock_vfactors']    # Set Vfactors to the RELOCK values since it will never come back to SEARCH state.
+        config.FT['Vfactors'] = config.FT['vfactorsRelock']    # Set Vfactors to the RELOCK values since it will never come back to SEARCH state.
         
         # Reinitialise parameters for sawtooth function
         config.FT['eps'] = np.ones(NA)
         config.FT['nbChanges'] = np.ones(NA)
+        config.FT['sweep0'] = config.FT['sweepRelock']
+        config.FT['covering'] = config.FT['coveringRelock']
+        config.FT['commonRatio'] = config.FT['commonRatioRelock']
         
     else:
         config.FT['state'][it+1] = 2    # Remain in SEARCH state
         
         # newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
         # TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
-        # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
+        # # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
         
         # TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
-
+        # if len(TelescopesThatNeedARestart):
+        #     # print(config.FT['moveSinceLastChange'])
+        #     config.FT['moveSinceLastChange'][TelescopesThatNeedARestart] = 0
+            
         if it>=1:
             if config.FT['state'][it-1] != 2:
                 config.FT['eps'] = np.ones(NA)
                 config.FT['it0'] = np.ones(NA)*it
                 config.FT['it_last'] = np.ones(NA)*it
                     
-        Increment = relockfunction_inc_sylvain_gestioncophased(it, config.FT['search_vfactors'], config.FT['covering'], CophasedGroups)
+        Increment = relockfunction_inc_sylvain_gestioncophased(it, config.FT['vfactorsSearch'], config.FT['covering'], coherentGroups)
     
         #You should send command only on telescope with flux
         #outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
@@ -412,7 +428,7 @@ def SearchState(CophasedGroups=[]):
     return uSearch
 
 
-def SearchState2(CophasedGroups=[]):
+def SearchState2(coherentGroups=[]):
     # import scipy
     from . import outputs,config
     from . import skeleton as sk
@@ -454,7 +470,7 @@ def SearchState2(CophasedGroups=[]):
     coherenceLength = R*wlOfTrack
     # GDmic = currGD*coherenceLength/(2*np.pi)
     
-    # scanVelocity = FT['search_vfactors']/np.ptp(FT['search_vfactors'])*FT['maxVelocity']
+    # scanVelocity = FT['vfactorsSearch']/np.ptp(FT['vfactorsSearch'])*FT['maxVelocity']
     # NTForCoherenceLength = coherenceLength/scanVelocity
     # waveletWindow = np.arange(NTForCoherenceLength)
     # snrEvolutionTemp = []
@@ -470,26 +486,27 @@ def SearchState2(CophasedGroups=[]):
         snrEvolution = outputs.snrEvolution[ib].copy()
         offsetsEvolution = outputs.offsetsEvolution[ib].copy()
         
-        # update the list of snr and offsets with the new snr and offset
-        snrEvolution, offsetsEvolution = updateSnrEvolution(snrEvolution, offsetsEvolution, 
-                                                            snrCurrent, offsetCurrent)
+        # if global not already found, update the list of snr and offsets with the new snr and offset
+        if not FT['globalMaximumSnr'][ib]:
+            snrEvolution, offsetsEvolution = updateSnrEvolution(snrEvolution, offsetsEvolution, 
+                                                                snrCurrent, offsetCurrent)
         
-        outputs.snrEvolution[ib] = snrEvolution.copy()
-        outputs.offsetsEvolution[ib] = offsetsEvolution.copy()
+            outputs.snrEvolution[ib] = snrEvolution.copy()
+            outputs.offsetsEvolution[ib] = offsetsEvolution.copy()
         
-        offsetSteps = np.abs(FT['search_vfactors'][iap]-FT['search_vfactors'][ia])
-        distance = 4/3*coherenceLength / offsetSteps
-        
-        # return 0,0 if no global max not found yet
-        globalMaximumSnr, globalMaximumOffset, secondMaximumSnr = getGlobalMaximum(snrEvolution, offsetsEvolution, distance)
+            offsetSteps = np.abs(FT['vfactorsSearch'][iap]-FT['vfactorsSearch'][ia])
+            distance = 4/3*coherenceLength / offsetSteps
+            
+            # return 0,0 if no global max not found yet
+            globalMaximumSnr, globalMaximumOffset, secondMaximumSnr = getGlobalMaximum(snrEvolution, offsetsEvolution, distance)
 
-        if globalMaximumSnr:
-            FT['globalMaximumSnr'][ib] = globalMaximumSnr
-            FT['globalMaximumOffsets'][ib] = globalMaximumOffset
-            FT['secondMaximumSnr'][ib] = secondMaximumSnr
+            if globalMaximumSnr:
+                FT['globalMaximumSnr'][ib] = globalMaximumSnr
+                FT['globalMaximumOffsets'][ib] = globalMaximumOffset
+                FT['secondMaximumSnr'][ib] = secondMaximumSnr
         
     outputs.globalMaximumOffset[it] = FT['globalMaximumOffsets']
-    outputs.globalMaximumSnr[it] = FT['globalMaximumSnr']           
+    outputs.globalMaximumSnr[it] = FT['globalMaximumSnr']    
     outputs.secondMaximumSnr[it] = FT['secondMaximumSnr']
     
     # Transpose the globalMaximumSnr matrix in the Piston-space for checking rank
@@ -552,7 +569,7 @@ def SearchState2(CophasedGroups=[]):
                 FT['it0'] = np.ones(NA)*it
                 FT['it_last'] = np.ones(NA)*it
                     
-        Increment = relockfunction_inc_sylvain_gestioncophased(it, FT['search_vfactors'], FT['covering'], CophasedGroups)
+        Increment = relockfunction_inc_sylvain_gestioncophased(it, FT['vfactorsSearch'], FT['covering'], coherentGroups)
     
         outputs.CommandSearch[it+1] = outputs.CommandSearch[it] + Increment
         
@@ -565,7 +582,7 @@ def SearchState2(CophasedGroups=[]):
         FT['state'][it+1] = 0    # Go to TRACK state
         
         # Set Vfactors to the RELOCK values since it will never come back to SEARCH state.
-        FT['Vfactors'] = FT['relock_vfactors']   
+        FT['Vfactors'] = FT['vfactorsRelock']   
         
         # Reinitialise parameters for sawtooth function
         FT['eps'] = np.ones(NA)
@@ -1155,11 +1172,7 @@ def CommandCalc(CfPD,CfGD):
     #     if allTelFound:
     #         outputs.SearchState[it+1] = 0
             
-            
-            
-    
-    
-    
+
     
     """
     RELOCK state
@@ -1168,7 +1181,7 @@ def CommandCalc(CfPD,CfGD):
     """ Implementation comme Sylvain:
             - sans réinitialisation
             - avec patch pour garder groupes cophasés lors des sauts
-            """
+    """
     
     
     IgdRank = np.linalg.matrix_rank(outputs.Igd[it])
@@ -1189,12 +1202,18 @@ def CommandCalc(CfPD,CfGD):
             Kernel = np.identity(NA) - Igdna
             
             CophasedBaselines=np.where(np.diag(outputs.Igd[it])!=0)[0]
-            CophasedPairs=[]
+            coherentPairs=[]
+            isolatedTels = list(np.arange(NA))
             for ib in CophasedBaselines:
-                ia,iap = config.FS['ich'][ib][0], config.FS['ich'][ib][1]
-                CophasedPairs.append([ia,iap])
-                
-            CophasedGroups = JoinOnCommonElements(CophasedPairs)
+                ia,iap = int(config.FS['ich'][ib][0])-1, int(config.FS['ich'][ib][1])-1
+                coherentPairs.append([ia,iap])
+                if ia in isolatedTels:
+                    isolatedTels.remove(ia)
+                if iap in isolatedTels:
+                    isolatedTels.remove(iap)
+                    
+            coherentGroups = JoinOnCommonElements(coherentPairs)
+            print("Coherent:",coherentGroups,"; Isolated:", isolatedTels)
             
             # Fringe loss
             outputs.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
@@ -1209,23 +1228,30 @@ def CommandCalc(CfPD,CfGD):
             if not outputs.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
                 config.FT['state'][it] = 1
                 
-                # newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
-                # TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
+                newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
+                TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
                 # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
                 
-                # TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
-
+                TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
+                
+                # Null the value of the accumulative element that handle sawtooth jumps
+                if len(TelescopesThatNeedARestart):
+                    config.FT['moveSinceLastChange'][TelescopesThatNeedARestart] = 0
+                    
                 if config.FT['state'][it-1] != 1:
                     config.FT['eps'] = np.ones(NA)
                     config.FT['it0'] = np.ones(NA)*it
                     config.FT['it_last'] = np.ones(NA)*it
                 
-                Velocities = np.dot(Kernel,config.FT['relock_vfactors'])
+                Velocities = np.dot(Kernel,config.FT['vfactorsRelock'])
                 
-                Increment = relockfunction_inc_sylvain_gestioncophased(it, Velocities, config.FT['covering'], CophasedGroups)
+                # Increment = relockfunction_inc_sylvain_gestioncophased(it, Velocities, config.FT['covering'], coherentGroups)
+            
+                Increment = relockfunction_230515(it, Velocities, config.FT['covering'], coherentGroups, isolatedTels)
             
                 #You should send command only on telescope with flux
                 outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
+                
                 Increment = np.dot(outputs.NoPhotometryFiltration[it],Increment)
                 
                 uRelock = outputs.CommandRelock[it] + Increment
@@ -1246,7 +1272,6 @@ def CommandCalc(CfPD,CfGD):
     
     # The command is sent at the next time, that's why we note it+1
     uRelock = outputs.CommandRelock[it+1]
-    
     
         
     """
@@ -1798,13 +1823,13 @@ def relockfunction(usaw):
             utemp=usaw[ia]
             config.FT['eps'][ia] = -config.FT['eps'][ia]
             config.FT['it_last'][ia] = it
-            usaw[ia] = config.FT['LastPosition'][ia] + config.FT['eps'][ia]
-            config.FT['LastPosition'][ia] = utemp
+            usaw[ia] = config.FT['moveSinceLastChange'][ia] + config.FT['eps'][ia]
+            config.FT['moveSinceLastChange'][ia] = utemp
         
     
     outputs.eps[it] = config.FT['eps']
     outputs.it_last[it] = config.FT['it_last']
-    outputs.LastPosition[it] = config.FT['LastPosition']
+    outputs.moveSinceLastChange[it] = config.FT['moveSinceLastChange']
     
     return usaw
   
@@ -1824,8 +1849,8 @@ def relockfunction_basical(usaw,it):
         utemp=usaw
         config.FT['eps'] = -config.FT['eps']
         config.FT['it_last'] = it
-        usaw = config.FT['LastPosition'] + config.FT['eps']
-        config.FT['LastPosition'] = utemp
+        usaw = config.FT['moveSinceLastChange'] + config.FT['eps']
+        config.FT['moveSinceLastChange'] = utemp
 
     config.FT['usaw'][it] = usaw
         
@@ -1843,11 +1868,11 @@ def relockfunction3(usaw,it):
         # return config.FT['eps']*config.FT['Vfactors']*time_since_last_change
     else:
         utemp=usaw
-        diff = config.FT['LastPosition'] - usaw
+        diff = config.FT['moveSinceLastChange'] - usaw
         config.FT['eps'] = -config.FT['eps']
         config.FT['it_last'] = it
         usaw = diff + config.FT['eps']
-        config.FT['LastPosition'] = utemp
+        config.FT['moveSinceLastChange'] = utemp
 
     config.FT['usaw'][it] = usaw
         
@@ -1934,20 +1959,20 @@ def relockfunction_inc_sylvain(it, v):
         if time_since_last_change < sweep:  # Pas de saut
             change=False
             move[ia] = eps*v[ia]
-            config.FT['LastPosition'][ia]+=move[ia]
+            config.FT['moveSinceLastChange'][ia]+=move[ia]
             
         else:   # Saut 
             change=True
             config.FT['eps'][ia] = -config.FT['eps'][ia]
             config.FT['it_last'][ia] = it
-            move[ia] = -config.FT['LastPosition'][ia]
-            config.FT['LastPosition'][ia] = move[ia]
+            move[ia] = -config.FT['moveSinceLastChange'][ia]
+            config.FT['moveSinceLastChange'][ia] = move[ia]
     
     
     return move
 
 
-def relockfunction_inc_sylvain_gestioncophased(it, v, covering, CophasedGroups):
+def relockfunction_inc_sylvain_gestioncophased(it, v, covering, coherentGroups):
     """
     Incremental sawtooth function working.
     It returns +1 or -1 depending on the tooth on which it is, and add a delta only at the change of tooth.
@@ -1987,15 +2012,14 @@ def relockfunction_inc_sylvain_gestioncophased(it, v, covering, CophasedGroups):
             config.FT['eps'][ia] = -config.FT['eps'][ia]
             config.FT['it_last'][ia] = it
             config.FT['nbChanges'][ia] += 1
-            move[ia] = -config.FT['LastPosition'][ia]   # Cancel all moves you did since last change on telescope ia
+            move[ia] = -config.FT['moveSinceLastChange'][ia]   # Cancel all moves you did since last change on telescope ia
             
             # Cophased telescopes remain together when jumping
-            tel=ia+1
-            for CophasedGroup in CophasedGroups:
-                l = [move[itel-1] for itel in CophasedGroup]
-                generalmove = l[0]  #max(set(l), key = l.count)
+            for CophasedGroup in coherentGroups:
+                l = [move[ia-1] for ia in CophasedGroup]
+                generalmove = l[0]
                 
-                if tel in CophasedGroup:
+                if ia in CophasedGroup:
                     move[ia] = generalmove
                     
             # Add some covering to prevent from missing fringes
@@ -2012,15 +2036,200 @@ def relockfunction_inc_sylvain_gestioncophased(it, v, covering, CophasedGroups):
             coveringtemp = covering
             
             # Starts the new accumulation of commands until next change
-            config.FT['LastPosition'][ia] = move[ia]
+            config.FT['moveSinceLastChange'][ia] = move[ia]
             
-    
-    if not change: # If there is no jump, the increment is normalised by the maximal authorized velocity
+    # If there is no jump, the increment is normalised by the maximal authorized velocity
+    if not change: 
         move = move / np.ptp(move) * config.FT['maxVelocity']
-        config.FT['LastPosition'] += move  
-    
+        config.FT['moveSinceLastChange'] += move  
     
     return move
+
+
+def relockfunction_230515(it, v, covering, coherentGroups, isolatedTels):
+    """
+    Incremental sawtooth function working.
+    It returns +1 or -1 depending on the tooth on which it is, and add a delta only at the change of tooth.
+    INPUT:
+        - it : FLOAT
+            Current time.
+        - v : FLOAT ARRAY
+            Velocities of the different ODL
+            
+    OUTPUT:
+        - usaw : FLOAT ARRAY
+            Incrementation to add to the current ODL position, telescope per telescope.
+        - dico : DICTIONNARY
+            Updated dico.
+    """
+    from .config import NA
+    
+    move = np.zeros(NA)
+    
+    allGroups = coherentGroups + isolatedTels
+    nbOfGroups = len(allGroups)
+    v_groups = np.arange(nbOfGroups) - nbOfGroups/2
+    
+    
+    for iGroup in range(nbOfGroups):
+        group = allGroups[iGroup]
+        
+        if isinstance(group,list):
+            
+            for ia in group:
+            
+                it_last=config.FT['it_last'][ia]; eps=config.FT['eps'][ia]
+                nbChanges = config.FT['nbChanges'][ia]
+                
+                # Temps avant saut de frange
+                sweep = config.FT['sweep0']*config.FT['commonRatio']**nbChanges
+                
+                # Temps passé depuis dernier saut.
+                time_since_last_change = (it-it_last)*config.dt
+                
+                change=False
+                if time_since_last_change < sweep:  # Pas de saut
+                    move[ia] = eps*v_groups[iGroup]
+                    
+                else:   # Saut 
+                    change=True
+                    config.FT['eps'][ia] = -config.FT['eps'][ia]
+                    config.FT['it_last'][ia] = it
+                    config.FT['nbChanges'][ia] += 1
+                    move[ia] = -config.FT['moveSinceLastChange'][ia]   # Cancel all moves you did since last change on telescope ia
+                    
+                    # Cophased telescopes remain together when jumping
+                    if ia != group[0]:
+                        ia0 = group[0]
+                        move[ia] = move[ia0] # All telescopes of the group follow the first one.
+                            
+                    # Add some covering to prevent from missing fringes
+                    if np.abs(move[ia]) < 2*covering:
+                        coveringtemp = 0
+                    else:
+                        coveringtemp = covering
+                        
+                    if move[ia] > 0:
+                        move[ia] -= coveringtemp
+                    if move[ia] < 0:
+                        move[ia] += coveringtemp
+                        
+                    coveringtemp = covering
+                    
+                    # Starts the new accumulation of commands until next change
+                    config.FT['moveSinceLastChange'][ia] = move[ia]
+            
+        else:
+            ia = group
+            
+            it_last=config.FT['it_last'][ia]; eps=config.FT['eps'][ia]
+            nbChanges = config.FT['nbChanges'][ia]
+            
+            # Temps avant saut de frange
+            sweep = config.FT['sweep0']*config.FT['commonRatio']**nbChanges
+            
+            # Temps passé depuis dernier saut.
+            time_since_last_change = (it-it_last)*config.dt
+            
+            change=False
+            if time_since_last_change < sweep:  # Pas de saut
+                move[ia] = eps*v_groups[iGroup]
+                
+            else:   # Saut 
+                change=True
+                config.FT['eps'][ia] = -config.FT['eps'][ia]
+                config.FT['it_last'][ia] = it
+                config.FT['nbChanges'][ia] += 1
+                move[ia] = -config.FT['moveSinceLastChange'][ia]   # Cancel all moves you did since last change on telescope ia
+                        
+                # Add some covering to prevent from missing fringes
+                if np.abs(move[ia]) < 2*covering:
+                    coveringtemp = 0
+                else:
+                    coveringtemp = covering
+                    
+                if move[ia] > 0:
+                    move[ia] -= coveringtemp
+                if move[ia] < 0:
+                    move[ia] += coveringtemp
+                    
+                coveringtemp = covering
+                
+                # Starts the new accumulation of commands until next change
+                config.FT['moveSinceLastChange'][ia] = move[ia]
+            
+    # If there is no jump, the increment is normalised by the maximal authorized velocity
+    if not change:
+        move = move / np.ptp(move) * config.FT['maxVelocity']
+        config.FT['moveSinceLastChange'] += move  
+    
+    return move
+    
+    # for ia in range(NA):
+    
+    #     it_last=config.FT['it_last'][ia]; eps=config.FT['eps'][ia]
+    #     nbChanges = config.FT['nbChanges'][ia]
+        
+    #     # Temps avant saut de frange
+    #     sweep = config.FT['sweep0']*config.FT['commonRatio']**nbChanges
+        
+    #     # Temps passé depuis dernier saut.
+    #     time_since_last_change = (it-it_last)*config.dt
+        
+    #     change=False
+    #     if time_since_last_change < sweep:  # Pas de saut
+    #         move[ia] = eps*v[ia]
+            
+    #         # Cophased telescopes remain together when jumping
+    #         tel=ia+1
+    #         for igroup in range(nbOfGroups):
+    #             group = coherentGroups[igroup]
+    #             if isinstance(group,list):
+    #                 if tel in group:
+    #                     move[ia] = eps*v_modified[igroup]
+    #             elif isinstance(group,float):
+    #                 if tel == group:
+    #                     move[ia] = eps*v_modified[igroup]
+            
+    #     else:   # Saut 
+    #         change=True
+    #         config.FT['eps'][ia] = -config.FT['eps'][ia]
+    #         config.FT['it_last'][ia] = it
+    #         config.FT['nbChanges'][ia] += 1
+    #         move[ia] = -config.FT['moveSinceLastChange'][ia]   # Cancel all moves you did since last change on telescope ia
+            
+    #         # Cophased telescopes remain together when jumping
+    #         tel=ia+1
+    #         for CophasedGroup in coherentGroups:
+    #             l = [move[ia-1] for ia in CophasedGroup]
+    #             generalmove = l[0]  #max(set(l), key = l.count)
+                
+    #             if tel in CophasedGroup:
+    #                 move[ia] = generalmove
+                    
+    #         # Add some covering to prevent from missing fringes
+    #         if np.abs(move[ia]) < 2*covering:
+    #             coveringtemp = 0
+    #         else:
+    #             coveringtemp = covering
+                
+    #         if move[ia] > 0:
+    #             move[ia] -= coveringtemp
+    #         if move[ia] < 0:
+    #             move[ia] += coveringtemp
+                
+    #         coveringtemp = covering
+            
+    #         # Starts the new accumulation of commands until next change
+    #         config.FT['moveSinceLastChange'][ia] = move[ia]
+            
+    
+    # if not change: # If there is no jump, the increment is normalised by the maximal authorized velocity
+    #     move = move / np.ptp(move) * config.FT['maxVelocity']
+    #     config.FT['moveSinceLastChange'] += move  
+    
+    
+    # return move
 
 
 def relockfunction_incind(it):
@@ -2055,7 +2264,7 @@ def relockfunction_incind(it):
         if time_since_last_change < sweep:
             change=False
             usaw[ia] = eps
-            config.FT['LastPosition'][ia]+=eps
+            config.FT['moveSinceLastChange'][ia]+=eps
             
         else:
             change=True
@@ -2064,12 +2273,12 @@ def relockfunction_incind(it):
             
             # la fonction usaw prend la valeur qu'elle avait avant le précédent
             # saut.
-            usaw[ia] = -config.FT['LastPosition'][ia]
+            usaw[ia] = -config.FT['moveSinceLastChange'][ia]
             config.FT['it_last'][ia] = it_last
-            config.FT['LastPosition'][ia]=-config.FT['LastPosition'][ia]
+            config.FT['moveSinceLastChange'][ia]=-config.FT['moveSinceLastChange'][ia]
             
         config.FT['eps'][ia] = eps
-    print(config.FT['LastPosition'])
+    print(config.FT['moveSinceLastChange'])
     print(usaw)
         
     return usaw, change
