@@ -1694,8 +1694,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                 continue
 
             obs = getattr(outputs, obsName)
-                
             obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+            
+            if "command".casefold() in obsName.casefold():
+                obs = obs[:-1] ; obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
             
             generaltitle = obsName
             obsType = obsName
@@ -1713,13 +1715,6 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             elif ("opd".casefold() in obsName.casefold())\
                 or ("snr".casefold() in obsName.casefold()):
                 display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
-                                          obsName=obsName,
-                                          display=display,filename=filename,ext='pdf',infos={"details":''},
-                                          verbose=verbose)
-                
-            elif "Command".casefold() in obsName.casefold():
-                obs = obs[:-1] ; obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-                display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
                                           obsName=obsName,
                                           display=display,filename=filename,ext='pdf',infos={"details":''},
                                           verbose=verbose)

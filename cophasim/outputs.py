@@ -151,6 +151,7 @@ IgdRank =np.ones([NT])                              # Rank of the weighting matr
 time_since_loss=np.zeros(NT)                        # Time since the loss of one telescope
 NoPhotometryFiltration = np.zeros([NT,NA,NA])       # Matrix that filters telescopes which have no photometry
 LostTelescopes = np.zeros([NT,NA])                  # Lost telescopes
+LostBaselines = np.zeros([NT,NINmes])               # Lost baselines
 noSignal_on_T = np.zeros([NT,NA])                   # No photometry on telescopes
 
 Is = np.ones([NT,NA,NA])
@@ -204,6 +205,7 @@ varPD = np.zeros([NT,NINmes])
 varGDUnbiased = np.zeros([NT,NINmes])
 varNum2 = np.zeros([NT,MW,NINmes])
 LossDueToInjection = np.zeros(NT)
+TelescopesThatNeedARestart = np.zeros([NT,NA])
 eps = np.zeros([NT,NA])
 it_last = np.zeros([NT,NA])
 last_usaw = np.zeros([NT,NA])

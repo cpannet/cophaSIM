@@ -25,7 +25,7 @@ from . import config
 
 def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0, 
             Ngd=40, Nsnr=40, roundGD='round', Ncross=1,
-            relock=True,SMdelay=1e3, sweep30s=10, maxVelocity=0.300, searchMinGD=500,
+            relock=True,SMdelay=1e3, sweep30s=10, maxVelocity=0.100, searchMinGD=500,
             sweepRelock=20,commonRatioRelock=1.2, coveringRelock=10,vfactorsRelock = [],
             sweepSearch=4000,commonRatioSearch=1, coveringSearch=40,vfactorsSearch=[],
             searchThreshGD=3,Nsearch=50,searchSNR='gd',searchSnrThreshold=2,
@@ -184,6 +184,7 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         config.FT['search'] = search            # If True, the simulation begins with SEARCH state. If False, no SEARCH state, directly TRACK state."
         config.FT['SMdelay'] = SMdelay          # Waiting time before launching relock
         config.FT['sweep30s'] = sweep30s        # Sweep at 30s in seconds
+        config.FT['maxVelocity'] = maxVelocity        # Sweep at 30s in seconds
         config.FT['sweepRelock'] = sweepRelock            # Starting sweep in seconds
         config.FT['commonRatioRelock'] = commonRatioRelock  # Common ratio of the geometrical sequence
         config.FT['coveringRelock'] = coveringRelock        # Covering of the sawtooth function in microns
@@ -1190,7 +1191,7 @@ def CommandCalc(CfPD,CfGD):
     
     
     if NotCophased and config.FT['relock']:
-        outputs.time_since_loss[it]=outputs.time_since_loss[it-1]+config.dt
+        outputs.time_since_loss[it] = outputs.time_since_loss[it-1]+config.dt
         
         # FringeLost = (NotCophased and (IgdRank<np.linalg.matrix_rank(outputs.Igd[it-1]))
         # This situation could pose a problem but we don't manage it yet        
@@ -1213,11 +1214,14 @@ def CommandCalc(CfPD,CfGD):
                     isolatedTels.remove(iap)
                     
             coherentGroups = JoinOnCommonElements(coherentPairs)
-            print("Coherent:",coherentGroups,"; Isolated:", isolatedTels)
             
             # Fringe loss
+            outputs.LostBaselines[it] = (np.diag(outputs.Igd[it])==0)*1
             outputs.LostTelescopes[it] = (np.diag(Igdna) == 0)*1      # The positions of the lost telescopes get 1.
             # WeLostANewTelescope = (sum(newLostTelescopes) > 0)
+            if (outputs.LostBaselines[it] != outputs.LostBaselines[it-1]).any() \
+                and (outputs.LostTelescopes[it] != outputs.LostTelescopes[it-1]).any():
+                    print("Time:",it*config.dt,"ms; Coherent:",coherentGroups,"; Isolated:", isolatedTels)
             
             # Photometry loss
             outputs.noSignal_on_T[it] = 1*(outputs.SNRPhotometry[it] < config.FT['ThresholdPhot'])
@@ -1227,16 +1231,22 @@ def CommandCalc(CfPD,CfGD):
             
             if not outputs.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
                 config.FT['state'][it] = 1
-                
+                # nbFrameBeforeRestart = int(config.FT['SMdelay']/config.dt)
+                # newLostTelescopes = (outputs.LostTelescopes[it-nbFrameBeforeRestart] == 0 * (outputs.LostTelescopes[it-nbFrameBeforeRestart+1:] == 1).all(axis=0))
                 newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
                 TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
                 # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
                 
                 TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
+                outputs.TelescopesThatNeedARestart[it] = np.ones(NA)*(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
                 
                 # Null the value of the accumulative element that handle sawtooth jumps
                 if len(TelescopesThatNeedARestart):
                     config.FT['moveSinceLastChange'][TelescopesThatNeedARestart] = 0
+                    # config.FT['eps'][TelescopesThatNeedARestart] = 1
+                    # config.FT['it0'][TelescopesThatNeedARestart] = it
+                    # config.FT['it_last'][TelescopesThatNeedARestart] = it
+                    # config.FT['nbChanges'][TelescopesThatNeedARestart] = 0
                     
                 if config.FT['state'][it-1] != 1:
                     config.FT['eps'] = np.ones(NA)
@@ -2075,50 +2085,58 @@ def relockfunction_230515(it, v, covering, coherentGroups, isolatedTels):
         group = allGroups[iGroup]
         
         if isinstance(group,list):
+            ia0 = group[0]
+
+            it_last=config.FT['it_last'][ia0]; eps=config.FT['eps'][ia0]
+            nbChanges = config.FT['nbChanges'][ia0]
             
-            for ia in group:
+            # Temps avant saut de frange
+            sweep = config.FT['sweep0']*config.FT['commonRatio']**nbChanges
             
-                it_last=config.FT['it_last'][ia]; eps=config.FT['eps'][ia]
-                nbChanges = config.FT['nbChanges'][ia]
+            # Temps passé depuis dernier saut.
+            time_since_last_change = (it-it_last)*config.dt
+            
+            change=False
+            if time_since_last_change < sweep:  # Pas de saut
+                move[ia0] = eps*v_groups[iGroup]
                 
-                # Temps avant saut de frange
-                sweep = config.FT['sweep0']*config.FT['commonRatio']**nbChanges
+            else:   # Saut 
+                change=True
+                config.FT['eps'][ia0] = -config.FT['eps'][ia0]
+                config.FT['it_last'][ia0] = it
+                config.FT['nbChanges'][ia0] += 1
+                move[ia0] = -config.FT['moveSinceLastChange'][ia0]   # Cancel all moves you did since last change on telescope ia
                 
-                # Temps passé depuis dernier saut.
-                time_since_last_change = (it-it_last)*config.dt
-                
-                change=False
-                if time_since_last_change < sweep:  # Pas de saut
-                    move[ia] = eps*v_groups[iGroup]
-                    
-                else:   # Saut 
-                    change=True
-                    config.FT['eps'][ia] = -config.FT['eps'][ia]
-                    config.FT['it_last'][ia] = it
-                    config.FT['nbChanges'][ia] += 1
-                    move[ia] = -config.FT['moveSinceLastChange'][ia]   # Cancel all moves you did since last change on telescope ia
-                    
-                    # Cophased telescopes remain together when jumping
-                    if ia != group[0]:
-                        ia0 = group[0]
-                        move[ia] = move[ia0] # All telescopes of the group follow the first one.
-                            
-                    # Add some covering to prevent from missing fringes
-                    if np.abs(move[ia]) < 2*covering:
-                        coveringtemp = 0
-                    else:
-                        coveringtemp = covering
+                # # Cophased telescopes remain together when jumping
+                # if ia != group[0]:
+                #     ia0 = group[0]
+                #     # All telescopes of the group follow the first one.
+                #     move[ia] = move[ia0]
                         
-                    if move[ia] > 0:
-                        move[ia] -= coveringtemp
-                    if move[ia] < 0:
-                        move[ia] += coveringtemp
-                        
+                # Add some covering to prevent from missing fringes
+                if np.abs(move[ia0]) < 2*covering:
+                    coveringtemp = 0
+                else:
                     coveringtemp = covering
                     
-                    # Starts the new accumulation of commands until next change
-                    config.FT['moveSinceLastChange'][ia] = move[ia]
+                if move[ia0] > 0:
+                    move[ia0] -= coveringtemp
+                if move[ia0] < 0:
+                    move[ia0] += coveringtemp
+                    
+                coveringtemp = covering
+                
+                # Starts the new accumulation of commands until next change
+                config.FT['moveSinceLastChange'][ia0] = move[ia0]
             
+            for ia in group[1:]:
+                config.FT['eps'][ia] = config.FT['eps'][ia0]
+                config.FT['it_last'][ia] = config.FT['it_last'][ia0]
+                config.FT['nbChanges'][ia] = config.FT['nbChanges'][ia0]
+                config.FT['moveSinceLastChange'][ia] = config.FT['moveSinceLastChange'][ia0]
+                move[ia] = move[ia0]
+                
+                    
         else:
             ia = group
             
