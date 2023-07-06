@@ -2672,11 +2672,11 @@ def setaxelim(ax, xdata=[],ydata=[],xmargin=0.1,ymargin=0.1, ylim_min=[0,0], **k
         
     if len(ydata):
         if not 'ymin' in kwargs.keys():
-            ymin = (1+ymargin)*np.min(ydata)
+            ymin = np.min(ydata) - ymargin * np.abs(np.min(ydata))
         else:
             ymin=kwargs['ymin']
         
-        ymax = (1+ymargin)*np.max(ydata)
+        ymax = np.max(ydata) + ymargin*np.abs(np.max(ydata))
         
         ydown_min, yup_min = ylim_min
         if yup_min !=0:

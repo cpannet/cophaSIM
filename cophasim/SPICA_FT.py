@@ -31,7 +31,7 @@ def SPICAFT(*args, init=False, search=False, update=False, GainPD=0, GainGD=0,
             searchThreshGD=3,Nsearch=50,searchSNR='gd',searchSnrThreshold=2,
             CPref=True, BestTel=2, Ncp = 300, Nvar = 5, stdPD=0.07,stdGD=0.14,stdCP=0.07,
             cmdOPD=True, switch=1, continu=True,whichSNR='gd',
-            ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 2,ThresholdRELOCK=2,ratioThreshold=0.2,
+            ThresholdGD=2, ThresholdPD = 1.5, ThresholdPhot = 0.1,Nflux=100,ThresholdRELOCK=2,ratioThreshold=0.2,
             Threshold=True, useWmatrices=True,
             latencytime=1,usecupy=False, verbose=False,
             **kwargs_for_update):
@@ -219,7 +219,7 @@ I set ThresholdRELOCK to the {NINmes} first values."))
         # config.FT['it0'] = 0
         # config.FT['eps'] = 1
         
-        
+        config.FT['Nflux'] = Nflux                      # Length of flux average window
         config.FT['ThresholdPhot'] = ThresholdPhot      # Minimal photometry SNR for launching relock
 
         if (len(vfactorsRelock) == 0) and (len(vfactorsRelock) == NA):
@@ -403,7 +403,7 @@ def SearchState(coherentGroups=[]):
         config.FT['state'][it+1] = 2    # Remain in SEARCH state
         
         # newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
-        # TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
+        # TelescopesThatGotBackPhotometry = (outputs.noSignalOnTel[it-1] - outputs.noSignalOnTel[it] == 1)
         # # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
         
         # TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
@@ -420,7 +420,7 @@ def SearchState(coherentGroups=[]):
         Increment = relockfunction_inc_sylvain_gestioncophased(it, config.FT['vfactorsSearch'], config.FT['covering'], coherentGroups)
     
         #You should send command only on telescope with flux
-        #outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
+        #outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignalOnTel[it])
         #Increment = np.dot(outputs.NoPhotometryFiltration[it],Increment)
         outputs.CommandSearch[it+1] = outputs.CommandSearch[it] + Increment
         
@@ -532,7 +532,7 @@ def SearchState2(coherentGroups=[]):
         Sdag = np.zeros([NA,NA])
         Sdag[reliablepistons,reliablepistons] = 1/S[reliablepistons]
         
-        # Come back to the OPD-space        
+        # Come back to the OPD-space
         VSdagUt = np.dot(V, np.dot(Sdag,Ut))
         
         Igd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], np.diag(FT['globalMaximumSnr']))))
@@ -542,13 +542,16 @@ def SearchState2(coherentGroups=[]):
         for ib in range(NINmes):
             FT['expectedOffsetsExplored'][ib] = ((FT['expectedOffsets'][ib] <= outputs.offsetsEvolution[ib]).any()\
                                                         and (FT['expectedOffsets'][ib] >= outputs.offsetsEvolution[ib]).any())
-        allExpectedOffsetsExplored = FT['expectedOffsetsExplored'].all()
         
+        """
+        # Version that waits for all telescopes to be found before cophasing
+        
+        allExpectedOffsetsExplored = FT['expectedOffsetsExplored'].all()
         if allExpectedOffsetsExplored:  # We stop the scan since all offsets have been explored
             keepScanning = False
             
             # Update SNR thresholds
-            newThresholdGD = np.ones(NINmes)*FT['searchSnrThreshold']
+            newThresholdGD = np.ones(NINmes)*FT['ThresholdGD']
             for ib in range(NINmes):
                 if FT['globalMaximumSnr'][ib]:
                     newThresholdGD[ib] = FT['secondMaximumSnr'][ib] + FT['ratioThreshold']*(FT['globalMaximumSnr'][ib]-FT['secondMaximumSnr'][ib])
@@ -556,6 +559,17 @@ def SearchState2(coherentGroups=[]):
         
         else:   # Keep scanning until exploring the expected offsets of all baselines
             keepScanning = True
+            
+        """
+        
+        keepScanning = False
+        
+        # Update SNR thresholds
+        newThresholdGD = np.ones(NINmes)*FT['ThresholdGD']
+        for ib in range(NINmes):
+            if FT['globalMaximumSnr'][ib]:
+                newThresholdGD[ib] = FT['secondMaximumSnr'][ib] + FT['ratioThreshold']*(FT['globalMaximumSnr'][ib]-FT['secondMaximumSnr'][ib])
+        sk.updateFTparams(ThresholdGD=newThresholdGD, verbose=True)            
         
     else:   # Not enough independant baselines found, so keep scanning
         keepScanning = True
@@ -715,16 +729,25 @@ def getGlobalMaximum(snrEvolution, offsetsEvolution, distance):
     
     localMaximaOffsets = np.array(offsetsEvolution)[peaks]
     
+    # If a maximum is surrounded by two lower maxima, it's the global maximum.
+    if (localMaximaSnr[-2] > localMaximaSnr[-3]) and (localMaximaSnr[-2] > localMaximaSnr[-1]):
+        globalMaximumSnr = localMaximaSnr[-2]
+        globalMaximumOffsets = localMaximaOffsets[-2]
+        secondMaximumSnr = np.max([localMaximaSnr[-3],localMaximaSnr[-1]])
+
+    """
     # Compute the first derivative of the localMaxima
     localMaximaSnrDeriv = np.gradient(localMaximaSnr)
     
     # If the derivative changes of sign, it means we reached the global maximum
     if not ((localMaximaSnrDeriv>=0).all() or (localMaximaSnrDeriv<0).all()):
         globalMaximumIndex = np.argmax(localMaximaSnr)
-        globalMaximumSnr = localMaximaSnr[globalMaximumIndex]
-        globalMaximumOffsets = localMaximaOffsets[globalMaximumIndex]
-        
-        secondMaximumSnr = np.max([localMaximaSnr[globalMaximumIndex+1],localMaximaSnr[globalMaximumIndex-1]])
+        if globalMaximumIndex == len(localMaximaSnr)-2:
+            globalMaximumSnr = localMaximaSnr[globalMaximumIndex]
+            globalMaximumOffsets = localMaximaOffsets[globalMaximumIndex]
+            
+            secondMaximumSnr = np.max([localMaximaSnr[globalMaximumIndex+1],localMaximaSnr[globalMaximumIndex-1]])
+    """
     
     if globalMaximumSnr < config.FT['searchSnrThreshold']:
         globalMaximumSnr, globalMaximumOffsets, secondMaximumSnr = 0,0,0
@@ -779,8 +802,19 @@ def ReadCf(currCfEstimated):
             
     # Save coherent flux and photometries in stack
     outputs.PhotometryEstimated[it] = PhotEst
-
-        
+    
+    Nflux = config.FT['Nflux']
+    if it < Nflux:
+        Nflux=it+1
+    timerange = range(it-Nflux,it)
+    for ia in range(NA):
+        # Test if there were flux in the Nf last frames, before updating the average
+        thereIsFlux = not outputs.noFlux[timerange,ia].any()
+        if thereIsFlux:
+            outputs.PhotometryAverage[it,ia] = np.mean(outputs.PhotometryEstimated[timerange,:,ia])
+        else:
+            outputs.PhotometryAverage[it,ia] = outputs.PhotometryAverage[it-1,ia]
+            
     """
     Visibilities extraction
     [NT,MW,NIN]
@@ -882,35 +916,7 @@ def CommandCalc(CfPD,CfGD):
         Nsnr = it+1
     
     Ncross = config.FT['Ncross']  # Distance between wavelengths channels for GD calculation
-    R = config.FS['R']
-    
-    """
-    Signal-to-noise ratio of the fringes ("Phase variance")
-    The function getvar saves the inverse of the squared SNR ("Phase variance")
-    in the global stack variable varPD [NT, MW, NIN]
-    Eq. 12, 13 & 14
-    """
-
-    varcurrPD, varcurrGD = getvar()
-    outputs.SquaredSnrPD[it] = np.nan_to_num(1/varcurrPD)
-    outputs.SquaredSnrGD[it] = np.nan_to_num(1/varcurrGD)
-    outputs.SquaredSnrGDUnbiased[it] = np.nan_to_num(1/outputs.varGDUnbiased[it])
-    
-    timerange = range(it+1-Nsnr, it+1)
-    outputs.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(outputs.varPD[timerange], axis=0))
-    outputs.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(outputs.varGD[timerange], axis=0))
-    outputs.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(outputs.varGDUnbiased[timerange], axis=0))
-    
-    outputs.TemporalVariancePD[it] = np.var(outputs.PDEstimated[timerange], axis=0)
-    outputs.TemporalVarianceGD[it] = np.var(outputs.GDEstimated[timerange], axis=0)
-    
-    if config.FT['whichSNR'] == 'pd':
-        outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAveragePD[it]
-        outputs.SquaredSNR[it] = outputs.SquaredSnrPD[it]
-    else:
-        outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAverageGD[it]
-        outputs.SquaredSNR[it] = outputs.SquaredSnrGD[it]
-        
+    R = config.FS['R']        
     
     """
     SEARCH State
@@ -925,74 +931,7 @@ def CommandCalc(CfPD,CfGD):
         outputs.CommandSearch[it+1] = outputs.CommandSearch[it]
         uSearch = outputs.CommandSearch[it+1]
     
-    """
-    WEIGHTING MATRIX
-    """
-
-    if config.FT['useWmatrices']:
-        
-        # Raw Weighting matrix in the OPD-space
-        
-        reliablebaselines = (outputs.SquaredSNRMovingAverage[it] >= FT['ThresholdGD']**2)
-        
-        outputs.TrackedBaselines[it] = reliablebaselines
-        
-        Wdiag=np.zeros(NINmes)
-        if config.FT['whichSNR'] == 'pd':
-            Wdiag[reliablebaselines] = 1/varcurrPD[reliablebaselines]
-        else:
-            Wdiag[reliablebaselines] = 1/varcurrGD[reliablebaselines]
-            
-        W = np.diag(Wdiag)
-        # Transpose the W matrix in the Piston-space
-        MtWM = np.dot(FS['OPD2Piston_r'], np.dot(W,FS['Piston2OPD_r']))
-        
-        # Singular-Value-Decomposition of the W matrix
-        U, S, Vt = np.linalg.svd(MtWM)
-        
-        Ut = np.transpose(U)
-        V = np.transpose(Vt)
-        
-        """
-        GD weighting matrix
-        """
-        
-        reliablepistons = (S>1e-4)  #True at the positions of S verifying the condition
-        Sdag = np.zeros([NA,NA])
-        Sdag[reliablepistons,reliablepistons] = 1/S[reliablepistons]
-        
-        # Come back to the OPD-space        
-        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
-        
-        # Calculates the weighting matrix
-        currIgd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], W)))
     
-    
-        """
-        PD Weighting matrix
-        """
-
-        Sdag = np.zeros([NA,NA])
-        reliablepistons = (S >= config.FT['ThresholdPD']**2)
-        notreliable = (reliablepistons==False)
-        
-        diagS = np.zeros([NA])
-        diagS[reliablepistons] = 1/S[reliablepistons]
-        diagS[notreliable] = 0#S[notreliable]/FT['ThresholdPD']**4
-        Sdag = np.diag(diagS)
-        
-        # Come back to the OPD-space
-        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
-        
-        # Calculates the weighting matrix
-        currIpd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], W)))
-            
-    else:
-        currIgd = np.identity(NINmes)
-        currIpd = np.identity(NINmes)
-    
-    outputs.Igd[it,:,:] = currIgd
-    outputs.Ipd[it,:,:] = currIpd
         
     """
     Closure phase calculation
@@ -1104,9 +1043,12 @@ def CommandCalc(CfPD,CfGD):
     currGD = np.zeros(NINmes)
     for ib in range(NINmes):
         cfGDlmbdas = outputs.CfGD[it,:-Ncross,ib]*np.conjugate(outputs.CfGD[it,Ncross:,ib])
-        cfGDmoy = np.sum(cfGDlmbdas)
+        # outputs.CfGDlmbdas[it,:,ib] = cfGDlmbdas
         
-        currGD[ib] = np.angle(cfGDmoy*np.exp(-1j*outputs.GDref[it,ib]))
+        cfGDmoy = np.mean(cfGDlmbdas)*np.exp(-1j*outputs.GDref[it,ib])
+        outputs.CfGDMeanOverLmbda[it,ib] = cfGDmoy
+        
+        currGD[ib] = np.angle(cfGDmoy)
         # currGD[ib] = np.angle(cfGDmoy*np.conj(outputs.CfGDref[it,ib])*np.conj(outputs.CfPDref[it,ib]**(1/config.FS['R'])))*ich_pos[ib]
 
     outputs.PDEstimated[it] = currPD
@@ -1176,6 +1118,107 @@ def CommandCalc(CfPD,CfGD):
 
     
     """
+    Signal-to-noise ratio of the fringes ("Phase variance")
+    The function getvar saves the inverse of the squared SNR ("Phase variance")
+    in the global stack variable varPD [NT, MW, NIN]
+    Eq. 12, 13 & 14
+    """
+
+    varcurrPD, varcurrGD = getvar()
+    outputs.SquaredSnrPD[it] = np.nan_to_num(1/varcurrPD)
+    outputs.SquaredSnrGD[it] = np.nan_to_num(1/varcurrGD)
+    outputs.SquaredSnrGDUnbiased[it] = np.nan_to_num(1/outputs.varGDUnbiased[it])
+    
+    timerange = range(it+1-Nsnr, it+1)
+    outputs.SquaredSNRMovingAveragePD[it] = np.nan_to_num(1/np.mean(outputs.varPD[timerange], axis=0))
+    outputs.SquaredSNRMovingAverageGD[it] = np.nan_to_num(1/np.mean(outputs.varGD[timerange], axis=0))
+    outputs.SquaredSNRMovingAverageGDUnbiased[it] = np.nan_to_num(1/np.mean(outputs.varGDUnbiased[timerange], axis=0))
+    outputs.SquaredSNRMovingAverageGDnew[it] = np.nan_to_num(1/np.mean(outputs.varGDnew[timerange], axis=0))
+    
+    outputs.TemporalVariancePD[it] = np.var(outputs.PDEstimated[timerange], axis=0)
+    timerange = range(it+1-Nsnr, it+1)
+    outputs.TemporalVarianceGD[it] = np.var(outputs.GDEstimated[timerange], axis=0)
+    
+    if config.FT['whichSNR'] == 'pd':
+        outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAveragePD[it]
+        outputs.SquaredSNR[it] = outputs.SquaredSnrPD[it]
+    else:
+        outputs.SquaredSNRMovingAverage[it] = outputs.SquaredSNRMovingAverageGD[it]
+        outputs.SquaredSNR[it] = outputs.SquaredSnrGD[it]
+
+    
+    
+    """
+    WEIGHTING MATRIX
+    """
+
+    if config.FT['useWmatrices']:
+        
+        # Raw Weighting matrix in the OPD-space
+        
+        reliablebaselines = (outputs.SquaredSNRMovingAverage[it] >= FT['ThresholdGD']**2)
+        
+        outputs.TrackedBaselines[it] = reliablebaselines
+        
+        Wdiag=np.zeros(NINmes)
+        if config.FT['whichSNR'] == 'pd':
+            Wdiag[reliablebaselines] = 1/varcurrPD[reliablebaselines]
+        else:
+            Wdiag[reliablebaselines] = 1/varcurrGD[reliablebaselines]
+            
+        W = np.diag(Wdiag)
+        # Transpose the W matrix in the Piston-space
+        MtWM = np.dot(FS['OPD2Piston_r'], np.dot(W,FS['Piston2OPD_r']))
+        
+        # Singular-Value-Decomposition of the W matrix
+        U, S, Vt = np.linalg.svd(MtWM)
+        
+        Ut = np.transpose(U)
+        V = np.transpose(Vt)
+        
+        """
+        GD weighting matrix
+        """
+        
+        reliablepistons = (S>1e-4)  #True at the positions of S verifying the condition
+        Sdag = np.zeros([NA,NA])
+        Sdag[reliablepistons,reliablepistons] = 1/S[reliablepistons]
+        
+        # Come back to the OPD-space        
+        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
+        
+        # Calculates the weighting matrix
+        currIgd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], W)))
+    
+    
+        """
+        PD Weighting matrix
+        """
+
+        Sdag = np.zeros([NA,NA])
+        reliablepistons = (S >= config.FT['ThresholdPD']**2)
+        notreliable = (reliablepistons==False)
+        
+        diagS = np.zeros([NA])
+        diagS[reliablepistons] = 1/S[reliablepistons]
+        diagS[notreliable] = 0#S[notreliable]/FT['ThresholdPD']**4
+        Sdag = np.diag(diagS)
+        
+        # Come back to the OPD-space
+        VSdagUt = np.dot(V, np.dot(Sdag,Ut))
+        
+        # Calculates the weighting matrix
+        currIpd = np.dot(FS['Piston2OPD_r'],np.dot(VSdagUt,np.dot(FS['OPD2Piston_r'], W)))
+            
+    else:
+        currIgd = np.identity(NINmes)
+        currIpd = np.identity(NINmes)
+    
+    outputs.Igd[it,:,:] = currIgd
+    outputs.Ipd[it,:,:] = currIpd
+
+
+    """
     RELOCK state
     """
     
@@ -1224,17 +1267,22 @@ def CommandCalc(CfPD,CfGD):
                     print("Time:",it*config.dt,"ms; Coherent:",coherentGroups,"; Isolated:", isolatedTels)
             
             # Photometry loss
-            outputs.noSignal_on_T[it] = 1*(outputs.SNRPhotometry[it] < config.FT['ThresholdPhot'])
+            # We consider that flux is lost if the estimated flux is lower than a fraction of the average flux.
+            # Parameter is the float config.FT['ThresholdPhot'].
+            outputs.noFlux[it] = 1*(np.mean(outputs.PhotometryEstimated[it,:,:],axis=0) < config.FT['ThresholdPhot']*outputs.PhotometryAverage[it])
                 
-            comparison = (outputs.noSignal_on_T[it] == outputs.LostTelescopes[it])
-            outputs.LossDueToInjection[it] = (comparison.all() and sum(outputs.noSignal_on_T[it])>1)       # Evaluates if the two arrays are the same
+            outputs.noSignalOnTel[it] = outputs.noFlux[timerange].all(axis=0)
+            
+            # Evaluates if the two arrays are the same
+            comparison = (outputs.noSignalOnTel == outputs.LostTelescopes[it])
+            outputs.LossDueToInjection[it] = (comparison.all() and outputs.noSignalOnTel[it].any()) 
             
             if not outputs.LossDueToInjection[it]:     # The fringe loss is not due to an injection loss
                 config.FT['state'][it] = 1
                 # nbFrameBeforeRestart = int(config.FT['SMdelay']/config.dt)
                 # newLostTelescopes = (outputs.LostTelescopes[it-nbFrameBeforeRestart] == 0 * (outputs.LostTelescopes[it-nbFrameBeforeRestart+1:] == 1).all(axis=0))
                 newLostTelescopes = (outputs.LostTelescopes[it] - outputs.LostTelescopes[it-1] == 1)
-                TelescopesThatGotBackPhotometry = (outputs.noSignal_on_T[it-1] - outputs.noSignal_on_T[it] == 1)
+                TelescopesThatGotBackPhotometry = (outputs.noSignalOnTel[it] - outputs.noSignalOnTel[it-1] == 1)
                 # WeGotBackPhotometry = (sum(TelescopesThatGotBackPhotometry) > 0)
                 
                 TelescopesThatNeedARestart = np.argwhere(newLostTelescopes + TelescopesThatGotBackPhotometry > 0)
@@ -1260,7 +1308,7 @@ def CommandCalc(CfPD,CfGD):
                 Increment = relockfunction_230515(it, Velocities, config.FT['covering'], coherentGroups, isolatedTels)
             
                 #You should send command only on telescope with flux
-                outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignal_on_T[it])
+                outputs.NoPhotometryFiltration[it] = np.identity(NA) - np.diag(outputs.noSignalOnTel[it])
                 
                 Increment = np.dot(outputs.NoPhotometryFiltration[it],Increment)
                 
@@ -1528,6 +1576,7 @@ def getvar():
     varX = np.abs(diagCovar[timerange,:,NA:NA+NINmes])
     varY = np.abs(diagCovar[timerange,:,NA+NINmes:])
     varNum = np.mean(varX+varY,axis=0)
+    
     # for ia in range(NA):
     #     ibp = ia*(NA+1)
     #     varPhot[:,ia] = outputs.Covariance[it,:,ibp,ibp]       # Variance of photometry at each frame
@@ -1543,8 +1592,10 @@ def getvar():
     CohFlux = np.mean(outputs.CfPD[timerange], axis=0)
     CfSumOverLmbda = np.sum(CohFlux,axis=0)
     
+    
     outputs.varGDdenom[it] = np.sum(np.real(CohFlux*np.conj(CohFlux)),axis=0)  # Sum over lambdas of |CohFlux|² (modified eq.14)
     outputs.varGDdenomUnbiased[it] = np.sum(np.real(CohFlux*np.conj(CohFlux))-outputs.BiasModCf[it],axis=0)  # Sum over lambdas of |CohFlux|²
+    
     outputs.varPDdenom[it] = np.real(CfSumOverLmbda*np.conj(CfSumOverLmbda))#-np.mean(outputs.BiasModCf[it],axis=0)) # Original eq.14    
     #outputs.varPDdenom2[it] = np.sum(np.mean(np.abs(outputs.CfPD[timerange])**2,axis=0),axis=0)
     outputs.varPDnum[it] = np.sum(varNum,axis=0)/2     # Sum over lmbdas of Variance of |CohFlux|
@@ -1553,7 +1604,12 @@ def getvar():
     outputs.varPD[it] = outputs.varPDnum[it]/outputs.varPDdenom[it]      # Var(|CohFlux|)/|CohFlux|²
     outputs.varGD[it] = outputs.varPDnum[it]/outputs.varGDdenom[it]
     
-    outputs.SNRPhotometry[it,:] = np.sum(outputs.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
+    varNumGD = np.mean(varX+varY,axis=0)**2
+    varNumGDMeanOverLmbda = np.mean(varNumGD)
+    CfGDSquaredNorm = np.real(outputs.CfGDMeanOverLmbda[it]*np.conj(outputs.CfGDMeanOverLmbda[it]))  # Sum over lambdas of |CohFlux|² (modified eq.14)
+    outputs.varGDnew[it] = varNumGDMeanOverLmbda/CfGDSquaredNorm
+    
+    # outputs.SNRPhotometry[it,:] = np.sum(outputs.PhotometryEstimated[it,:],axis=0)/np.sqrt(np.sum(varPhot,axis=0))
     
     varPD = outputs.varPD[it]
     varGD = outputs.varGD[it]
@@ -2079,7 +2135,6 @@ def relockfunction_230515(it, v, covering, coherentGroups, isolatedTels):
     allGroups = coherentGroups + isolatedTels
     nbOfGroups = len(allGroups)
     v_groups = np.arange(nbOfGroups) - nbOfGroups/2
-    
     
     for iGroup in range(nbOfGroups):
         group = allGroups[iGroup]

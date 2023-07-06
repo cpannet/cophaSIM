@@ -36,7 +36,8 @@ CfEstimated = np.zeros([NT, MW, NBmes])*1j          # Estimated coherent flux
 
 """Coherent flux [NIN]""" # Only purely coherent flux
 CfPD = np.zeros([NT, MW, NINmes])*1j                # Dispersion corrected coherent flux
-CfGD = np.zeros([NT, MW, NINmes])*1j                # GD coherent flux
+CfGD = np.zeros([NT, MW, NINmes])*1j                # Coherent flux for GD calculation
+CfGDMeanOverLmbda = np.zeros([NT, NINmes])*1j       # GD coherent flux
 SquaredCoherenceDegree = np.zeros([NT, MW, NINmes]) # Estimated coherence degree \    
 VisibilityEstimated = np.zeros([NT, MW, NINmes])*1j # Estimated fringe visibility \    
 VisibilityTrue = np.zeros([NT, MW, NIN])*1j         # True expected fringe visibility \    
@@ -82,6 +83,7 @@ CfGDref = np.ones([NT,NINmes])+0j                   # Phasor of the GDref vector
 # Noise estimations
 varPD = np.zeros([NT,NINmes])                       # Estimated "PD variance" = 1/SNR²
 varGD = np.zeros([NT,NINmes])                       # Estimated "GD variance" = 1/SNR²
+varGDnew = np.zeros([NT,NINmes])                    # Estimated "GD variance" (squared numerator)
 
 SquaredSNRMovingAverage = np.zeros([NT,NINmes])     # Estimated SNR² averaged over N dit
 SquaredSNR = np.zeros([NT,NINmes])                  # Estimated instantaneous SNR²
@@ -97,8 +99,8 @@ GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
 diffOffsets = np.zeros([NT,NINmes])                 # Differential offsets (p1-p2) where the fringes are found
 diffOffsets_best = np.zeros([NT,NINmes])
 SearchSNR = np.zeros([NT,NINmes])                   # Differential offsets (p1-p2) where the fringes are found
-snrEvolution = [[]]*NINmes                 # Will be reshaped (increased) by SEARCH state
-offsetsEvolution = [[]]*NINmes             # Will be reshaped (increased) by SEARCH state
+snrEvolution = [[]]*NINmes                          # Will be reshaped (increased) by SEARCH state
+offsetsEvolution = [[]]*NINmes                      # Will be reshaped (increased) by SEARCH state
 globalMaximumSnr = np.zeros([NT,NINmes])
 globalMaximumOffset = np.zeros([NT,NINmes])
 secondMaximumSnr = np.zeros([NT,NINmes])
@@ -152,8 +154,9 @@ time_since_loss=np.zeros(NT)                        # Time since the loss of one
 NoPhotometryFiltration = np.zeros([NT,NA,NA])       # Matrix that filters telescopes which have no photometry
 LostTelescopes = np.zeros([NT,NA])                  # Lost telescopes
 LostBaselines = np.zeros([NT,NINmes])               # Lost baselines
-noSignal_on_T = np.zeros([NT,NA])                   # No photometry on telescopes
-
+noFlux = np.zeros([NT,NA])                          # No flux on telescopes
+noSignalOnTel = np.zeros([NT,NA])                   # No flux on telescopes since Nframes
+PhotometryAverage = np.zeros([NT,NA])               # Moving Average photometry (for photometry loss assumption)
 Is = np.ones([NT,NA,NA])
 rankIs = np.zeros(NT)
 Ws = np.zeros([NT,NINmes])
@@ -196,6 +199,7 @@ SquaredSNRMovingAveragePD = np.zeros([NT,NINmes])           # Averaged estimated
 SquaredSNRMovingAverageGD = np.zeros([NT,NINmes])           # Averaged estimated SNR GD
 
 SquaredSNRMovingAverageGDUnbiased = np.zeros([NT,NINmes])
+SquaredSNRMovingAverageGDnew = np.zeros([NT,NINmes])
 varPDnum = np.zeros([NT,NINmes])
 varPDnum2 = np.zeros([NT,NINmes])
 varPDdenom = np.zeros([NT,NINmes])

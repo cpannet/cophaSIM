@@ -76,7 +76,7 @@ latency = 1                 # Latency in number of frames
 
 """Fringe-tracker"""
 # will be completed by the fringe-tracker method.
-FT = {}
+FT = {'ThresholdGD':np.zeros(NIN), 'ThresholdPD':0}
     
 
 """Other parameters"""

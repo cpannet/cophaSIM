@@ -220,8 +220,8 @@ to {baselines[iLastBase]}")
     plt.rcParams.update(plt.rcParamsDefault)
 
 
-def simpleplot_bases(timestamps, obs,obsRms,generalTitle,plotObs,
-               obsName='PD [µm]',display=True,filename='',ext='pdf',infos={"details":''},
+def simpleplot_bases(timestamps, obs,obsHisto,generalTitle,plotObs,
+               obsName='PD [µm]',histoName='RMS',display=True,filename='',ext='pdf',infos={"details":''},
                verbose=False):
     """
     Each figure only shows up to 15 baselines, distributed on two subplots
@@ -236,7 +236,7 @@ def simpleplot_bases(timestamps, obs,obsRms,generalTitle,plotObs,
         DESCRIPTION.
     obs : TYPE
         DESCRIPTION.
-    obsRms : TYPE
+    obsHisto : TYPE
         DESCRIPTION.
     generalTitle : TYPE
         DESCRIPTION.
@@ -290,19 +290,25 @@ def simpleplot_bases(timestamps, obs,obsRms,generalTitle,plotObs,
         basecolors = colors[:len1]+colors[:len2]
         basecolors = np.array(basecolors)
     
-        rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
-        title=f'{generalTitle}: {rangeBases}'
+        oneAxe = False
+        if NbOfObsToPlot <= 6:
+            oneAxe=True
+    
+        if not oneAxe:
+            rangeBases = f"{baselines[iFirstBase]}-{baselines[iLastBase]}"
+            title=f'{generalTitle}: {rangeBases}'
+        else:
+            rangeBases = ""
+            title=generalTitle
+        
         plt.close(title)
         fig=plt.figure(title, clear=True)
     
         if len(infos["details"]):
             fig.suptitle(title)
+        
 
-        OneAxe = False
-        if NbOfObsToPlot <= 6:
-            OneAxe=True
-
-        if OneAxe:
+        if oneAxe:
             ax1,ax2 = fig.subplots(nrows=2,gridspec_kw={"height_ratios":[3,1]})
             basecolorstemp = basecolors[:NbOfObsToPlot]
             baselinestemp = [baselines[iBase] for iBase in plotObsIndex]
@@ -317,8 +323,7 @@ def simpleplot_bases(timestamps, obs,obsRms,generalTitle,plotObs,
                                color=basecolors[iColor], linestyle='dashed')
                 iColor+=1                
             
-            p1=ax2.bar(baselinestemp,[obsRms[iBase] for iBase in plotObsIndex], color=basecolorstemp)
-            
+            p1=ax2.bar(baselinestemp,[obsHisto[iBase] for iBase in plotObsIndex], color=basecolorstemp)
             ax2.set_box_aspect(1/20)
     
         else:
@@ -354,15 +359,14 @@ to {baselines[iLastBase]}")
 
                 iColor+=1
                 
-            p1=ax2.bar(baselines[FirstSet],obsRms[FirstSet], color=barbasecolors[:len1])
-            p2=ax4.bar(baselines[SecondSet],obsRms[SecondSet], color=barbasecolors[len1:])
+            p1=ax2.bar(baselines[FirstSet],obsHisto[FirstSet], color=barbasecolors[:len1])
+            p2=ax4.bar(baselines[SecondSet],obsHisto[SecondSet], color=barbasecolors[len1:])
             ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
-            ct.setaxelim(ax1, ydata=obs, ymargin=0.4,ymin=0)
+            ct.setaxelim(ax1, ydata=obs, ymargin=0.4)
             if 'pd'.casefold() in obsName.casefold():
                 ax4.set_ylim([0,wl])
             else:
-                ct.setaxelim(ax4, ydata=obsRms,ymin=0)
-                
+                ct.setaxelim(ax4, ydata=obsHisto,ymin=0)
             
             ax4.bar_label(p2,label_type='edge',fmt='%.2f')
             
@@ -371,13 +375,21 @@ to {baselines[iLastBase]}")
             ax4.set_anchor('S')
             ax2.set_box_aspect(1/6) ; ax4.set_box_aspect(1/6)
             
+        if obsIsSnr:
+            ct.setaxelim(ax1,ydata=[obs[:,iBase] for iBase in plotObsIndex],ymargin=0.2,ymin=0)
+        else:
+            print(NbOfObsToPlot)
+            ct.setaxelim(ax1,ydata=[obs[:,iBase] for iBase in plotObsIndex], ymargin=0.2)
+            # else:
+            #     print(plotObsIndex)
+            #     ct.setaxelim(ax1,ydata=obs[:,plotObsIndex[0]], ymargin=0.2)
+            # ct.setaxelim(ax1,ydata=obs, ymargin=0.2)
             
-        ct.setaxelim(ax1,ydata=[obs[:,iBase] for iBase in plotObsIndex])
-        ct.setaxelim(ax2,ydata=list(obsRms)+[wl/2], ymin=0)
+        ct.setaxelim(ax2,ydata=list(obsHisto)+[wl/2], ymin=0)
         ax1.legend(handles=linestyles)
         ax1.set_ylabel(obsName)
         ax1.set_xlabel("Time [ms]") ; 
-        ax2.set_ylabel('RMS')
+        ax2.set_ylabel(histoName)
         ax2.set_xlabel("Baselines") ; 
         ax2.set_anchor('S')
         
@@ -396,8 +408,8 @@ to {baselines[iLastBase]}")
                 plt.savefig(filename+f"_{rangeBases}.{ext}")
                 
                 
-def simpleplot_tels(timestamps, obs,obsRms,generalTitle,plotObs,
-               obsName='PD [µm]',display=True,filename='',ext='pdf',infos={"details":''},
+def simpleplot_tels(timestamps, obs,obsHisto,generalTitle,plotObs,
+               obsName='PD [µm]',histoName='RMS',display=True,filename='',ext='pdf',infos={"details":''},
                verbose=False):
     """
     Each figure only shows up to 10 telescopes, distributed on two subplots
@@ -412,7 +424,7 @@ def simpleplot_tels(timestamps, obs,obsRms,generalTitle,plotObs,
         DESCRIPTION.
     obs : TYPE
         DESCRIPTION.
-    obsRms : TYPE
+    obsHisto : TYPE
         DESCRIPTION.
     generalTitle : TYPE
         DESCRIPTION.
@@ -459,22 +471,23 @@ def simpleplot_tels(timestamps, obs,obsRms,generalTitle,plotObs,
         iFirstTel= NAdisp*iFig                         # Index of first baseline to display
         iLastTel= iFirstTel + NAtodisplay - 1          # Index of last baseline to display
         
-        
-    
-        rangeTels= f"{telescopes[iFirstTel]}-{telescopes[iLastTel]}"
-        title=f'{generalTitle}: {rangeTels}'
+        oneAxe = False
+        if NbOfObsToPlot <= 6:
+            oneAxe=True
+            
+        if not oneAxe:
+            rangeTels= f"{telescopes[iFirstTel]}-{telescopes[iLastTel]}"
+            title=f'{generalTitle}: {rangeTels}'
+        else:
+            title=generalTitle
+            
         plt.close(title)
         fig=plt.figure(title, clear=True)
     
         if len(infos["details"]):
             fig.suptitle(title)
 
-        OneAxe = False
-        if NbOfObsToPlot <= 6:
-            
-            OneAxe=True
-
-        if OneAxe:
+        if oneAxe:
             telcolors = colors[:NbOfObsToPlot]
             ax1,ax2 = fig.subplots(nrows=2,gridspec_kw={"height_ratios":[3,1]})
             telcolorstemp = telcolors[:NbOfObsToPlot]
@@ -485,7 +498,7 @@ def simpleplot_tels(timestamps, obs,obsRms,generalTitle,plotObs,
                 ax1.plot(timestamps,obs[:,iTel],color=telcolorstemp[iColor],label=telescopes[iTel])
                 iColor+=1                
             
-            p1=ax2.bar(telescopestemp,[obsRms[iTel] for iTel in plotObsIndex], color=telcolorstemp)
+            p1=ax2.bar(telescopestemp,[obsHisto[iTel] for iTel in plotObsIndex], color=telcolorstemp)
             
             ax2.set_box_aspect(1/20)
             ax1.legend()
@@ -518,14 +531,14 @@ to {telescopes[iLastTel]}")
                     barcolors[iColor] = telcolors[iColor]
                 iColor+=1
                 
-            p1=ax2.bar(telescopes[FirstSet],obsRms[FirstSet], color=barcolors[:len1])
-            p2=ax4.bar(telescopes[SecondSet],obsRms[SecondSet], color=barcolors[len1:])
+            p1=ax2.bar(telescopes[FirstSet],obsHisto[FirstSet], color=barcolors[:len1])
+            p2=ax4.bar(telescopes[SecondSet],obsHisto[SecondSet], color=barcolors[len1:])
             ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
             ct.setaxelim(ax1, ydata=obs, ymargin=0.4,ymin=0)
             if 'pd'.casefold() in obsName.casefold():
                 ax4.set_ylim([0,wl])
             else:
-                ct.setaxelim(ax4, ydata=obsRms,ymin=0)
+                ct.setaxelim(ax4, ydata=obsHisto,ymin=0)
                 
             
             ax4.bar_label(p2,label_type='edge',fmt='%.2f')
@@ -537,9 +550,10 @@ to {telescopes[iLastTel]}")
             
             
         ct.setaxelim(ax1,ydata=[obs[:,iTel] for iTel in plotObsIndex])
-        ct.setaxelim(ax2,ydata=list(obsRms)+[wl/2], ymin=0)
+        ct.setaxelim(ax2,ydata=list(obsHisto)+[wl/2], ymin=0)
         ax1.set_xlabel("Time [ms]") ; 
-        ax2.set_ylabel('RMS')
+        ax1.set_ylabel(obsName)
+        ax2.set_ylabel(histoName)
         ax2.set_xlabel("Telescopes") ; 
         ax2.set_anchor('S')
         

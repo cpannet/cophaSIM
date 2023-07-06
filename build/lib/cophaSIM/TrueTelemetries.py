@@ -447,8 +447,8 @@ def ReadFits(file):
     #         PhotometryEstimated,ClosurePhasePD, ClosurePhaseGD,PDref,GDref,\
     #             PistonPDCommand,PistonGDCommand,SearchCommand, CommandODL,\
     #                 varPD, SquaredSNRMovingAverage, VisibilityEstimated
-        
-    with fits.open(file) as hduL:       
+    
+    with fits.open(file) as hduL:
 
         NT, NA = hduL[1].data["pdDlCmdMicrons"].shape # microns
         _, NINmes = hduL[1].data["gD"].shape # microns
@@ -463,8 +463,8 @@ def ReadFits(file):
         config.FT['whichSNR'] = 'pd'
         
         config.FS['R'] = 50
-        config.FS['ich'] = np.array([[1,2], [1,3], [2,3], [2,4], [1,4], [1,5], [2,5], [1,6],[2,6],\
-                         [3,6],[3,4],[3,5],[4,5],[4,6],[5,6]])
+        config.FS['ich'] = np.array([[1,2], [1,3], [1,4], [1,5], [1,6], [2,3], [2,4], [2,5],[2,6],\
+                         [3,4],[3,5],[3,6],[4,5],[4,6],[5,6]])
             
         config.InterfArray = config.Interferometer(name='chara')
         
@@ -483,10 +483,17 @@ def ReadFits(file):
         # tBefore = hduL[1].data['tBeforeProcessFrameCall'][:,0] + hduL[1].data['tBeforeProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)
         # timestamps = tBefore-tBefore[0]
         
-        config.dt = 4e-3 # frame duration
-        outputs.timestamps = np.arange(NT)*config.dt        # Times in seconds
+        # config.dt = 4e-3 # frame duration
+        # outputs.timestamps = np.arange(NT)*config.dt        # Times in seconds
         outputs.TimeID = time.strftime("%Y%m%d-%H%M%S")
             
+        tBefore = hduL[1].data['tBeforeProcessFrameCall'][:,0] + hduL[1].data['tBeforeProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)*
+        tAfter = hduL[1].data['tAfterProcessFrameCall'][:,0] + hduL[1].data['tAfterProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)
+        outputs.timestamps = tBefore-tBefore[0]
+        outputs.tAfter = tAfter - tAfter[0] 
+        
+        config.dt = np.mean(outputs.timestamps[1:]-outputs.timestamps[:-1])
+        
         """Global variables analog to outputs module"""
         
         outputs.GainPD = hduL[1].data["KgdKpd"][:,1] # Gains PD [NT]
@@ -504,15 +511,31 @@ def ReadFits(file):
         outputs.PhotometryEstimated = hduL[1].data["Photometry"] # Estimated photometries [NTxNA - ADU]
         
         outputs.varPD = hduL[1].data["curPdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
+        outputs.varGD = hduL[1].data["alternatePdVar"] # Estimated "GD variance" = 1/SNR² [NTxNINmes]
         outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["avPdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
         
         outputs.VisibilityEstimated = np.nan_to_num(1/hduL[1].data["VisiNorm"],posinf=0) # Estimated fringe visibility [NTxNINmes]
         
-        outputs.PistonPDCommand = hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
-        outputs.PistonGDCommand = hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
-        outputs.SearchCommand = hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
-        outputs.CommandODL = hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
+        outputs.PistonPDCommand = np.zeros([NT+1,NA])
+        outputs.PistonGDCommand = np.zeros([NT+1,NA])
+        outputs.SearchCommand = np.zeros([NT+1,NA])
+        outputs.CommandODL = np.zeros([NT+1,NA])
         
+        outputs.PistonPDCommand[:-1] = hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
+        outputs.PistonGDCommand[:-1] = hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
+        outputs.SearchCommand[:-1] = hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
+        outputs.CommandODL[:-1] = hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
+        
+    outputs.PDCommand = np.zeros([NT+1,NIN])
+    outputs.GDCommand = np.zeros([NT+1,NIN])
+    outputs.OPDCommand = np.zeros([NT+1,NIN])
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = ct.posk(ia,iap,NA)
+            outputs.PDCommand[:,ib] = outputs.PistonPDCommand[:,iap]-outputs.PistonPDCommand[:,ia]
+            outputs.GDCommand[:,ib] = outputs.PistonGDCommand[:,iap]-outputs.PistonGDCommand[:,ia]
+            outputs.OPDCommand[:,ib] = outputs.CommandODL[:,iap]-outputs.CommandODL[:,ia]
+            
     print("Load telemetries into outputs module:")
     for key in CommonOutputs+AdditionalOutputs:
         print(f"- {key}")
@@ -543,7 +566,7 @@ def moving_average(x, w):
 #     return np.abs(ftr)
 
 def BodeDiagrams(Output,Command,timestamps,Input=[],
-                 fbonds=[], mov_average=0, lmbda0=1.6, gain=0, details='', window='hanning',
+                 fbonds=[], mov_average=0, lmbda0=0.55, gain=0, details='', window='hanning',
                  display=True, figsave=False, figdir='',ext='pdf',only='ftbo',
                  displaytemporal=False):
     """
@@ -618,8 +641,8 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     Output2 = Output*windowsequence
     Command2 = Command*windowsequence
     
-    FTResidues = np.fft.fft(Output2)[PresentFrequencies]
-    FTCommands = np.fft.fft(Command2)[PresentFrequencies]
+    FTResidues = np.fft.fft(Output2,norm="forward")[PresentFrequencies]
+    FTCommands = np.fft.fft(Command2,norm="forward")[PresentFrequencies]
     
     FTBO = FTCommands/FTResidues
     
@@ -635,7 +658,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     
     if not only:
         Input2 = Input*windowsequence
-        FTTurb = np.fft.fft(Input2)[PresentFrequencies]    
+        FTTurb = np.fft.fft(Input2,norm="forward")[PresentFrequencies]    
         
         FTrej = FTResidues/FTTurb
         FTBF = FTCommands/FTTurb
@@ -652,12 +675,9 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     poly1d_fn = np.poly1d(coefs)
     ModFTCommandsfit = 10**poly1d_fn(logFrequencySampling)
     
-    PSDat1Hz_index = np.argmin(np.abs(ModFTCommandsfit+1))
-    PSDat1Hz = ModFTCommandsfit[PSDat1Hz_index]
-    EstimatedT0 = (PSDat1Hz/2.84e-4*lmbda0**2)**(-3/5)*1e3
-    
-    #a,b = np.polyfit(FrequencySampling[NominalRegime], ModFTCommands[NominalRegime], 1)
-    
+    index1Hz = np.argmin(np.abs(logFrequencySampling-1))
+    PSDat1Hz = ModFTCommandsfit[index1Hz]
+    EstimatedT0 = (PSDat1Hz/2.84e-4/lmbda0**2)**(-3/5)
     
     results = {"CutoffFrequency0dB":CutoffFrequency0dB,
                "EstimatedT0":EstimatedT0}
@@ -734,7 +754,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             ax3.set_xlabel('Timestamps [s]')
             ax3.set_ylabel('Command')
 
-            
+            fig.show()
         
         if only == 'ftbo':
             
@@ -753,7 +773,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             
             ax1.plot(FrequencySampling, 40*np.log10(ModFTBO), "k")
             ax1.plot(FrequencySampling, 40*np.log10(ModFTBOfit), 
-                     color=colors[1], linestyle='--')
+                     color=colors[0], linestyle='--')
             
             if gain:
                 gains = [gain] ; delays=np.arange(10,60,10)
@@ -781,7 +801,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             
             
             ax3.plot(FrequencySampling, ModFTCommands**2, "k")
-            ax3.plot(FrequencySampling, ModFTCommandsfit**2, color=colors[1])
+            ax3.plot(FrequencySampling, ModFTCommandsfit**2, color=colors[0])
             ax3.set_ylabel('PSD [µm²/Hz]')
             addtext(ax3,"Commands",loc='upper center',fontsize='x-large')
             
@@ -794,7 +814,9 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             ax3.sharey(ax2)
             
             setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
-    
+            
+            fig.show()
+            
             if figsave:
                 prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
                 figname = f"BodeDiagram_{only}"
@@ -837,8 +859,6 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
                                 linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
                     ax1.legend(handles=linestyles)
                     
-                
-                
                 #ax1.set_yscale('log')
                 ax1.set_xscale('log')
                 ax1.set_ylabel('G(|FTBO|²)')
@@ -855,8 +875,8 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
                 ax2.sharex(ax3)
                 
                 ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
-            
-    
+                fig.show()
+        
     return results
             
             
@@ -872,10 +892,12 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
 
 def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Signal [µm]',
                          fbonds=[], details='', window='hanning',mov_average=0,model=True,
+                         cumStd=False,
                          display=True, figsave=False, figdir='',ext='pdf'):
     
     nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
-
+    T = timestamps[-1]
+    
     FrequencySampling1 = np.fft.fftfreq(nNT, dt)
     if len(fbonds):
         fmin, fmax = fbonds
@@ -895,23 +917,42 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
         
     signal_filtered = signal*windowsequence
     
-    PSD = np.abs(np.fft.fft(signal_filtered)[PresentFrequencies])**2
-    
+    PSD = 2*np.abs(np.fft.fft(signal_filtered,norm="forward")[PresentFrequencies])**2
+
+    if cumStd:
+        cumulativeStd = np.sqrt(np.cumsum(PSD))
+        cumFrequencySampling = np.copy(FrequencySampling)
+
     if mov_average:
         PSD = moving_average(PSD, mov_average)
         FrequencySampling = moving_average(FrequencySampling,mov_average)
+        
+    df = FrequencySampling[1]-FrequencySampling[0]
+    # print(np.var(signal)) ; print(np.var(signal_filtered))
+    # print(np.sum(np.abs(signal_filtered)**2*dt))
+    # print(np.sum(np.abs(PSD)))
+    
+    f1 = 0.3 ; f2 = 10
+    logFrequencySampling = np.log10(FrequencySampling)
+    NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
+    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(PSD[NominalRegime]), 1)
+    poly1d_fn = np.poly1d(coefs)
+    psdFit = 10**poly1d_fn(logFrequencySampling)   # model sampled in direct space
+    # val0 = 10**coefs[0]#FTSignalfit[np.abs(np.argmin(logFrequencySampling-1))]
     
     if len(AdditionalSignals):
-        AddSig=[] ; AddPSD=[]
-        
+        addSig=[] ; addPSD=[] ; addCumStd=[]
+    
     for sig in AdditionalSignals:
-        AddSig.append(sig)
-        tempPSD = np.abs(np.fft.fft(sig*windowsequence)[PresentFrequencies])**2
+        addSig.append(sig)
+        tempPSD = 2*np.abs(np.fft.fft(sig*windowsequence, norm="forward")[PresentFrequencies])**2
         
         if mov_average:
-            AddPSD.append(moving_average(tempPSD, mov_average))
+            addPSD.append(moving_average(tempPSD, mov_average))
         else:
-            AddPSD.append(tempPSD)
+            addPSD.append(tempPSD)
+    
+        addCumStd.append(np.cumsum(tempPSD))
     
     if display:
         
@@ -923,30 +964,58 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
         title = f'{details} - PSD'
         fig = plt.figure(title, clear=True)
         fig.suptitle(title)
-        ax1,ax2 = fig.subplots(nrows=2)
-        # ax3 = ax2.twinx()
         
-        ax1.plot(FrequencySampling, PSD,'k')
-        ax2.plot(timestamps, signal, 'k')
-        
-        for i in range(len(AdditionalSignals)):
-            ax1.plot(FrequencySampling, AddPSD[i],color=colors[i])
-            ax2.plot(timestamps, AddSig[i], colors[i])
-        
-        if model:
-            ax1.plot(FrequencySampling, 1e5*FrequencySampling**(-8/3))
-        # ax3.plot(timestamps, windowsequence,'k--', label='Window')
-        
-        ax1.set_ylim(1e-4,1e11)
-        ax1.set_yscale('log') ; ax1.set_xscale('log')
-        ax1.set_ylabel('PSD [µm²/Hz]')
-        ax2.set_ylabel(SignalName)
-        #ax2.legend()#handles=linestyles)
-        
-        ax1.set_xlabel('Frequencies [Hz]')
-        ax2.set_xlabel('Time (s)')
-        #ax3.set_ylabel("Window amplitude")
-        ax1.grid(True); ax2.grid(True);# ax3.grid(False)
+        if not cumStd:
+            ax1,ax2 = fig.subplots(nrows=2)
+            
+            ax1.plot(FrequencySampling, PSD,'k')
+            ax2.plot(timestamps, signal, 'k')
+            
+            for i in range(len(AdditionalSignals)):
+                ax1.plot(FrequencySampling, addPSD[i],color=colors[i])
+                ax2.plot(timestamps, addSig[i], colors[i])
+            
+            if model:
+                ax1.plot(FrequencySampling, psdFit)#10*FrequencySampling**(-8/3))
+            # ax3.plot(timestamps, windowsequence,'k--', label='Window')
+            
+            # ct.setaxelim(ax1, 
+            ax1.set_yscale('log') ; ax1.set_xscale('log')
+            ax1.set_ylabel('PSD [µm²/Hz]')
+            ax2.set_ylabel(SignalName)
+            #ax2.legend()#handles=linestyles)
+            
+            ax1.set_xlabel('Frequencies [Hz]')
+            ax2.set_xlabel('Time (s)')
+            #ax3.set_ylabel("Window amplitude")
+            ax1.grid(True); ax2.grid(True);# ax3.grid(False)
+
+        else:
+            ax1,ax2,ax3 = fig.subplots(nrows=3)
+            
+            ax1.plot(FrequencySampling, PSD,'k')
+            ax2.plot(cumFrequencySampling, cumulativeStd, 'k')
+            ax3.plot(timestamps, signal, 'k')
+            
+            for i in range(len(AdditionalSignals)):
+                ax1.plot(FrequencySampling, addPSD[i],color=colors[i])
+                ax2.plot(cumFrequencySampling, addCumStd[i],color=colors[i])
+                ax3.plot(timestamps, addSig[i], colors[i])
+            
+            if model:
+                ax1.plot(FrequencySampling, psdFit)#10*FrequencySampling**(-8/3))
+            # ax3.plot(timestamps, windowsequence,'k--', label='Window')
+            
+            ax1.set_yscale('log') ; ax1.set_xscale('log')
+            ax2.set_xscale('log')
+            ax2.sharex(ax1)
+            ax1.set_ylabel('PSD [µm²/Hz]')
+            ax2.set_ylabel("Cumulative STD [µm]")
+            ax3.set_ylabel(SignalName)
+            
+            ax2.set_xlabel('Frequencies [Hz]')
+            ax3.set_xlabel('Time (s)')
+            ax1.grid(True); ax2.grid(True); ax3.grid(True)
 
         if figsave:
             prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
@@ -956,9 +1025,14 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
                     plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
             else:
                 plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
-
-    return PSD
+        
+        fig.show()
     
+    if cumStd:
+        return FrequencySampling, PSD, cumStd, psdFit
+
+    else:
+        return FrequencySampling, PSD, psdFit
 
 def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
                      bonds=[],window='no',
@@ -1012,7 +1086,7 @@ def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
     resultsgd = BodeDiagrams(BFgd, Commandgd, t, Input=BOgd, gain=gainGD,
                              fbonds=fbonds, window=window,
                              details=details,
-                             display=display,
+                             display=display,only=False,
                              figsave=figsave, figdir=figdir, ext=ext)
     
     FrequencySampling, FTrejgd, FTBOgd, FTBFgd = resultsgd
@@ -1021,7 +1095,7 @@ def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
     resultspd = BodeDiagrams(BFpd, Commandpd, t, Input=BOgd, gain=gainPD,
                              fbonds=fbonds, window=window,
                              details=details,
-                             display=display,
+                             display=display,only=False,
                              figsave=figsave, figdir=figdir, ext=ext)
     
     FrequencySampling, FTrejpd, FTBOpd, FTBFpd = resultspd

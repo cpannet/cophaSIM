@@ -1384,23 +1384,23 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     
     if UsedTelemetries == 'simu':
         
-        WLIndex = np.argmin(np.abs(config.spectraM-wlOfTrack))
-        wl = config.spectraM[WLIndex]
+        wlIndex = np.argmin(np.abs(config.spectraM-wlOfTrack))
+        wl = config.spectraM[wlIndex]
         
-        VisObj = ct.NB2NIN(outputs.VisibilityObject[WLIndex])
-        VisibilityPhase = np.angle(outputs.VisibilityEstimated[:,WLIndex,:])
+        VisObj = ct.NB2NIN(outputs.VisibilityObject[wlIndex])
+        VisibilityPhase = np.angle(outputs.VisibilityEstimated[:,wlIndex,:])
         
         
             
     else:
 
-        #WLIndex = np.argmin(np.abs(config.spectraM-wlOfTrack))
+        #wlIndex = np.argmin(np.abs(config.spectraM-wlOfTrack))
         wl = TT.lmbda
         
         # Temporary before getting info in fitsfile
-        VisObj = np.ones([NIN])#ct.NB2NIN(outputs.VisibilityObject[WLIndex])
-        VisibilityPhase = np.zeros([NIN])#np.angle(outputs.VisibilityEstimated[:,WLIndex,:])
-
+        VisObj = np.ones([NIN])#ct.NB2NIN(outputs.VisibilityObject[wlIndex])
+        VisibilityPhase = np.zeros([NIN])#np.angle(outputs.VisibilityEstimated[:,wlIndex,:])
+        
     display_module.wl = wl
     
     InterfArray = config.InterfArray
@@ -1694,10 +1694,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                 continue
 
             obs = getattr(outputs, obsName)
-            obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+            obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
             
             if "command".casefold() in obsName.casefold():
-                obs = obs[:-1] ; obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+                obs = obs[:-1] ; obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
             
             generaltitle = obsName
             obsType = obsName
@@ -1707,30 +1707,30 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                 filename=''
             
             if "pis".casefold() in obsName.casefold():
-                display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+                display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
                                           obsName=obsName,
-                                          display=display,filename=filename,ext='pdf',infos={"details":''},
+                                          display=display,filename=filename,ext='pdf',infos=infos,
                                           verbose=verbose)
                 
             elif ("opd".casefold() in obsName.casefold())\
                 or ("snr".casefold() in obsName.casefold()):
-                display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+                display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
                                           obsName=obsName,
-                                          display=display,filename=filename,ext='pdf',infos={"details":''},
+                                          display=display,filename=filename,ext='pdf',infos=infos,
                                           verbose=verbose)
                 
             else:
                 if obs.shape[-1] < 10:
                     print(f"{obsName} plotted with piston-oriented display.")
-                    display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+                    display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
                                               obsName=obsName,
-                                              display=display,filename=filename,ext='pdf',infos={"details":''},
+                                              display=display,filename=filename,ext='pdf',infos=infos,
                                               verbose=verbose)
                 else:
                     print(f"{obsName} plotted with OPD-oriented display.")
-                    display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+                    display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
                                               obsName=obsName,
-                                              display=display,filename=filename,ext='pdf',infos={"details":''},
+                                              display=display,filename=filename,ext='pdf',infos=infos,
                                               verbose=verbose)
 
 
@@ -1832,6 +1832,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                                      generaltitle,display=display,filename=filename,ext='pdf',
                                      infos=infos)
 
+
     if displayall or ('GDPDcmd' in args) :
         generaltitle = "GD and PD commands in OPD-space"
         obsType = "GDPDcmd"
@@ -1857,7 +1858,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
 
 
-    """ PLOT OF A SINGLE OBSERVABLES (PD,GD,OPD,SNR,etc...) IN OPD-SPACE """
+    """ PLOT OF A SINGLE OBSERVABLES (flux, PD,GD,OPD,SNR,etc...) IN OPD-SPACE """
 
     if displayall or ('distOpd' in args):
         generaltitle = 'OPD Disturbances'
@@ -1868,11 +1869,11 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''
             
         obs = outputs.OPDDisturbance
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
                                   obsName='OPD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
     if displayall or ('opd' in args):
@@ -1884,11 +1885,11 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''
             
         obs = outputs.OPDTrue
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaselineNIN,
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
                                   obsName='OPD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
     
@@ -1901,13 +1902,13 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''
 
         obs = PDmic
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='PD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
     
-    if displayall or ('pd2' in args):      
+    if displayall or ('pd2' in args):
         generaltitle = 'Phase-delays 2'
         obsType = "PD2"
         obs = PDmic2
@@ -1916,10 +1917,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         else:
             filename=''
             
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='PD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
     if displayall or ('gd' in args):
@@ -1932,10 +1933,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''        
             
         obs = GDmic
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='GD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
     if displayall or ('gd2' in args):
@@ -1947,12 +1948,42 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''        
             
         obs = GDmic2
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='GD2 [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
+    if displayall or ('gderr' in args):
+        generaltitle = 'Group-delays error'
+        obsType = "GDerr"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
+        else:
+            filename=''        
+            
+        obs = GDerrmic
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
+                                  obsName='GDerr [µm]',
+                                  display=display,filename=filename,ext='pdf',infos=infos,
+                                  verbose=verbose)    
+    
+    if displayall or ('gderr2' in args):
+        generaltitle = 'Group-delays filtered'
+        obsType = "GDerr2"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
+        else:
+            filename=''        
+            
+        obs = GDerrmic2
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
+                                  obsName='GDerr2 [µm]',
+                                  display=display,filename=filename,ext='pdf',infos=infos,
+                                  verbose=verbose)
+            
         
     if displayall or ('snr' in args):
         generaltitle = 'SNR'
@@ -1963,10 +1994,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''        
             
         obs = SNR
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='SNR',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
                 
         
@@ -1980,11 +2011,11 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''     
             
         obs = SNR_pd
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='SNR',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
                 
     if displayall or ('snrGd' in args):
@@ -1996,10 +2027,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''     
             
         obs = SNR_gd
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='SNR',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
     if displayall or ('gdCmd' in args):
@@ -2011,10 +2042,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''     
             
         obs = outputs.GDCommand[:-1]
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
         
@@ -2027,10 +2058,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''     
             
         obs = outputs.PDCommand[:-1]
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
         
@@ -2043,14 +2074,55 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''     
             
         obs = outputs.OPDCommand[:-1]
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
                                   obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
         
-    """ PISTONS """    
+    """ PISTONS-SPACE (flux, pistons) """    
+    
+    if displayall or ('estFlux' in args):
+        generaltitle = 'Estimated Flux'
+        obsType = "estFlux"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
+        else:
+            filename=''
+            
+        if UsedTelemetries == 'simu':
+            obs = outputs.PhotometryEstimated[:,wlIndex]
+            obsHisto = np.mean(obs[start_pd_tracking:,:],axis=0)
+        else:
+            obs = outputs.PhotometryEstimated
+            obsHisto = np.mean(obs[start_pd_tracking:],axis=0)
+        
+        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
+                                  obsName='Flux [ph]',histoName='Average',
+                                  display=display,filename=filename,ext='pdf',infos=infos,
+                                  verbose=verbose)
+    
+    if displayall or ('trueFlux' in args):
+        generaltitle = 'True Flux'
+        obsType = "trueFlux"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
+        else:
+            filename=''
+            
+        if UsedTelemetries == 'simu':
+            obs = outputs.PhotometryDisturbance[:,wlIndex]
+            obsHisto = np.mean(obs[start_pd_tracking:,:],axis=0)
+        else:
+            obs = outputs.PhotometryDisturbance
+            obsHisto = np.mean(obs[start_pd_tracking:],axis=0)
+        
+        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
+                                  obsName='Flux [ph]',histoName='Average',
+                                  display=display,filename=filename,ext='pdf',infos=infos,
+                                  verbose=verbose)
+    
     
     if displayall or ('distPis' in args):
         generaltitle = 'Piston Disturbances'
@@ -2061,10 +2133,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''     
             
         obs = outputs.PistonDisturbance
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
                                   obsName='Disturbances [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
         
     if displayall or ('cmdPis' in args):
@@ -2076,17 +2148,34 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             filename=''     
             
         obs = outputs.CommandODL[:-1]
-        obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsRms,generaltitle,PlotTel,
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
                                   obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos={"details":''},
+                                  display=display,filename=filename,ext='pdf',infos=infos,
                                   verbose=verbose)
+        
+        
+    if displayall or ('truePis' in args):
+        generaltitle = 'Piston True'
+        obsType="pisTrue"
+        if len(savedir):
+            filename= savedir+f"Simulation{TimeID}_{obsType}"
+        else:
+            filename=''     
+            
+        obs = outputs.PistonTrue
+        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
+                                  obsName='Piston [µm]',
+                                  display=display,filename=filename,ext='pdf',infos=infos,
+                                  verbose=verbose)
+        
     # if displayall or ('piscmds' in args):
     #     obs = outputs.GDCommand[:-1]
-    #     obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+    #     obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
         
     #     generaltitle = 'GD Commands'
-    #     display_module.simpleplot(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+    #     display_module.simpleplot(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
     #                               obsName='Commands',
     #                               display=True,filename='',ext='pdf',infos={"details":''},
     #                               verbose=False)
@@ -2094,10 +2183,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         
     # if displayall or ('pdcmd' in args):
     #     obs = outputs.PDCommand[:-1]
-    #     obsRms = np.std(obs[start_pd_tracking:,:],axis=0)
+    #     obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
         
     #     generaltitle = 'PD Commands'
-    #     display_module.simpleplot(timestamps, obs,obsRms,generaltitle,PlotBaseline,
+    #     display_module.simpleplot(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
     #                               obsName='Commands',
     #                               display=True,filename='',ext='pdf',infos={"details":''},
     #                               verbose=False)
@@ -2120,7 +2209,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         
         #visibilities, _,_,_=ct.VanCittert(wlOfScience,config.Obs,config.Target)
         #outputs.VisibilityAtPerfWL = visibilities
-        visibilities = ct.NB2NIN(outputs.VisibilityObject[WLIndex])
+        visibilities = ct.NB2NIN(outputs.VisibilityObject[wlIndex])
         vismod = np.abs(visibilities) ; visangle = np.angle(visibilities)
         PhotometricBalance = config.FS['PhotometricBalance']
         
@@ -2231,7 +2320,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                          color=colors[ic])
                 ax1.plot(timestamps, outputs.ClosurePhaseGD[:,ic],
                          color=colors[ic],linestyle=':')
-                ax1.hlines(outputs.ClosurePhaseObject[WLIndex,ic], 0, timestamps[-1], 
+                ax1.hlines(outputs.ClosurePhaseObject[wlIndex,ic], 0, timestamps[-1], 
                            color=colors[ic], linestyle='--')
                 linestyles1.append(mlines.Line2D([],[], color=colors[ic],
                                                 linestyle='-', label=f'{1}{ia+1}{iap+1}'))
@@ -2246,7 +2335,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                              color=colors[colorindex])
                     ax2.plot(timestamps, outputs.ClosurePhaseGD[:,ic],
                              color=colors[colorindex],linestyle=':')
-                    ax2.hlines(outputs.ClosurePhaseObject[WLIndex,ic], 0, timestamps[-1],
+                    ax2.hlines(outputs.ClosurePhaseObject[wlIndex,ic], 0, timestamps[-1],
                                color=colors[colorindex], linestyle='--')
                     linestyles2.append(mlines.Line2D([],[], color=colors[colorindex],
                                                     linestyle='-', label=f'{ia+1}{iap+1}{iapp+1}'))
@@ -2288,8 +2377,8 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                     iap+=1
                 
                 ib = ct.posk(ia,iap,NA)
-                ax.plot(timestamps, np.abs(outputs.VisibilityEstimated[:,WLIndex,ib]), color='k')
-                ax.plot(timestamps, np.abs(outputs.VisibilityTrue[:,WLIndex,ib]),color='k',linestyle='--')
+                ax.plot(timestamps, np.abs(outputs.VisibilityEstimated[:,wlIndex,ib]), color='k')
+                ax.plot(timestamps, np.abs(outputs.VisibilityTrue[:,wlIndex,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                 iap += 1
@@ -2319,8 +2408,8 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                     iap+=1
                 
                 ib = ct.posk(ia,iap,NA)
-                ax.plot(timestamps, np.angle(outputs.VisibilityEstimated[:,WLIndex,ib]), color='k')
-                ax.plot(timestamps, np.angle(outputs.VisibilityTrue[:,WLIndex,ib]),color='k',linestyle='--')
+                ax.plot(timestamps, np.angle(outputs.VisibilityEstimated[:,wlIndex,ib]), color='k')
+                ax.plot(timestamps, np.angle(outputs.VisibilityTrue[:,wlIndex,ib]),color='k',linestyle='--')
                 ax.set_ylim(ylim)
                 ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                 
@@ -2363,7 +2452,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                 ax = plt.subplot(NIN,NMod,ip+1)
                 if ip < NMod:
                     ax.set_title(config.FS['Modulation'][ip])
-                im = plt.imshow(np.transpose(np.dot(np.reshape(outputs.MacroImages[:,WLIndex,ip],[NT,1]), \
+                im = plt.imshow(np.transpose(np.dot(np.reshape(outputs.MacroImages[:,wlIndex,ip],[NT,1]), \
                                                     np.ones([1,100]))), vmin=np.min(outputs.MacroImages), vmax=np.max(outputs.MacroImages))    
                     
                 plt.tick_params(axis='y',left='off')
@@ -2396,7 +2485,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             
             # realimage[:,:,posi_center//p-(NP-NA)//2:posi_center//p+(NP-NA)//2] = outputs.MacroImages[:,:,NA:]
             ax = plt.subplot()
-            im = plt.imshow(outputs.MacroImages[:,WLIndex,:], vmin=np.min(outputs.MacroImages), vmax=np.max(outputs.MacroImages))
+            im = plt.imshow(outputs.MacroImages[:,wlIndex,:], vmin=np.min(outputs.MacroImages), vmax=np.max(outputs.MacroImages))
             
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.3, 0.05, 0.6])
@@ -2551,9 +2640,9 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     #     plt.suptitle('Photometries in the spectral channel containing {:.2f}µm'.format(wl))
         
     #     for ia in range(NA):
-    #         plt.plot(t[timerange], np.sum(outputs.PhotometryDisturbance[:,OW*WLIndex:OW*(WLIndex+1),ia],axis=1),
+    #         plt.plot(t[timerange], np.sum(outputs.PhotometryDisturbance[:,OW*wlIndex:OW*(wlIndex+1),ia],axis=1),
     #                  color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
-    #         plt.plot(t[timerange], outputs.PhotometryEstimated[:,WLIndex,ia],
+    #         plt.plot(t[timerange], outputs.PhotometryEstimated[:,wlIndex,ia],
     #                  color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
             
     #     plt.vlines(config.starttracking*dt*ms,s[0],s[1],
