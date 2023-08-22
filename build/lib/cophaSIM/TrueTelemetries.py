@@ -22,6 +22,9 @@ from .tol_colors import tol_cset
 from . import coh_tools as ct
 from mypackage.plot_tools import setaxelim, addtext
 from scipy.special import binom
+from scipy.optimize import curve_fit
+
+from importlib import reload
 
 import matplotlib.lines as mlines
 from astropy.io import fits
@@ -450,15 +453,34 @@ def ReadFits(file):
     
     with fits.open(file) as hduL:
 
+        outputs.TimeID = time.strftime("%Y%m%d-%H%M%S")
+        outputs.outputsFile = file.split('/')[-1]
         NT, NA = hduL[1].data["pdDlCmdMicrons"].shape # microns
         _, NINmes = hduL[1].data["gD"].shape # microns
-        
         
         config.NT = NT ; config.NA=NA; config.OW = 1
         config.NIN = int(NA*(NA-1)/2) ; config.NINmes=NINmes
         config.NB = int(NA**2) 
         config.NC = int(binom(NA,3))           # Number of closure phases
         config.ND = int((NA-1)*(NA-2)/2)       # Number of independant closure phases
+        
+        config.Beam2Tel = hduL[0].header['Beam2Tel']
+        telNameLength=2
+        tels = [config.Beam2Tel[i:i+telNameLength] for i in range(0, len(config.Beam2Tel), telNameLength)]
+        
+        TelConventionalArrangement =  ['S1','S2','E1','E2','W1','W2']
+        
+        Tel2Beam = np.zeros([6,6])
+        for ia in range(NA):
+            tel0 = TelConventionalArrangement[ia] 
+            pos = np.argwhere(np.array(tels)==tel0)[0][0]
+            Tel2Beam[pos,ia]=1
+            
+        Sort2Conventional = np.zeros([6,6])
+        for ia in range(NA):
+            tel0 = tels[ia] 
+            pos = np.argwhere(np.array(TelConventionalArrangement)==tel0)[0][0]
+            Sort2Conventional[pos,ia]=1
         
         config.FT['whichSNR'] = 'pd'
         
@@ -480,18 +502,10 @@ def ReadFits(file):
                 setattr(outputs,key,hduL[1].data[key])
                 AdditionalOutputs.append(key)
                 
-        # tBefore = hduL[1].data['tBeforeProcessFrameCall'][:,0] + hduL[1].data['tBeforeProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)
-        # timestamps = tBefore-tBefore[0]
-        
-        # config.dt = 4e-3 # frame duration
-        # outputs.timestamps = np.arange(NT)*config.dt        # Times in seconds
-        outputs.TimeID = time.strftime("%Y%m%d-%H%M%S")
-            
         tBefore = hduL[1].data['tBeforeProcessFrameCall'][:,0] + hduL[1].data['tBeforeProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)*
         tAfter = hduL[1].data['tAfterProcessFrameCall'][:,0] + hduL[1].data['tAfterProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)
         outputs.timestamps = tBefore-tBefore[0]
         outputs.tAfter = tAfter - tAfter[0] 
-        
         config.dt = np.mean(outputs.timestamps[1:]-outputs.timestamps[:-1])
         
         """Global variables analog to outputs module"""
@@ -499,6 +513,11 @@ def ReadFits(file):
         outputs.GainPD = hduL[1].data["KgdKpd"][:,1] # Gains PD [NT]
         outputs.GainGD = hduL[1].data["KgdKpd"][:,0] # Gains GD [NT]
         
+        if (np.std(outputs.GainPD,axis=0) == 0).all():
+            config.FT['GainPD'] = outputs.GainPD[0]
+        if (np.std(outputs.GainGD,axis=0) == 0).all():
+            config.FT['GainGD'] = outputs.GainGD[0]
+            
         outputs.PDEstimated = hduL[1].data["PD"] # Estimated baselines PD [NTxNINmes - rad]
         outputs.GDEstimated = hduL[1].data["GD"] # Estimated baselines GD [NTxNINmes - rad]
         outputs.PDResidual2 = hduL[1].data["curPdErrBaseMicrons"]/lmbda*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
@@ -510,22 +529,58 @@ def ReadFits(file):
         
         outputs.PhotometryEstimated = hduL[1].data["Photometry"] # Estimated photometries [NTxNA - ADU]
         
-        outputs.varPD = hduL[1].data["curPdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
+        """ Before 2023-07-11 """
+        
+        # outputs.varPD = hduL[1].data["curPdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
+        # outputs.varGD = hduL[1].data["alternatePdVar"] # Estimated "GD variance" = 1/SNR² [NTxNINmes]
+        # outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["avPdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        
+        """ After 2023-07-11 """
+        
+        outputs.varPD = hduL[1].data["pdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
         outputs.varGD = hduL[1].data["alternatePdVar"] # Estimated "GD variance" = 1/SNR² [NTxNINmes]
-        outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["avPdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        outputs.SquaredSnrGD = 1/outputs.varGD
+        outputs.SquaredSnrPD = 1/outputs.varPD
+        
+        # outputs.whichVar = hduL[1].data['whichCurPdVar'][0]    # 0: varPd ; 1:varGd
+        outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        outputs.SquaredSNRMovingAverageGD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        outputs.singularValuesSqrt = np.sqrt(hduL[1].data["sPdSingularValues"])
+        
+        config.FT['ThresholdPD'] = hduL[1].data['pdThreshold'][0]
+        config.FT['ThresholdGD'] = hduL[1].data['gdThresholds'][0]
+        outputs.ThresholdPD = hduL[1].data['pdThreshold']
+        outputs.ThresholdGD = hduL[1].data['gdThresholds']
+        whichCurPdVar = hduL[0].header['whichCurPdVar']
+        if whichCurPdVar == "Sylvestre":
+            config.FT['whichSNR'] = "pd"
+        else:
+            config.FT['whichSNR'] = "gd"
         
         outputs.VisibilityEstimated = np.nan_to_num(1/hduL[1].data["VisiNorm"],posinf=0) # Estimated fringe visibility [NTxNINmes]
+        
+        outputs.PistonGDcorr = hduL[1].data["gdDlCorMicrons"] # GD before round [NTxNA - microns]
         
         outputs.PistonPDCommand = np.zeros([NT+1,NA])
         outputs.PistonGDCommand = np.zeros([NT+1,NA])
         outputs.SearchCommand = np.zeros([NT+1,NA])
         outputs.CommandODL = np.zeros([NT+1,NA])
         
-        outputs.PistonPDCommand[:-1] = hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
-        outputs.PistonGDCommand[:-1] = hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
-        outputs.SearchCommand[:-1] = hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
-        outputs.CommandODL[:-1] = hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
+        outputs.PistonPDCommand[:-1] = 2*hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
+        outputs.PistonGDCommand[:-1] = 2*hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
+        outputs.SearchCommand[:-1] = 2*hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
+        outputs.CommandODL[:-1] = 2*hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
         
+    # #ALL DATA WHICH ARE COMMANDS RELATED NEED TO BE SORTED RELATED TO
+    # The telemetries are sorted in the order "S1
+    for it in range(NT):
+        outputs.PistonPDCommand[it] = np.dot(Tel2Beam,outputs.PistonPDCommand[it])
+        outputs.PistonGDCommand[it] = np.dot(Tel2Beam,outputs.PistonGDCommand[it])
+        outputs.SearchCommand[it] = np.dot(Tel2Beam,outputs.SearchCommand[it])
+        outputs.CommandODL[it] = np.dot(Tel2Beam,outputs.CommandODL[it])
+        outputs.PistonGDcorr[it] = np.dot(Tel2Beam,outputs.PistonGDcorr[it])
+
+    
     outputs.PDCommand = np.zeros([NT+1,NIN])
     outputs.GDCommand = np.zeros([NT+1,NIN])
     outputs.OPDCommand = np.zeros([NT+1,NIN])
@@ -535,7 +590,10 @@ def ReadFits(file):
             outputs.PDCommand[:,ib] = outputs.PistonPDCommand[:,iap]-outputs.PistonPDCommand[:,ia]
             outputs.GDCommand[:,ib] = outputs.PistonGDCommand[:,iap]-outputs.PistonGDCommand[:,ia]
             outputs.OPDCommand[:,ib] = outputs.CommandODL[:,iap]-outputs.CommandODL[:,ia]
-            
+
+    # Reload outputs parameters.
+    # reload(outputs)
+    
     print("Load telemetries into outputs module:")
     for key in CommonOutputs+AdditionalOutputs:
         print(f"- {key}")
@@ -617,7 +675,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
         DESCRIPTION.
 
     """
-     
+    
     nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
 
     FrequencySampling1 = np.fft.fftfreq(nNT, dt)
@@ -646,12 +704,13 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     
     FTBO = FTCommands/FTResidues
     
-    ModFTBO = np.abs(FTBO)
+    ModFTBO = np.abs(FTBO) ; AngleFTBO = np.angle(FTBO)
     ModFTCommands = np.abs(FTCommands)
     ModFTResidues = np.abs(FTResidues)
     
     if mov_average:
         ModFTBO = moving_average(ModFTBO,mov_average)
+        AngleFTBO = moving_average(AngleFTBO,mov_average)
         ModFTResidues = moving_average(ModFTResidues, mov_average)
         ModFTCommands = moving_average(ModFTCommands, mov_average)
         FrequencySampling = moving_average(FrequencySampling,mov_average)
@@ -669,7 +728,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTBO[NominalRegime])), 1)
     poly1d_fn = np.poly1d(coefs)
     ModFTBOfit = 10**poly1d_fn(logFrequencySampling)
-    CutoffFrequency0dB = FrequencySampling[np.argmin(np.abs(20*np.log10(ModFTBOfit)+3))]
+    CutoffFrequency0dB = FrequencySampling[np.argmin(np.abs(20*np.log10(ModFTBOfit)))]
     
     coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTCommands[NominalRegime])), 1)
     poly1d_fn = np.poly1d(coefs)
@@ -682,6 +741,10 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     results = {"CutoffFrequency0dB":CutoffFrequency0dB,
                "EstimatedT0":EstimatedT0}
     
+    # popt, *remain=curve_fit(model,freqs[f_plus],20*np.log10(np.abs(transfer_function[i,:][f_plus]))
+    #                      ,p0=[2,0.1,0.99,0],bounds=[[0,0,0,-100],[5,1,0.999,100]])
+
+    
     if display:
         
         if not only:
@@ -690,7 +753,8 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
                 
             plt.rcParams.update(rcParamsForBaselines)
             title = f'{details} - Bode diagrams'
-            fig = plt.figure(title, clear=True)
+            plt.close(title)
+            fig = plt.figure(title)
             fig.suptitle(title)
             ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
             
@@ -730,15 +794,16 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
 
             if figsave:
                 prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
-                figname = "BodeDiagrams"
+                figname = "TransferFunctions"
                 if isinstance(ext,list):
                     for extension in ext:
                         plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
                 else:
                     plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
     
-    
-            fig = plt.figure(f'{details} - Temporal sampling used', clear=True)
+            generaltitle=f'{details} - Temporal sampling used'
+            plt.close(generaltitle)
+            fig = plt.figure(generaltitle)
             ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
             
             ax1.plot(timestamps, Input)
@@ -758,6 +823,44 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
         
         if only == 'ftbo':
             
+            
+            """ Display gain and phase of FTBO """
+            
+            plt.rcParams.update(rcParamsForBaselines)
+            if not details:
+                title = 'Bode Diagrams FTBO'
+            else:
+                title = f'Bode Diagrams FTBO - {details}'
+            
+            plt.close(title)
+            fig = plt.figure(title)
+            fig.suptitle(title)
+            ax1,ax2 = fig.subplots(nrows=2,sharex=True)
+            
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTBO), "k")
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTBOfit), 
+                     color=colors[0], linestyle='--')
+            
+            ax2.plot(FrequencySampling, AngleFTBO*180/np.pi, "k")
+            
+            ax1.set_ylabel('Gain [dB]')
+            ax2.set_ylabel("Phase [°]")
+            
+            ax1.grid(True) ; ax2.grid(True)
+            
+            ax2.set_xscale('log')
+            
+            fig.show()
+            
+            if figsave:
+                prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+                figname = f"BodeDiagrams_{only}"
+                if isinstance(ext,list):
+                    for extension in ext:
+                        plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+                else:
+                    plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
+            
             """
             Display FTBO and PSD of command and residues
             """
@@ -767,7 +870,8 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
                 title = 'FTBO'
             else:
                 title = f'FTBO - {details}'
-            fig = plt.figure(title, clear=True)
+            plt.close(title)
+            fig = plt.figure(title)
             fig.suptitle(title)
             ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
             
@@ -819,7 +923,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             
             if figsave:
                 prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
-                figname = f"BodeDiagram_{only}"
+                figname = f"Amplitude_{only}"
                 if isinstance(ext,list):
                     for extension in ext:
                         plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
@@ -837,7 +941,8 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
                     title = 'FTBO and temporal sequences'
                 else:
                     title = f'FTBO and temporal sequences - {details}'
-                fig = plt.figure(title, clear=True)
+                plt.close(title)
+                fig = plt.figure(title)
                 fig.suptitle(title)
                 ax1,axGhost,ax2,ax3 = fig.subplots(nrows=4, gridspec_kw={"height_ratios":[2,0.5,2,2]})
                 axGhost.remove()
@@ -878,16 +983,6 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
                 fig.show()
         
     return results
-            
-            
-            
-            
-            
-    if not only:    
-        return FrequencySampling, FTrej, FTBO, FTBF
-    
-    elif only=='ftbo':
-        return FrequencySampling, FTBO
 
 
 def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Signal [µm]',
@@ -959,10 +1054,11 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
         linestyles = [mlines.Line2D([],[],color='k',label="Signal"),
                       mlines.Line2D([],[],color='k',linestyle='--', label="Window")]
                       
-        #plt.rcParams.update(plt.rcParamsDefault)
-        plt.rcParams.update({"figure.subplot.hspace":0.2})
+        plt.rcParams.update(rcParamsForBaselines)
+        # plt.rcParams.update({"figure.subplot.hspace":0.2})
         title = f'{details} - PSD'
-        fig = plt.figure(title, clear=True)
+        plt.close(title)
+        fig = plt.figure(title)
         fig.suptitle(title)
         
         if not cumStd:
@@ -991,8 +1087,8 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
             ax1.grid(True); ax2.grid(True);# ax3.grid(False)
 
         else:
-            ax1,ax2,ax3 = fig.subplots(nrows=3)
-            
+            ax1,ax2,axGhost,ax3 = fig.subplots(nrows=4,gridspec_kw={"height_ratios":[5,5,1.5,5]})
+            axGhost.axis("off")
             ax1.plot(FrequencySampling, PSD,'k')
             ax2.plot(cumFrequencySampling, cumulativeStd, 'k')
             ax3.plot(timestamps, signal, 'k')
@@ -1008,7 +1104,7 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
             
             ax1.set_yscale('log') ; ax1.set_xscale('log')
             ax2.set_xscale('log')
-            ax2.sharex(ax1)
+            ax2.sharex(ax1) ;# ax1.tick_params.labelbottom(False)
             ax1.set_ylabel('PSD [µm²/Hz]')
             ax2.set_ylabel("Cumulative STD [µm]")
             ax3.set_ylabel(SignalName)
@@ -1039,7 +1135,18 @@ def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
                      display=True, 
                      figsave=False, figdir='', ext='pdf'):
     
-    TelArrangement = infos['TelescopeArrangement']
+    from config import NA
+    
+    telNameLength=2
+    if 'TelescopeArrangement' in infos.keys():
+        TelArrangement = infos['TelescopeArrangement']
+    elif 'Beam2Tel' in vars(config):
+        TelNameLength=2
+        TelArrangement = [config.Beam2Tel[i:i+telNameLength] for i in range(0, len(config.Beam2Tel), telNameLength)]
+    else:
+        TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
+        TelArrangement = TelConventionalArrangement
+        
     base = infos['Base']
     
     if 'gains' in infos.keys():
@@ -1048,10 +1155,8 @@ def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
         gainGD,gainPD = 0,0
         
     TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
-    NA=6
-    TelNameLength=2
     
-    tel1, tel2 = base[:TelNameLength],base[TelNameLength:]
+    tel1, tel2 = base[:TelNameLength],base[telNameLength:]
     
     iTel1mes = np.argwhere(tel1==np.array(TelArrangement))[0][0]
     iTel2mes = np.argwhere(tel2==np.array(TelArrangement))[0][0]
@@ -1070,7 +1175,6 @@ def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
         timerange = range(0,len(timestamps))
     
     t = timestamps[timerange]
-    N = len(t)
     
     BOgd=BOTelemetries["gD"][timerange,iBaseMes]*R*lmbda/2/np.pi #microns
     BOpd=BOTelemetries["pD"][timerange,iBaseMes]*lmbda/2/np.pi #microns

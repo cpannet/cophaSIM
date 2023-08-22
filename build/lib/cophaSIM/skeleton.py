@@ -451,7 +451,7 @@ def save_config():
 def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
                             spectra=[], RefLambda=0, NT=1000,NTend=0,dt=1,
                             ampl=0, seed=100, dist='step', startframe = 10, 
-                            f_fin=200, value_start=0, value_end=0,
+                            f_fin=300, value_start=0, value_end=0,
                             r0=0.15,t0=10, L0=25, direction=0, d=1,
                             Levents=[],
                             TransDisturb={}, PhaseJumps={},
@@ -1012,6 +1012,7 @@ Longueur timestamps: {len(timestamps)}")
                     print(f'Done. Ellapsed time: {ElapsedTime}s')
         
     elif dist == 'chirp':
+        
         f_fin = f_fin*1e-3   # Conversion to kHz
         omega_fin = 2*np.pi*f_fin
         t_fin = timestamps[-1]
@@ -1088,7 +1089,7 @@ Longueur timestamps: {len(timestamps)}")
     
     hdu = fits.HDUList([primary,hdu1,im1,im2])
     
-    if dist == 'random' or dist == 'chirp':
+    if dist == 'random':
 
         DisturbancePSD = np.abs(newdsp[freqfft>=0])**2      # Save the PSD of the last disturbance for example
         filtrePSD = np.abs(filtre)**2                       # Convert the filter to PSD space
@@ -1284,7 +1285,7 @@ The simulation might experience aliasing. /!\\n")
 def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             Pistondetails=False,OPDdetails=False,withsnr=True,
             OneTelescope=True, pause=False, display=True,verbose=False,
-            start_pd_tracking = 0,UsedTelemetries='simu',
+            start_pd_tracking = 0,timebonds=(),UsedTelemetries='simu',
             savedir='',ext='pdf',infos={"details":''}):
     """
     
@@ -1387,10 +1388,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         wlIndex = np.argmin(np.abs(config.spectraM-wlOfTrack))
         wl = config.spectraM[wlIndex]
         
-        VisObj = ct.NB2NIN(outputs.VisibilityObject[wlIndex])
-        VisibilityPhase = np.angle(outputs.VisibilityEstimated[:,wlIndex,:])
+        # VisObj = ct.NB2NIN(outputs.VisibilityObject[wlIndex])
+        # VisibilityPhase = np.angle(outputs.VisibilityEstimated[:,wlIndex,:])
         
-        
+        filenamePrefix = f"Simulation{TimeID}"
             
     else:
 
@@ -1398,20 +1399,31 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         wl = TT.lmbda
         
         # Temporary before getting info in fitsfile
-        VisObj = np.ones([NIN])#ct.NB2NIN(outputs.VisibilityObject[wlIndex])
-        VisibilityPhase = np.zeros([NIN])#np.angle(outputs.VisibilityEstimated[:,wlIndex,:])
+        # VisObj = np.ones([NIN])#ct.NB2NIN(outputs.VisibilityObject[wlIndex])
+        # VisibilityPhase = np.zeros([NIN])#np.angle(outputs.VisibilityEstimated[:,wlIndex,:])
+        
+        if len(outputs.outputsFile)>6:
+            filenamePrefix = outputs.outputsFile[:6]
+        else:
+            filenamePrefix = outputs.outputsFile
+        
         
     display_module.wl = wl
     
     InterfArray = config.InterfArray
-    t = timestamps*ms # time in ms
-    timerange = range(NT)
 
-    stationaryregim_start = config.starttracking+(config.NT-config.starttracking)*1//3
-    if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
-    stationaryregim = np.arange(stationaryregim_start,NT)
+    if len(timebonds)==2:
+        if timebonds[1]==-1:
+            timerange = range(np.argmin(np.abs(timestamps-timebonds[0])),NT)
+        else:
+            timerange = range(np.argmin(np.abs(timestamps-timebonds[0])),np.argmin(np.abs(timestamps-timebonds[1])))
+    else:
+        stationaryregim_start = config.starttracking+(config.NT-config.starttracking)*1//3
+        if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
+        timerange = np.arange(stationaryregim_start,NT)
+        
+    display_module.timerange = timerange
     
-    display_module.stationaryregim = stationaryregim
     
     effDIT = min(DIT, config.NT - config.starttracking -1)
     
@@ -1420,6 +1432,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     else:
         if verbose:
             print("don't compute performances")
+            
+            
+    timestamps = timestamps[timerange]
+    t = timestamps*ms # time in ms
 
     
     if verbose:
@@ -1446,11 +1462,16 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     HANDLE THE POSSILIBITY TO SHOW ONLY A PART OF THE TELESCOPES/BASELINES/CLOSURES
     """
     
-    TelConventionalArrangement = InterfArray.TelNames
+    TelConventionalArrangement = InterfArray.TelNames        
+    telNameLength=len(TelConventionalArrangement[0])
     if 'TelescopeArrangement' in infos.keys():
         telescopes = infos['TelescopeArrangement']
+    elif 'Beam2Tel' in vars(config):
+        telNameLength=2
+        telescopes = [config.Beam2Tel[i:i+telNameLength] for i in range(0, len(config.Beam2Tel), telNameLength)]
     else:
         telescopes = TelConventionalArrangement
+        
     display_module.telescopes = telescopes
         
     beam_patches = []
@@ -1501,8 +1522,8 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     
     
     PlotTel = [False]*NA ; PlotTelOrigin=[False]*NA
-    PlotBaselineNIN = [False]*NIN
-    PlotBaseline = [False]*NINmes
+    plotBaselineNIN = [False]*NIN
+    plotBaseline = [False]*NINmes
     PlotClosure = [False]*NC
     TelNameLength = len(InterfArray.TelNames[0])
     
@@ -1521,14 +1542,14 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                 tel1,tel2=baseline[:TelNameLength],baseline[TelNameLength:]
                 if (tel1 in TelsToDisplay) \
                     and (tel2 in TelsToDisplay):
-                        PlotBaselineNIN[ib] = True
+                        plotBaselineNIN[ib] = True
                         
             for ib in range(NINmes):
                 baseline = baselines[ib]
                 tel1,tel2=baseline[:TelNameLength],baseline[TelNameLength:]
                 if (tel1 in TelsToDisplay) \
                     and (tel2 in TelsToDisplay):
-                        PlotBaseline[ib] = True
+                        plotBaseline[ib] = True
                     
         if not 'ClosuresToDisplay' in infos.keys():
             for ic in range(NC):
@@ -1551,12 +1572,12 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         for ib in range(NIN):
             baseline = baselinesNIN[ib]
             if (baseline in BaselinesToDisplay) or (baseline[2:]+baseline[:2] in BaselinesToDisplay):
-                PlotBaselineNIN[ib] = True
+                plotBaselineNIN[ib] = True
         
         for ib in range(NINmes):
             baseline = baselines[ib]
             if (baseline in BaselinesToDisplay) or (baseline[2:]+baseline[:2] in BaselinesToDisplay):
-                PlotBaseline[ib] = True
+                plotBaseline[ib] = True
         
         if not 'ClosuresToDisplay' in infos.keys():
             for ic in range(NC):
@@ -1580,13 +1601,13 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             baseline = baselinesNIN[ib]
             for closure in ClosuresToDisplay:
                 if baseline in closure:
-                    PlotBaselineNIN[ib] = True
+                    plotBaselineNIN[ib] = True
         
         for ib in range(NINmes):
             baseline = baselines[ib]
             for closure in ClosuresToDisplay:
                 if baseline in closure:
-                    PlotBaseline[ib] = True
+                    plotBaseline[ib] = True
         
         for ic in range(NC):
             closure = closures[ic]
@@ -1597,21 +1618,21 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             or ('BaselinesToDisplay' in infos.keys()) \
                 or ('ClosuresToDisplay' in infos.keys())):
         PlotTel = [True]*NA ; PlotTelOrigin = [True]*NA
-        PlotBaselineNIN = [True]*NIN
-        PlotBaseline = [True]*NINmes
+        plotBaselineNIN = [True]*NIN
+        plotBaseline = [True]*NINmes
         PlotClosure = [True]*NC
         
-    PlotBaselineNINIndex = np.argwhere(PlotBaselineNIN).ravel()
-    PlotBaselineIndex = np.argwhere(PlotBaseline).ravel()
+    plotBaselineNINIndex = np.argwhere(plotBaselineNIN).ravel()
+    plotBaselineIndex = np.argwhere(plotBaseline).ravel()
     
     display_module.PlotTel = PlotTel
     display_module.PlotTelOrigin = PlotTelOrigin
-    display_module.PlotBaselineNIN = PlotBaselineNIN
-    display_module.PlotBaseline = PlotBaseline
+    display_module.plotBaselineNIN = plotBaselineNIN
+    display_module.plotBaseline = plotBaseline
     display_module.PlotClosure = PlotClosure
     display_module.TelNameLength = TelNameLength
-    display_module.PlotBaselineIndex = PlotBaselineIndex
-    display_module.PlotBaselineNINIndex = PlotBaselineNINIndex
+    display_module.plotBaselineIndex = plotBaselineIndex
+    display_module.plotBaselineNINIndex = plotBaselineNINIndex
 
     """
     COMPUTATION RMS
@@ -1649,33 +1670,34 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     #     # Reference vectors
     #     GDrefmic = TT.GDref ; PDrefmic = TT.PDref
     
-    GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
-    GDmic2 = GD2*R*wl/2/np.pi ; PDmic2 = PD2*wl/2/np.pi
-    GDerrmic = GDerr*R*wl/2/np.pi ; PDerrmic = PDerr*wl/2/np.pi
-    GDerrmic2 = GDerr2*R*wl/2/np.pi ; PDerrmic2 = PDerr2*wl/2/np.pi
+    GDmic = GD[timerange]*R*wl/2/np.pi ; PDmic = PD[timerange]*wl/2/np.pi
+    GDerrmic2 = GDerr2[timerange]*R*wl/2/np.pi ; PDerrmic2 = PDerr2[timerange]*wl/2/np.pi
     
-    # GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
-    # GDrefmic = outputs.GDref*R*wl/2/np.pi ; PDrefmic = outputs.PDref*wl/2/np.pi
+    GDrefmic = outputs.GDref[timerange]*R*wl/2/np.pi ; PDrefmic = outputs.PDref[timerange]*wl/2/np.pi
     
     # GDerr = outputs.GDResidual2 ; PDerr =outputs.PDResidual2
-    # GDmic = GD*R*wl/2/np.pi ; PDmic = PD*wl/2/np.pi
     
-    RMSgdmic = np.std(GDmic[start_pd_tracking:,:],axis=0)
-    RMSpdmic = np.std(PDmic[start_pd_tracking:,:],axis=0)
+    # RMSgdmic = np.std(GDmic[timerange,:],axis=0)
+    # RMSpdmic = np.std(PDmic[timerange,:],axis=0)
     
-    RMSgderrmic = np.std(GDerrmic[start_pd_tracking:,:],axis=0)
-    RMSpderrmic = np.std(PDerrmic[start_pd_tracking:,:],axis=0)
+    if UsedTelemetries == 'simu':
+        GDmic2 = GD2[timerange]*R*wl/2/np.pi ; PDmic2 = PD2[timerange]*wl/2/np.pi
+        GDerrmic = GDerr[timerange]*R*wl/2/np.pi ; PDerrmic = PDerr[timerange]*wl/2/np.pi
+
+        # RMSgderrmic = np.std(GDerrmic[timerange,:],axis=0)
+        # RMSpderrmic = np.std(PDerrmic[timerange,:],axis=0)
     
-    RMStrueOPD = np.sqrt(outputs.VarOPD)
+    # RMStrueOPD = np.sqrt(outputs.VarOPD)
     
     
     """
     SIGNAL TO NOISE RATIOS
     """
     
-    SNR_pd = np.sqrt(outputs.SquaredSNRMovingAveragePD)
-    SNR_gd = np.sqrt(outputs.SquaredSNRMovingAverageGD)
-    SNRGD = np.sqrt(outputs.SquaredSNRMovingAverageGDUnbiased)
+    SNR_pd = np.sqrt(outputs.SquaredSNRMovingAveragePD[timerange])
+    SNR_gd = np.sqrt(outputs.SquaredSNRMovingAverageGD[timerange])
+    if UsedTelemetries == 'simu':
+        SNRGD = np.sqrt(outputs.SquaredSNRMovingAverageGDUnbiased[timerange])
     
     if whichSNR == 'pd':
         SNR = SNR_pd
@@ -1693,44 +1715,42 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                 print(f"{obsName} not in outputs module, I can't plot it")
                 continue
 
-            obs = getattr(outputs, obsName)
-            obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-            
-            if "command".casefold() in obsName.casefold():
-                obs = obs[:-1] ; obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+            obs = getattr(outputs, obsName)[timerange]
+            obsBar = np.std(obs,axis=0)
             
             generaltitle = obsName
             obsType = obsName
             if len(savedir):
-                filename= savedir+f"Simulation{TimeID}_{obsType}"
+                filename= savedir+f"{filenamePrefix}_{obsType}"
             else:
                 filename=''
             
             if "pis".casefold() in obsName.casefold():
-                display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
+                display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
                                           obsName=obsName,
-                                          display=display,filename=filename,ext='pdf',infos=infos,
+                                          display=display,filename=filename,ext=ext,infos=infos,
                                           verbose=verbose)
                 
             elif ("opd".casefold() in obsName.casefold())\
                 or ("snr".casefold() in obsName.casefold()):
-                display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
+                    
+                display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaselineNIN,
                                           obsName=obsName,
-                                          display=display,filename=filename,ext='pdf',infos=infos,
+                                          display=display,filename=filename,ext=ext,infos=infos,
                                           verbose=verbose)
                 
             else:
                 if obs.shape[-1] < 10:
                     print(f"{obsName} plotted with piston-oriented display.")
-                    display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
+                    display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
                                               obsName=obsName,
-                                              display=display,filename=filename,ext='pdf',infos=infos,
+                                              display=display,filename=filename,ext=ext,infos=infos,
                                               verbose=verbose)
                 else:
                     print(f"{obsName} plotted with OPD-oriented display.")
-                    display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
+                    display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaselineNIN,
                                               obsName=obsName,
-                                              display=display,filename=filename,ext='pdf',infos=infos,
+                                              display=display,filename=filename,ext=ext,infos=infos,
                                               verbose=verbose)
 
 
@@ -1743,119 +1763,142 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = "GD and PD estimated"
         obsType = "GDPDest"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
         
         GDobs = GDmic
         PDobs = PDmic
         
-        RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-        RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+        RMSgdobs = np.std(GDobs,axis=0)
+        RMSpdobs = np.std(PDobs,axis=0)
         
         if withsnr:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,SNR=SNR,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         else:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         
     if displayall or ('perftable2' in args) :
         generaltitle = "GD and PD estimated, after patch"
         obsType = "GDPDest2"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
         GDobs = GDmic2
         PDobs = PDmic2
         
-        RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-        RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+        RMSgdobs = np.std(GDobs,axis=0)
+        RMSpdobs = np.std(PDobs,axis=0)
         
         if withsnr:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,SNR=SNR,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         else:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         
         
     if displayall or ('perftableres' in args) :
         generaltitle = "GD and PD residuals"
         obsType = "GDPDres"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
         GDobs = GDerrmic
         PDobs = PDerrmic
         
-        RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-        RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+        RMSgdobs = np.std(GDobs,axis=0)
+        RMSpdobs = np.std(PDobs,axis=0)
         
         if withsnr:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,SNR=SNR,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         else:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         
     if displayall or ('perftableres2' in args) :
         generaltitle = "GD and PD residuals, after least square"
         obsType = "GDPDres2"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
         
         GDobs = GDerrmic2
         PDobs = PDerrmic2
         
-        RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-        RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+        RMSgdobs = np.std(GDobs,axis=0)
+        RMSpdobs = np.std(PDobs,axis=0)
         
         if withsnr:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,SNR=SNR,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         else:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,display=display,
+                                     filename=filename,ext=ext,infos=infos)
 
 
-    if displayall or ('GDPDcmd' in args) :
+    if displayall or ('gdPdCmd' in args) :
         generaltitle = "GD and PD commands in OPD-space"
-        obsType = "GDPDcmd"
+        obsType = "gdPdCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
-        GDobs = outputs.GDCommand[:-1]
-        PDobs = outputs.PDCommand[:-1]
+        GDobs = outputs.GDCommand[timerange]-outputs.GDCommand[timerange[0]]
+        PDobs = outputs.PDCommand[timerange]-outputs.PDCommand[timerange[0]]
         
-        RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-        RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+        RMSgdobs = np.std(GDobs,axis=0)
+        RMSpdobs = np.std(PDobs,axis=0)
         
         if withsnr:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,SNR=SNR,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,SNR=SNR,display=display,
+                                     filename=filename,ext=ext,infos=infos)
         else:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-                                     generaltitle,display=display,filename=filename,ext='pdf',
-                                     infos=infos)
+                                     plotBaseline,generaltitle,display=display,
+                                     filename=filename,ext=ext,infos=infos)
 
+    if displayall or ('gdPdCmdDiff' in args) :
+        generaltitle = "GD and PD commands diff in OPD-space"
+        obsType = "gdPdCmdDiff"
+        if len(savedir):
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename=''
+            
+        GDobs = outputs.GDCommand[timerange][1:] - outputs.GDCommand[timerange][:-1]
+        PDobs = outputs.PDCommand[timerange][1:] - outputs.PDCommand[timerange][:-1]
+        GDobs[-1] = 0 ; PDobs[-1] = 0
+        
+        RMSgdobs = np.std(GDobs,axis=0)
+        RMSpdobs = np.std(PDobs,axis=0)
+        
+        if withsnr:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     plotBaseline,generaltitle,SNR=SNR,display=display,
+                                     filename=filename,ext=ext,infos=infos)
+        else:
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
+                                     plotBaseline,generaltitle,display=display,
+                                     filename=filename,ext=ext,infos=infos)
 
 
     """ PLOT OF A SINGLE OBSERVABLES (flux, PD,GD,OPD,SNR,etc...) IN OPD-SPACE """
@@ -1864,32 +1907,32 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'OPD Disturbances'
         obsType = "distOpd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
-        obs = outputs.OPDDisturbance
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        obs = outputs.OPDDisturbance[timerange]
+        obsBar = np.std(obs,axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
-                                  obsName='OPD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaselineNIN,
+                                  obsName='OPD [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
     if displayall or ('opd' in args):
         generaltitle = 'True OPDs'
         obsType = "OPDtrue"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
-        obs = outputs.OPDTrue
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        obs = outputs.OPDTrue[timerange]
+        obsBar = np.std(obs,axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaselineNIN,
-                                  obsName='OPD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaselineNIN,
+                                  obsName='OPD [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
     
@@ -1897,15 +1940,15 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'Phase-delays'
         obsType='PD'
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
 
         obs = PDmic
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='PD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='PD [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
     
     if displayall or ('pd2' in args):
@@ -1913,14 +1956,14 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         obsType = "PD2"
         obs = PDmic2
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='PD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='PD [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
     if displayall or ('gd' in args):
@@ -1928,76 +1971,106 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'Group-delays'
         obsType = "GD"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDmic
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='GD [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='GD [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
     if displayall or ('gd2' in args):
         generaltitle = 'Group-delays 2'
         obsType = "GD2"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDmic2
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='GD2 [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='GD2 [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
     if displayall or ('gderr' in args):
         generaltitle = 'Group-delays error'
         obsType = "GDerr"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDerrmic
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='GDerr [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='GDerr [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)    
     
     if displayall or ('gderr2' in args):
         generaltitle = 'Group-delays filtered'
         obsType = "GDerr2"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDerrmic2
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='GDerr2 [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='GDerr2 [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
             
+    if displayall or ('visTrue' in args):
+        generaltitle = 'True visibilities'
+        obsType = "SquaredVisTrue"
+        if len(savedir):
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename=''        
+            
+        obs = np.abs(outputs.VisibilityTrue[timerange,wlIndex,:])**2
+        obsBar = np.std(np.abs(outputs.VisibilityTrue[timerange,wlIndex,:])**2,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='Square Vis True',display=display,
+                                  filename=filename,ext=ext,infos=infos,
+                                  verbose=verbose)
+        
+    if displayall or ('visEst' in args):
+        generaltitle = 'Estimated visibilities'
+        obsType = "SquaredVisEst"
+        if len(savedir):
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename=''        
+            
+        obs = np.abs(outputs.VisibilityEstimated[timerange,wlIndex,:])**2
+        obsBar = np.std(np.abs(outputs.VisibilityEstimated[timerange,wlIndex,:])**2,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='Square Vis Estimated',display=display,
+                                  filename=filename,ext=ext,infos=infos,
+                                  verbose=verbose)
+    
         
     if displayall or ('snr' in args):
         generaltitle = 'SNR'
         obsType = "SNR"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = SNR
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='SNR',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='SNR',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
                 
         
@@ -2006,46 +2079,46 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'SNR PD'
         obsType="SNRPD"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = SNR_pd
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+        obsBar = np.std(obs,axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='SNR',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='SNR',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
                 
     if displayall or ('snrGd' in args):
         generaltitle = 'SNR GD'
         obsType="SNRGD"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = SNR_gd
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='SNR',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='SNR',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
     if displayall or ('gdCmd' in args):
         generaltitle = 'GD Commands'
         obsType="GDCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
-        obs = outputs.GDCommand[:-1]
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obs = outputs.GDCommand[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='Commands [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
         
@@ -2053,15 +2126,15 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'PD Commands'
         obsType="PDCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
-        obs = outputs.PDCommand[:-1]
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obs = outputs.PDCommand[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='Commands [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
         
@@ -2069,15 +2142,15 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'OPD Commands'
         obsType="OPDCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
-        obs = outputs.OPDCommand[:-1]
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
-                                  obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obs = outputs.OPDCommand[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_bases(timestamps, obs,obsBar,generaltitle,plotBaseline,
+                                  obsName='Commands [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
         
@@ -2087,40 +2160,40 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'Estimated Flux'
         obsType = "estFlux"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
         if UsedTelemetries == 'simu':
-            obs = outputs.PhotometryEstimated[:,wlIndex]
-            obsHisto = np.mean(obs[start_pd_tracking:,:],axis=0)
+            obs = outputs.PhotometryEstimated[timerange,wlIndex]
+            obsBar = np.mean(obs,axis=0)
         else:
-            obs = outputs.PhotometryEstimated
-            obsHisto = np.mean(obs[start_pd_tracking:],axis=0)
+            obs = outputs.PhotometryEstimated[timerange]
+            obsBar = np.mean(obs,axis=0)
         
-        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
-                                  obsName='Flux [ph]',histoName='Average',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
+                                  obsName='Flux [ph]',barName='Average',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
     
     if displayall or ('trueFlux' in args):
         generaltitle = 'True Flux'
         obsType = "trueFlux"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
             
         if UsedTelemetries == 'simu':
-            obs = outputs.PhotometryDisturbance[:,wlIndex]
-            obsHisto = np.mean(obs[start_pd_tracking:,:],axis=0)
+            obs = outputs.PhotometryDisturbance[timerange,wlIndex]
+            obsBar = np.mean(obs,axis=0)
         else:
-            obs = outputs.PhotometryDisturbance
-            obsHisto = np.mean(obs[start_pd_tracking:],axis=0)
+            obs = outputs.PhotometryDisturbance[timerange]
+            obsBar = np.mean(obs,axis=0)
         
-        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
-                                  obsName='Flux [ph]',histoName='Average',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
+                                  obsName='Flux [ph]',barName='Average',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
     
     
@@ -2128,30 +2201,60 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'Piston Disturbances'
         obsType="pisDist"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
-        obs = outputs.PistonDisturbance
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
-                                  obsName='Disturbances [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obs = outputs.PistonDisturbance[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
+                                  obsName='Disturbances [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
     if displayall or ('cmdPis' in args):
         generaltitle = 'Piston Commands'
         obsType="pisCmd"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
-        obs = outputs.CommandODL[:-1]
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
-                                  obsName='Commands [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obs = outputs.CommandODL[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
+                                  obsName='Commands [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
+                                  verbose=verbose)
+        
+    if displayall or ('gdCmdPis' in args):
+        generaltitle = 'Piston GD Commands'
+        obsType="gdPisCmd"
+        if len(savedir):
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename=''     
+            
+        obs = outputs.PistonGDCommand[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
+                                  obsName='Commands [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
+                                  verbose=verbose)
+        
+    if displayall or ('pdCmdPis' in args):
+        generaltitle = 'Piston PD Commands'
+        obsType="pdCmdPis"
+        if len(savedir):
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename=''     
+            
+        obs = outputs.PistonPDCommand[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
+                                  obsName='Commands [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
         
@@ -2159,23 +2262,42 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         generaltitle = 'Piston True'
         obsType="pisTrue"
         if len(savedir):
-            filename= savedir+f"Simulation{TimeID}_{obsType}"
+            filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
-        obs = outputs.PistonTrue
-        obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsHisto,generaltitle,PlotTel,
-                                  obsName='Piston [µm]',
-                                  display=display,filename=filename,ext='pdf',infos=infos,
+        obs = outputs.PistonTrue[timerange]
+        obsBar = np.std(obs,axis=0)
+        display_module.simpleplot_tels(timestamps, obs,obsBar,generaltitle,PlotTel,
+                                  obsName='Piston [µm]',display=display,
+                                  filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
         
+        
+    if displayall or ("gdHist" in args):
+        plt.rcParams.update(rcParamsForBaselines)
+        generaltitle=f'Histogram GD'
+        obsType="gdHist"
+        if len(savedir):
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename='' 
+            
+        obs = GDmic
+        
+        display_module.plotHisto(obs,generaltitle,plotBaseline,obsName='GD',
+                      display=True,filename=filename,ext=ext,infos=infos,
+                      verbose=False)
+        
+        
+             
+
     # if displayall or ('piscmds' in args):
     #     obs = outputs.GDCommand[:-1]
-    #     obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+    #     obsBar = np.std(obs[timerange,:],axis=0)
         
     #     generaltitle = 'GD Commands'
-    #     display_module.simpleplot(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
+    #     display_module.simpleplot(timestamps, obs,obsBar,generaltitle,plotBaseline,
     #                               obsName='Commands',
     #                               display=True,filename='',ext='pdf',infos={"details":''},
     #                               verbose=False)
@@ -2183,10 +2305,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         
     # if displayall or ('pdcmd' in args):
     #     obs = outputs.PDCommand[:-1]
-    #     obsHisto = np.std(obs[start_pd_tracking:,:],axis=0)
+    #     obsBar = np.std(obs[timerange,:],axis=0)
         
     #     generaltitle = 'PD Commands'
-    #     display_module.simpleplot(timestamps, obs,obsHisto,generaltitle,PlotBaseline,
+    #     display_module.simpleplot(timestamps, obs,obsBar,generaltitle,plotBaseline,
     #                               obsName='Commands',
     #                               display=True,filename='',ext='pdf',infos={"details":''},
     #                               verbose=False)
@@ -2283,7 +2405,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         if len(savedir):
             if verbose:
                 print("Saving perfarray figure.")
-            plt.savefig(savedir+f"Simulation{TimeID}_perfarray.{ext}")
+            plt.savefig(savedir+f"{filenamePrefix}_perfarray.{ext}")
 
     plt.rcParams.update(plt.rcParamsDefault)
 
@@ -2320,7 +2442,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                          color=colors[ic])
                 ax1.plot(timestamps, outputs.ClosurePhaseGD[:,ic],
                          color=colors[ic],linestyle=':')
-                ax1.hlines(outputs.ClosurePhaseObject[wlIndex,ic], 0, timestamps[-1], 
+                ax1.hlines(outputs.ClosurePhaseObject[wlIndex,ic], 0, t[-1], 
                            color=colors[ic], linestyle='--')
                 linestyles1.append(mlines.Line2D([],[], color=colors[ic],
                                                 linestyle='-', label=f'{1}{ia+1}{iap+1}'))
@@ -2335,7 +2457,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                              color=colors[colorindex])
                     ax2.plot(timestamps, outputs.ClosurePhaseGD[:,ic],
                              color=colors[colorindex],linestyle=':')
-                    ax2.hlines(outputs.ClosurePhaseObject[wlIndex,ic], 0, timestamps[-1],
+                    ax2.hlines(outputs.ClosurePhaseObject[wlIndex,ic], 0, t[-1],
                                color=colors[colorindex], linestyle='--')
                     linestyles2.append(mlines.Line2D([],[], color=colors[colorindex],
                                                     linestyle='-', label=f'{ia+1}{iap+1}{iapp+1}'))
@@ -2344,7 +2466,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
                    color='k', linestyle=':')
         # ax2.vlines(config.starttracking*dt,ylim[0],ylim[1],
         #            color='k', linestyle=':')
-        plt.xlabel('Time [ms]')
+        plt.xlabel('Time [s]')
         plt.ylabel('Closure Phase [rad]')
         ax1.set_ylim(ylim)
         ax2.set_ylim(ylim)
@@ -2357,76 +2479,76 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
         config.newfig+=1
         
         if len(savedir):
-            fig.savefig(savedir+f"Simulation{TimeID}_cp.{ext}")
+            fig.savefig(savedir+f"{filenamePrefix}_cp.{ext}")
 
-    if displayall or ('vis' in args):
-        """
-        VISIBILITIES
-        """
+    # if displayall or ('vis' in args):
+    #     """
+    #     VISIBILITIES
+    #     """
     
-        ylim =[0,1.1]
-        # Squared Visibilities
-        for ia in range(NA):
-            fig = plt.figure(f"Squared Vis {ia+1}")
-            fig.suptitle(f"Squared visibility |V|² at {wl:.2f}µm for baselines \n\
-    including telescope {ia+1}")
-            axes = fig.subplots(nrows=NA-1,ncols=1,sharex=True)
-            iap=0
-            for ax in axes:
-                if iap == ia:
-                    iap+=1
+    #     ylim =[0,1.1]
+    #     # Squared Visibilities
+    #     for ia in range(NA):
+    #         fig = plt.figure(f"Squared Vis {ia+1}")
+    #         fig.suptitle(f"Squared visibility |V|² at {wl:.2f}µm for baselines \n\
+    # including telescope {ia+1}")
+    #         axes = fig.subplots(nrows=NA-1,ncols=1,sharex=True)
+    #         iap=0
+    #         for ax in axes:
+    #             if iap == ia:
+    #                 iap+=1
                 
-                ib = ct.posk(ia,iap,NA)
-                ax.plot(timestamps, np.abs(outputs.VisibilityEstimated[:,wlIndex,ib]), color='k')
-                ax.plot(timestamps, np.abs(outputs.VisibilityTrue[:,wlIndex,ib]),color='k',linestyle='--')
-                ax.set_ylim(ylim)
-                ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
-                iap += 1
-                ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                       color='k', linestyle=':')
-            plt.xlabel('Time (ms)')
-            if display:
-                plt.show()
-            config.newfig+=1
+    #             ib = ct.posk(ia,iap,NA)
+    #             ax.plot(timestamps, np.abs(outputs.VisibilityEstimated[:,wlIndex,ib]), color='k')
+    #             ax.plot(timestamps, np.abs(outputs.VisibilityTrue[:,wlIndex,ib]),color='k',linestyle='--')
+    #             ax.set_ylim(ylim)
+    #             ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
+    #             iap += 1
+    #             ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+    #                    color='k', linestyle=':')
+    #         plt.xlabel('Time (ms)')
+    #         if display:
+    #             plt.show()
+    #         config.newfig+=1
             
-            if OneTelescope:
-                break
+    #         if OneTelescope:
+    #             break
     
     
-        # Phase of the visibilities
-        ymax = np.pi #2*np.max(np.abs(VisibilityPhase))
-        ylim = [-ymax,ymax]
-        for ia in range(NA):
-            fig = plt.figure(f"Phase Vis {ia+1}")
-            fig.suptitle(f"Visibility phase \u03C6 at {wl:.2f}µm for baselines \n\
-    including telescope {ia+1}")
-            axes = fig.subplots(nrows=NA-1,ncols=1,sharex=True)
-            iap=0
-            for iax in range(len(axes)):
-                ax = axes[iax]
-                if iap == ia:
-                    iap+=1
+    #     # Phase of the visibilities
+    #     ymax = np.pi #2*np.max(np.abs(VisibilityPhase))
+    #     ylim = [-ymax,ymax]
+    #     for ia in range(NA):
+    #         fig = plt.figure(f"Phase Vis {ia+1}")
+    #         fig.suptitle(f"Visibility phase \u03C6 at {wl:.2f}µm for baselines \n\
+    # including telescope {ia+1}")
+    #         axes = fig.subplots(nrows=NA-1,ncols=1,sharex=True)
+    #         iap=0
+    #         for iax in range(len(axes)):
+    #             ax = axes[iax]
+    #             if iap == ia:
+    #                 iap+=1
                 
-                ib = ct.posk(ia,iap,NA)
-                ax.plot(timestamps, np.angle(outputs.VisibilityEstimated[:,wlIndex,ib]), color='k')
-                ax.plot(timestamps, np.angle(outputs.VisibilityTrue[:,wlIndex,ib]),color='k',linestyle='--')
-                ax.set_ylim(ylim)
-                ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
+    #             ib = ct.posk(ia,iap,NA)
+    #             ax.plot(timestamps, np.angle(outputs.VisibilityEstimated[:,wlIndex,ib]), color='k')
+    #             ax.plot(timestamps, np.angle(outputs.VisibilityTrue[:,wlIndex,ib]),color='k',linestyle='--')
+    #             ax.set_ylim(ylim)
+    #             ax.set_ylabel(f'[{ia+1},{iap+1}] [µm]')
                 
-                iap += 1
-                fig.subplots_adjust(right=0.8)
-                RMS_ax = fig.add_axes([0.82, 1-1/NA*(iax+1), 0.1, 0.9/NA])
-                RMS_ax.text(0,0,f"{np.std(VisibilityPhase[stationaryregim,ib])/(2*np.pi):.2f}\u03BB RMS")
-                RMS_ax.axis("off")
-                ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
-                       color='k', linestyle=':')
-            plt.xlabel('Time (ms)')
-            if display:
-                plt.show()
-            config.newfig+=1
+    #             iap += 1
+    #             fig.subplots_adjust(right=0.8)
+    #             RMS_ax = fig.add_axes([0.82, 1-1/NA*(iax+1), 0.1, 0.9/NA])
+    #             RMS_ax.text(0,0,f"{np.std(VisibilityPhase[stationaryregim,ib])/(2*np.pi):.2f}\u03BB RMS")
+    #             RMS_ax.axis("off")
+    #             ax.vlines(config.starttracking*dt,ylim[0],ylim[1],
+    #                    color='k', linestyle=':')
+    #         plt.xlabel('Time (ms)')
+    #         if display:
+    #             plt.show()
+    #         config.newfig+=1
     
-            if OneTelescope:
-                break
+    #         if OneTelescope:
+    #             break
 
     if displayall or ('detector' in args):
         """
@@ -2528,7 +2650,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             else:
                 plt.show()
         if len(savedir):
-            fig.savefig(savedir+f"Simulation{TimeID}_detector.{ext}")
+            fig.savefig(savedir+f"{filenamePrefix}_detector.{ext}")
             
     
     if ('state' in args):
@@ -2543,7 +2665,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
             ax.plot(timestamps, SNR_pd[:,ib],
                     label=f"{ich[ib]}")
             
-        ax.hlines(config.FT['ThresholdGD']**2,0,timestamps[-1],
+        ax.hlines(config.FT['ThresholdGD']**2,0,t[-1],
                   linestyle='--',label='Threshold GD')
         
         ax2.plot(timestamps, config.FT['state'][:-1], 
@@ -2640,9 +2762,9 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     #     plt.suptitle('Photometries in the spectral channel containing {:.2f}µm'.format(wl))
         
     #     for ia in range(NA):
-    #         plt.plot(t[timerange], np.sum(outputs.PhotometryDisturbance[:,OW*wlIndex:OW*(wlIndex+1),ia],axis=1),
+    #         plt.plot(timestamps[timerange], np.sum(outputs.PhotometryDisturbance[:,OW*wlIndex:OW*(wlIndex+1),ia],axis=1),
     #                  color=telcolors[ia],linestyle='dashed')#),label='Photometry disturbances')
-    #         plt.plot(t[timerange], outputs.PhotometryEstimated[:,wlIndex,ia],
+    #         plt.plot(timestamps[timerange], outputs.PhotometryEstimated[:,wlIndex,ia],
     #                  color=telcolors[ia],linestyle='solid')#,label='Estimated photometries')
             
     #     plt.vlines(config.starttracking*dt*ms,s[0],s[1],
@@ -2712,7 +2834,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     #     config.newfig+=1
     
     #     if len(savedir):
-    #         fig.savefig(savedir+f"Simulation{TimeID}_piston.{ext}")
+    #         fig.savefig(savedir+f"{filenamePrefix}_piston.{ext}")
     
     
     # if displayall or ('Pistondetails' in args):
@@ -2807,11 +2929,11 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor = 0
 #             for iBase in FirstSet:  # First serie
-#                 ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iColor])
 #                 iColor+=1
                 
 #             for iBase in SecondSet:   # Second serie
-#                 ax6.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iColor])
+#                 ax6.plot(timestamps[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iColor])
 #                 iColor+=1
                 
 #             ax1.vlines(config.starttracking*dt*ms,-3*np.max(np.abs(outputs.OPDTrue)),3*np.max(np.abs(outputs.OPDTrue)),
@@ -2861,7 +2983,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving opd figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_opd_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"{filenamePrefix}_opd_{rangeBases}.{ext}")
             
 #     """
 #     OPD
@@ -2875,7 +2997,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #         fig=plt.figure(title, clear=True)
 #         fig.suptitle(title)
         
-#         OneAxe = False ; NumberOfBaselinesToPlot = np.sum(PlotBaseline)
+#         OneAxe = False ; NumberOfBaselinesToPlot = np.sum(plotBaseline)
 #         if NumberOfBaselinesToPlot < len1:
 #             OneAxe=True
 #             ax1,ax2 = fig.subplots(nrows=2,gridspec_kw={"height_ratios":[3,1]})
@@ -2886,29 +3008,29 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             ax3.set_title("Second serie of baselines, from 26 to 56")
         
 #         if OneAxe:
-#             baselinestemp = [baselines[iBase] for iBase in PlotBaselineIndex]
+#             baselinestemp = [baselines[iBase] for iBase in plotBaselineIndex]
 #             basecolorstemp = basecolors[:NumberOfBaselinesToPlot]
 #             baselinestyles=['-']*len1 + ['--']*len2
 #             baselinehatches=['']*len1 + ['/']*len2
             
 #             k=0
-#             for iBase in PlotBaselineIndex:   # First serie
-#                 ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolorstemp[k],label=baselines[iBase])
+#             for iBase in plotBaselineIndex:   # First serie
+#                 ax1.plot(timestamps[timerange],outputs.OPDTrue[timerange,iBase],color=basecolorstemp[k],label=baselines[iBase])
 #                 # barbasecolors[iBase] = basecolorstemp[k]
 #                 k+=1                
             
-#             p2=ax2.bar(baselinestemp,[RMStrueOPD[iBase] for iBase in PlotBaselineIndex], color=basecolorstemp)
+#             p2=ax2.bar(baselinestemp,[RMStrueOPD[iBase] for iBase in plotBaselineIndex], color=basecolorstemp)
             
 #             ax1.legend()
     
 #         else:
 #             for iBase in range(len1):   # First serie
-#                 if PlotBaseline[iBase]:
-#                     ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
+#                 if plotBaseline[iBase]:
+#                     ax1.plot(timestamps[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
     
 #             for iBase in range(len1,NIN):   # Second serie
-#                 if PlotBaseline[iBase]:
-#                     ax3.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
+#                 if plotBaseline[iBase]:
+#                     ax3.plot(timestamps[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
     
 #             p1=ax5.bar(baselines[:len1],RMStrueOPD[:len1], color=basecolors[:len1])
 #             p2=ax6.bar(baselines[len1:],RMStrueOPD[len1:], color=basecolors[len1:])
@@ -2922,7 +3044,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             ax5.set_anchor('S') ; ax6.set_anchor('S')
 #             ax5.set_box_aspect(1/15) ; ax6.set_box_aspect(1/15)
             
-#         ct.setaxelim(ax1,ydata=[outputs.OPDTrue[timerange,iBase] for iBase in PlotBaselineIndex])
+#         ct.setaxelim(ax1,ydata=[outputs.OPDTrue[timerange,iBase] for iBase in plotBaselineIndex])
 #         ct.setaxelim(ax2,ydata=list(RMStrueOPD)+[wl/2], ymin=0)
 #         ax1.set_ylabel('True OPD [µm]')
 #         ax1.set_xlabel("Time [s]")#, labelpad=xlabelpad) ; ax4.set_xlabel("Time (s)", labelpad=xlabelpad)
@@ -2937,7 +3059,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             else:
 #                 plt.show()  
 #         if len(savedir):
-#             fig.savefig(savedir+f"Simulation{TimeID}_opd.{ext}")
+#             fig.savefig(savedir+f"{filenamePrefix}_opd.{ext}")
 
     
     # if displayall or ('opdcontrol' in args):
@@ -2955,10 +3077,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     #     ax6.set_title("Second serie of baselines, from 26 to 56")
         
     #     for iBase in range(len1):   # First serie
-    #         ax1.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
+    #         ax1.plot(timestamps[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
 
     #     for iBase in range(len1,NIN):   # Second serie
-    #         ax6.plot(t[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
+    #         ax6.plot(timestamps[timerange],outputs.OPDTrue[timerange,iBase],color=basecolors[iBase])
         
     #     ax1.vlines(config.starttracking*dt,-3*np.max(np.abs(outputs.OPDTrue)),3*np.max(np.abs(outputs.OPDTrue)),
     #                color='k', linestyle=':')
@@ -3006,7 +3128,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
     #     if len(savedir):
     #         if verbose:
     #             print("Saving opdcontrol figure.")
-    #         plt.savefig(savedir+f"Simulation{TimeID}_opdcontrol.{ext}")
+    #         plt.savefig(savedir+f"{filenamePrefix}_opdcontrol.{ext}")
     
     
     # if 'OPDcmd' in args:
@@ -3251,13 +3373,13 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor = 0
 #             for iBase in FirstSet:   # First serie
-#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
 #                 iColor+=1
                 
 #             for iBase in SecondSet:   # Second serie
-#                 ax2.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
 #                 iColor+=1
@@ -3346,13 +3468,13 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor = 0
 #             for iBase in FirstSet:   # First serie
-#                 ax1.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],SNR_pd[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
 #                 iColor+=1
                 
 #             for iBase in SecondSet:   # Second serie
-#                 ax2.plot(t[timerange],SNR_pd[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(timestamps[timerange],SNR_pd[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
 #                 iColor+=1
@@ -3435,13 +3557,13 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor = 0
 #             for iBase in FirstSet:   # First serie
-#                 ax1.plot(t[timerange],SNR_gd[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],SNR_gd[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
 #                 iColor+=1
                 
 #             for iBase in SecondSet:   # Second serie
-#                 ax2.plot(t[timerange],SNR_gd[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(timestamps[timerange],SNR_gd[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax2.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
 #                 iColor+=1
@@ -3494,7 +3616,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #         fig=plt.figure(title, clear=True)
 #         fig.suptitle(title)
         
-#         OneAxe = False ; NumberOfBaselinesToPlot = np.sum(PlotBaseline)
+#         OneAxe = False ; NumberOfBaselinesToPlot = np.sum(plotBaseline)
 #         if NumberOfBaselinesToPlot < len1:
 #             OneAxe=True
 #             ax1,ax2 = fig.subplots(nrows=2,sharex=True,sharey='row')
@@ -3506,15 +3628,15 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #         # ax1.set_ylim(np.sqrt(ylimSNR)) 
         
 #         if OneAxe:
-#             baselinestemp = [baselines[iBase] for iBase in PlotBaselineIndex]
+#             baselinestemp = [baselines[iBase] for iBase in plotBaselineIndex]
 #             basecolorstemp = basecolors[:NumberOfBaselinesToPlot]
 #             baselinestyles=['-']*len1 + ['--']*len2
 #             baselinehatches=['']*len1 + ['/']*len2
             
 #             k=0
-#             for iBase in PlotBaselineIndex:   # First serie
-#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolorstemp[k],label=baselines[iBase])
-#                 ax2.plot(t[timerange],GDerr[timerange,iBase],color=basecolorstemp[k])
+#             for iBase in plotBaselineIndex:   # First serie
+#                 ax1.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolorstemp[k],label=baselines[iBase])
+#                 ax2.plot(timestamps[timerange],GDerr[timerange,iBase],color=basecolorstemp[k])
 #                 # barbasecolors[iBase] = basecolorstemp[k]
 #                 k+=1                
 
@@ -3522,14 +3644,14 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 
 #         else:
 #             for iBase in range(len1):   # First serie
-#                 if PlotBaseline[iBase]:
-#                     ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-#                     ax2.plot(t[timerange],GDerr[timerange,iBase],color=basecolors[iBase])
+#                 if plotBaseline[iBase]:
+#                     ax1.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+#                     ax2.plot(timestamps[timerange],GDerr[timerange,iBase],color=basecolors[iBase])
 
 #             for iBase in range(len1,NIN):   # Second serie
-#                 if PlotBaseline[iBase]:
-#                     ax3.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iBase])
-#                     ax4.plot(t[timerange],GDerr[timerange,iBase],color=basecolors[iBase])
+#                 if plotBaseline[iBase]:
+#                     ax3.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iBase])
+#                     ax4.plot(timestamps[timerange],GDerr[timerange,iBase],color=basecolors[iBase])
 
 #             ax1.sharex(ax2)
 #             ax3.sharex(ax4)
@@ -3546,7 +3668,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             ax5.set_anchor('S') ; ax6.set_anchor('S')
 #             ax5.set_box_aspect(1/15) ; ax6.set_box_aspect(1/15)
             
-#         ct.setaxelim(ax2,ydata=[GDerr[timerange,iBase] for iBase in PlotBaselineIndex])
+#         ct.setaxelim(ax2,ydata=[GDerr[timerange,iBase] for iBase in plotBaselineIndex])
 #         ax1.set_ylabel('SNR')
 #         ax2.set_ylabel('Group-Delays [µm]')
     
@@ -3559,7 +3681,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             else:
 #                 plt.show()  
 #         if len(savedir):
-#             fig.savefig(savedir+f"Simulation{TimeID}_GDonly.{ext}")
+#             fig.savefig(savedir+f"{filenamePrefix}_GDonly.{ext}")
     
     
     
@@ -3571,8 +3693,8 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #         GDobs = GDmic
 #         PDobs = PDmic
         
-#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+#         RMSgdobs = np.std(GDobs[timerange,:],axis=0)
+#         RMSpdobs = np.std(PDobs[timerange,:],axis=0)
 
 #         # if 'ThresholdGD' in config.FT.keys():
 #         #     linestyles.append(mlines.Line2D([],[], color='black',
@@ -3606,22 +3728,22 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor=0
 #             for iBase in FirstSet:   # First serie
-#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax2.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
 #             for iBase in SecondSet:   # Second serie
-#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax6.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax7.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
             
 #             ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
@@ -3672,7 +3794,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"{filenamePrefix}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -3684,8 +3806,8 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #         GDobs = GDmic2
 #         PDobs = PDmic2
         
-#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+#         RMSgdobs = np.std(GDobs[timerange,:],axis=0)
+#         RMSpdobs = np.std(PDobs[timerange,:],axis=0)
 
 #         # linestyles=[mlines.Line2D([],[], color='black',
 #         #                                 linestyle=':', label='Start tracking')]
@@ -3721,22 +3843,22 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor=0
 #             for iBase in FirstSet:   # First serie
-#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax2.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
 #             for iBase in SecondSet:   # Second serie
-#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax6.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax7.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
             
 #             # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
@@ -3796,7 +3918,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"{filenamePrefix}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -3809,8 +3931,8 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #         GDobs = GDerrmic
 #         PDobs = PDerrmic
         
-#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+#         RMSgdobs = np.std(GDobs[timerange,:],axis=0)
+#         RMSpdobs = np.std(PDobs[timerange,:],axis=0)
 
 #         # linestyles=[mlines.Line2D([],[], color='black',
 #         #                                 linestyle=':', label='Start tracking')]
@@ -3846,22 +3968,22 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor=0
 #             for iBase in FirstSet:   # First serie
-#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax2.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
 #             for iBase in SecondSet:   # Second serie
-#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax6.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax7.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
             
 #             # ax2.vlines(config.starttracking*dt,-3*np.max(np.abs(GDmic)),3*np.max(np.abs(GDmic)),
@@ -3921,7 +4043,7 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"{filenamePrefix}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 
@@ -3935,8 +4057,8 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #         GDobs = GDerrmic2
 #         PDobs = PDerrmic2
         
-#         RMSgdobs = np.std(GDobs[start_pd_tracking:,:],axis=0)
-#         RMSpdobs = np.std(PDobs[start_pd_tracking:,:],axis=0)
+#         RMSgdobs = np.std(GDobs[timerange,:],axis=0)
+#         RMSpdobs = np.std(PDobs[timerange,:],axis=0)
 
 #         # linestyles=[mlines.Line2D([],[], color='black',
 #         #                                 linestyle=':', label='Start tracking')]
@@ -3972,22 +4094,22 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             SecondSet = range(iFirstBase+len1,iLastBase+1)
 #             iColor=0
 #             for iBase in FirstSet:   # First serie
-#                 ax1.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax1.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax1.hlines(config.FT['ThresholdGD'][iBase], t[timerange[0]],t[timerange[-1]], color=basecolors[iColor], linestyle='dashed')
-#                 ax2.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax2.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax3.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax3.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax2.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax2.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax3.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax3.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
 #             for iBase in SecondSet:   # Second serie
-#                 ax6.plot(t[timerange],SNR[timerange,iBase],color=basecolors[iColor])
+#                 ax6.plot(timestamps[timerange],SNR[timerange,iBase],color=basecolors[iColor])
 #                 if 'ThresholdGD' in config.FT.keys():
 #                     ax6.hlines(config.FT['ThresholdGD'][iBase],t[timerange[0]],t[timerange[-1]],color=basecolors[iColor], linestyle='dashed')
-#                 ax7.plot(t[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax7.plot(t[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
-#                 ax8.plot(t[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
-#                 ax8.plot(t[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax7.plot(timestamps[timerange],GDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax7.plot(timestamps[timerange],GDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
+#                 ax8.plot(timestamps[timerange],PDobs[timerange,iBase],color=basecolors[iColor])
+#                 ax8.plot(timestamps[timerange],PDrefmic[timerange,iBase],color=basecolors[iColor],linewidth=1, linestyle=':')
 #                 iColor+=1
             
 #             ax4.bar(baselines[FirstSet],RMSgdobs[FirstSet], color=basecolors[:len1])
@@ -4038,37 +4160,10 @@ def display(*args, outputsData=[],wlOfTrack=1.6,DIT=50,wlOfScience=0.75,
 #             if len(savedir):
 #                 if verbose:
 #                     print("Saving perftable figure.")
-#                 plt.savefig(savedir+f"Simulation{TimeID}_{obsType}_{rangeBases}.{ext}")
+#                 plt.savefig(savedir+f"{filenamePrefix}_{obsType}_{rangeBases}.{ext}")
 
 #         plt.rcParams.update(plt.rcParamsDefault)
 
-
-    
-    
-    
-
-
-def investigate(*args):
-    from . import config
-    from . import outputs
-    
-    from cophasim.tol_colors import tol_cset
-    
-    if 'detail search' in args:
-        fig=plt.figure('detail FS', clear=True)
-        ax1,ax2,ax3 = fig.subplots(nrows=3)
-        for ia in range(config.NA):
-            ax1.plot(outputs.timestamps, outputs.last_usaw[:,ia], color=colors[ia], label=f"Tel{ia+1}")
-            ax2.plot(outputs.timestamps, outputs.it_last[:,ia]*config.dt, color=colors[ia])
-            ax3.plot(outputs.timestamps, outputs.eps[:,ia], color=colors[ia])
-            ax3.plot(outputs.timestamps, np.gradient(outputs.SearchCommand[:-2,ia]), color=colors[ia], linestyle='-.')
-        ax1.set_ylabel("last_usaw")
-        ax2.set_ylabel("it_last")
-        ax3.set_ylabel("eps")
-        ax3.set_ylim(-2,2)
-        ax1.legend()
-
-    pass
 
 def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
                     CoherentFluxObject=[],SNR_SI=False,
@@ -4709,9 +4804,10 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
     return NewIntegrationTimes
 '''
 
+
 def BodeDiagrams(Input,Output,Command,timestamps,
-                 fbonds=[], details='', window='hanning',
-                 display=True, figsave=False, figdir='',ext='pdf'):
+                  fbonds=[], details='', window='hanning',
+                  display=True, figsave=False, figdir='',ext='pdf'):
     """
     Compute the Bode Diagrams of a close loop.
     
@@ -4724,7 +4820,7 @@ def BodeDiagrams(Input,Output,Command,timestamps,
     Command : ARRAY
         Commands of the close loop.
     timestamps : ARRAY
-        Time sampling associated with entries.
+        Time (in seconds) sampling associated with entries.
     fbonds : LIST, optional
         Min and max frequency to display. The default is [].
     details : STRING, optional
@@ -4787,22 +4883,22 @@ def BodeDiagrams(Input,Output,Command,timestamps,
 
     if display:
         plt.rcParams.update(rcParamsForBaselines)
-        title = f'{details} - Bode diagrams'
+        title = f'{details} - Transfer Functions'
         fig = plt.figure(title, clear=True)
         fig.suptitle(title)
         ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
         
-        ax1.plot(FrequencySampling, np.abs(FTrej))           
+        ax1.plot(FrequencySampling, np.abs(FTrej),color='k')           
 
         # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
         ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
         ax1.set_ylabel('FTrej')
         
-        ax2.plot(FrequencySampling, np.abs(FTBO))
+        ax2.plot(FrequencySampling, np.abs(FTBO),color='k')
         ax2.set_yscale('log') #; ax2.set_ylim(1e-3,5)
         ax2.set_ylabel("FTBO")
         
-        ax3.plot(FrequencySampling, np.abs(FTBF))
+        ax3.plot(FrequencySampling, np.abs(FTBF),color='k')
     
         ax3.set_xlabel('Frequencies [Hz]')
         ax3.set_ylabel('FTBF')
@@ -4812,37 +4908,39 @@ def BodeDiagrams(Input,Output,Command,timestamps,
 
         if figsave:
             prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
-            figname = "BodeDiagrams"
+            figname = "TransferFunctions"
             if isinstance(ext,list):
                 for extension in ext:
                     plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
             else:
                 plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
 
-
+        fig.show()
+        
         fig = plt.figure(f'{details} - Temporal sampling used', clear=True)
         ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
         
-        ax1.plot(timestamps, Input)
+        ax1.plot(timestamps, Input,'k')
         # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
     
         ax1.set_ylabel('Open loop')
         
-        ax2.plot(timestamps, Output)
+        ax2.plot(timestamps, Output,'k')
         ax2.set_ylabel("Close loop")
         
-        ax3.plot(timestamps,Command)
+        ax3.plot(timestamps,Command,'k')
     
         ax3.set_xlabel('Timestamps [s]')
         ax3.set_ylabel('Command')
         
+        fig.show()
         
     return FrequencySampling, FTrej, FTBO, FTBF
 
 
 
 def SpectralAnalysis(OPD = (1,2),TimeBonds=0, details='', window='hanning',
-                     figsave=False, figdir='',ext='pdf'):
+                      figsave=False, figdir='',ext='pdf'):
     """
     Plot the three Transfer Function of the servo loop controlling the OPD between
     the telescopes OPD[0] and OPD[1]
@@ -4995,14 +5093,13 @@ def FSdefault(NA, NW):
     return V2PM, P2VM, ich
 
 
-
 def ReadCf(currCfEstimated):
     """
     From measured coherent flux, estimates GD, PD, CP, Photometry, Visibilities
     
     NAME: 
-        ReadCf - Calculates the group-delay, phase-delay, closure phase and 
-        complex visibility from the coherent flux estimated by the FS
+        COH_ALGO - Calculates the group-delay, phase-delay, closure phase and 
+        visibility from the fringe sensor image.
     
         
     INPUT: CfEstimated [MW,NB]
@@ -5010,54 +5107,65 @@ def ReadCf(currCfEstimated):
     OUTPUT: 
         
     UPDATE:
-        - outputs.CfPD: Coherent Flux Phase-Delay      [NT,MW,NIN]*1j
-        - outputs.CfGD: Coherent Flux GD               [NT,MW,NIN]*1j
+        - outputs.CfEstimated_             
+        - outputs.CfPD: Coherent Flux Phase-Delay     [NT,MW,NINmes]
+        - outputs.CfGD: Coherent Flux GD              [NT,MW,NINmes]
         - outputs.ClosurePhasePD                       [NT,MW,NC]
         - outputs.ClosurePhaseGD                       [NT,MW,NC]
         - outputs.PhotometryEstimated                  [NT,MW,NA]
-        - outputs.VisibilityEstimated                  [NT,MW,NIN]*1j
-        - outputs.SquaredCoherenceDegree               [NT,MW,NIN]
+        - outputs.VisibilityEstimated                    [NT,MW,NIN]*1j
+        - outputs.CoherenceDegree                      [NT,MW,NIN]
     """
-
+    
     from . import outputs
     
-    from .config import NA,NIN,NC
-    from .config import MW,FS
+    from .config import NA
+    from .config import MW
     
     it = outputs.it            # Time
      
+    NINmes = config.FS['NINmes']
     """
-    Photometries extraction
+    Photometries and CfNIN extraction
     [NT,MW,NA]
     """
-    PhotEst = np.zeros([MW,NA])
-    for ia in range(NA):
-        PhotEst[:,ia] = np.real(currCfEstimated[:,ia*(NA+1)])
     
-    # Extract NIN-sized coherence vector from NB-sized one. 
-    # (eliminates photometric and conjugate terms)
-    currCfEstimatedNIN = np.zeros([MW, NIN])*1j
-    for imw in range(MW):    
-        from .coh_tools import NB2NIN
-        currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
-        
+    PhotEst = np.abs(currCfEstimated[:,:NA])
+    
+    currCfEstimatedNIN = np.zeros([MW, NINmes])*1j
+    for ib in range(NINmes):
+        currCfEstimatedNIN[:,ib] = currCfEstimated[:,NA+ib] + 1j*currCfEstimated[:,NA+NINmes+ib]
+            
     # Save coherent flux and photometries in stack
     outputs.PhotometryEstimated[it] = PhotEst
     
+    # Nflux = config.FT['Nflux']
+    # if it < Nflux:
+    #     Nflux=it+1
+    # timerange = range(it-Nflux,it)
+    # for ia in range(NA):
+    #     # Test if there were flux in the Nf last frames, before updating the average
+    #     thereIsFlux = not outputs.noFlux[timerange,ia].any()
+    #     if thereIsFlux:
+    #         outputs.PhotometryAverage[it,ia] = np.mean(outputs.PhotometryEstimated[timerange,:,ia])
+    #     else:
+    #         outputs.PhotometryAverage[it,ia] = outputs.PhotometryAverage[it-1,ia]
+            
     """
     Visibilities extraction
     [NT,MW,NIN]
     """
     
-    for ia in range(NA):
-        for iap in range(ia+1,NA):
-            ib = ct.posk(ia,iap,NA)
-            Iaap = currCfEstimatedNIN[:,ib]                     # Interferometric intensity (a,a')
-            Ia = PhotEst[:,ia]                                  # Photometry pupil a
-            Iap = PhotEst[:,iap]                                # Photometry pupil a'
-            outputs.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Fringe VisibilityEstimated of the base (a,a')
-            outputs.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
+    for ib in range(NINmes):
+        ia = int(config.FS['ich'][ib][0])-1
+        iap = int(config.FS['ich'][ib][1])-1
+        Iaap = currCfEstimatedNIN[:,ib]         # Interferometric intensity (a,a')
+        Ia = PhotEst[:,ia]                      # Photometry pupil a
+        Iap = PhotEst[:,iap]                    # Photometry pupil a'
+        outputs.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Estimated Fringe Visibility of the base (a,a')
+        outputs.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
  
+
     """
     Phase-delays extraction
     PD_ is a global stack variable [NT, NIN]
@@ -5066,18 +5174,15 @@ def ReadCf(currCfEstimated):
     D = 0   # Dispersion correction factor: so far, put to zero because it's a 
             # calibration term (to define in coh_fs?)
             
-    LmbdaTrack = config.wlOfTrack
+    from .config import wlOfTrack
     
     # Coherent flux corrected from dispersion
     for imw in range(MW):
-        outputs.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
+        outputs.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-wlOfTrack/config.spectraM[imw])**2)
         
         # If ClosurePhase correction before wrapping
-        # outputs.CfPD[it,imw] = outputs.CfPD[it,imw]*np.exp(-1j*outputs.PDref)
-        
-    # Current Phase-Delay
-    currPD = np.angle(np.sum(outputs.CfPD[it,:,:], axis=0))*FS['active_ich']
-        
+        # outputs.CfPD[it,imw] = outputs.CfPD[it,imw]*np.exp(-1j*outputs.PDref[it])
+
     """
     Group-Delays extration
     GD_ is a global stack variable [NT, NIN]
@@ -5089,8 +5194,7 @@ def ReadCf(currCfEstimated):
                          Need several wavelengths for group delay')              # Group-delay calculation
     
     Ngd = config.FT['Ngd']                 # Group-delay DIT
-    Ncross = config.FT['Ncross']           # Distance between wavelengths channels for GD calculation
-    
+
     if it < Ngd:
         Ngd = it+1
     
@@ -5100,80 +5204,193 @@ def ReadCf(currCfEstimated):
         cfgd = outputs.CfPD[iot]*np.exp(-1j*outputs.PDEstimated[iot])/Ngd
         
         # If ClosurePhase correction before wrapping
-        # cfgd = cfgd*np.exp(-1j*outputs.GDref)
+        # cfgd = cfgd*np.exp(-1j*outputs.GDref[it])
         
         outputs.CfGD[it,:,:] += cfgd
+    
+    CfPD = outputs.CfPD[it]
+    CfGD = outputs.CfGD[it]
+
+    return CfPD, CfGD
 
 
-    currGD = np.zeros(NIN)
-    for ib in range(NIN):
-        # cs = 0*1j
-        cfGDlmbdas = outputs.CfGD[it,:-Ncross,ib]*np.conjugate(outputs.CfGD[it,Ncross:,ib])
-        cfGDmoy = np.sum(cfGDlmbdas)
+
+# def ReadCf(currCfEstimated):
+#     """
+#     From measured coherent flux, estimates GD, PD, CP, Photometry, Visibilities
+    
+#     NAME: 
+#         ReadCf - Calculates the group-delay, phase-delay, closure phase and 
+#         complex visibility from the coherent flux estimated by the FS
+    
+        
+#     INPUT: CfEstimated [MW,NB]
+    
+#     OUTPUT: 
+        
+#     UPDATE:
+#         - outputs.CfPD: Coherent Flux Phase-Delay      [NT,MW,NIN]*1j
+#         - outputs.CfGD: Coherent Flux GD               [NT,MW,NIN]*1j
+#         - outputs.ClosurePhasePD                       [NT,MW,NC]
+#         - outputs.ClosurePhaseGD                       [NT,MW,NC]
+#         - outputs.PhotometryEstimated                  [NT,MW,NA]
+#         - outputs.VisibilityEstimated                  [NT,MW,NIN]*1j
+#         - outputs.SquaredCoherenceDegree               [NT,MW,NIN]
+#     """
+
+#     from . import outputs
+    
+#     from .config import NA,NIN,NC
+#     from .config import MW,FS
+    
+#     it = outputs.it            # Time
+     
+#     """
+#     Photometries extraction
+#     [NT,MW,NA]
+#     """
+#     PhotEst = np.zeros([MW,NA])
+#     for ia in range(NA):
+#         PhotEst[:,ia] = np.real(currCfEstimated[:,ia*(NA+1)])
+    
+#     # Extract NIN-sized coherence vector from NB-sized one. 
+#     # (eliminates photometric and conjugate terms)
+#     currCfEstimatedNIN = np.zeros([MW, NIN])*1j
+#     for imw in range(MW):    
+#         from .coh_tools import NB2NIN
+#         currCfEstimatedNIN[imw,:] = NB2NIN(currCfEstimated[imw,:])
+        
+#     # Save coherent flux and photometries in stack
+#     outputs.PhotometryEstimated[it] = PhotEst
+    
+#     """
+#     Visibilities extraction
+#     [NT,MW,NIN]
+#     """
+    
+#     for ia in range(NA):
+#         for iap in range(ia+1,NA):
+#             ib = ct.posk(ia,iap,NA)
+#             Iaap = currCfEstimatedNIN[:,ib]                     # Interferometric intensity (a,a')
+#             Ia = PhotEst[:,ia]                                  # Photometry pupil a
+#             Iap = PhotEst[:,iap]                                # Photometry pupil a'
+#             outputs.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Fringe VisibilityEstimated of the base (a,a')
+#             outputs.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
+ 
+#     """
+#     Phase-delays extraction
+#     PD_ is a global stack variable [NT, NIN]
+#     Eq. 10 & 11
+#     """
+#     D = 0   # Dispersion correction factor: so far, put to zero because it's a 
+#             # calibration term (to define in coh_fs?)
+            
+#     LmbdaTrack = config.wlOfTrack
+    
+#     # Coherent flux corrected from dispersion
+#     for imw in range(MW):
+#         outputs.CfPD[it,imw,:] = currCfEstimatedNIN[imw,:]*np.exp(1j*D*(1-LmbdaTrack/config.spectraM[imw])**2)
+        
+#         # If ClosurePhase correction before wrapping
+#         # outputs.CfPD[it,imw] = outputs.CfPD[it,imw]*np.exp(-1j*outputs.PDref)
+        
+    # # Current Phase-Delay
+    # currPD = np.angle(np.sum(outputs.CfPD[it,:,:], axis=0))*FS['active_ich']
+        
+    # """
+    # Group-Delays extration
+    # GD_ is a global stack variable [NT, NIN]
+    # Eq. 15 & 16
+    # """
+    
+    # if MW <= 1:
+    #     raise ValueError('Tracking mode = GD but no more than one wavelength. \
+    #                       Need several wavelengths for group delay')              # Group-delay calculation
+    
+    # Ngd = config.FT['Ngd']                 # Group-delay DIT
+    # Ncross = config.FT['Ncross']           # Distance between wavelengths channels for GD calculation
+    
+    # if it < Ngd:
+    #     Ngd = it+1
+    
+    # # Integrates GD with Ngd last frames (from it-Ngd to it)
+    # timerange = range(it+1-Ngd,it+1)
+    # for iot in timerange:
+    #     cfgd = outputs.CfPD[iot]*np.exp(-1j*outputs.PDEstimated[iot])/Ngd
+        
+    #     # If ClosurePhase correction before wrapping
+    #     # cfgd = cfgd*np.exp(-1j*outputs.GDref)
+        
+    #     outputs.CfGD[it,:,:] += cfgd
+
+
+    # currGD = np.zeros(NIN)
+    # for ib in range(NIN):
+    #     # cs = 0*1j
+    #     cfGDlmbdas = outputs.CfGD[it,:-Ncross,ib]*np.conjugate(outputs.CfGD[it,Ncross:,ib])
+    #     cfGDmoy = np.sum(cfGDlmbdas)
 
             
-        currGD[ib] = np.angle(cfGDmoy)*FS['active_ich'][ib]    # Group-delay on baseline (ib).
+    #     currGD[ib] = np.angle(cfGDmoy)*FS['active_ich'][ib]    # Group-delay on baseline (ib).
     
-    """
-    Closure phase calculation
-    cpPD_ is a global stack variable [NT, NC]
-    cpGD_ is a global stack variable [NT, NC]
-    Eq. 17 & 18
-    CORRECTION: Eq. 18 Lacour érronée --> 
-        --> CPgd = arg[sum_{N_l-Ncross}(gamma''_{i,j,l+Ncross}*conj(gamma''_{i,j,l}))*sum(....)]
-    """
+    # """
+    # Closure phase calculation
+    # cpPD_ is a global stack variable [NT, NC]
+    # cpGD_ is a global stack variable [NT, NC]
+    # Eq. 17 & 18
+    # CORRECTION: Eq. 18 Lacour érronée --> 
+    #     --> CPgd = arg[sum_{N_l-Ncross}(gamma''_{i,j,l+Ncross}*conj(gamma''_{i,j,l}))*sum(....)]
+    # """
     
-    Ncp = config.FT['Ncp']
+    # Ncp = config.FT['Ncp']
     
-    if it < Ncp:
-        Ncp = it+1
+    # if it < Ncp:
+    #     Ncp = it+1
         
-    bispectrumPD = np.zeros([NC])*1j
-    bispectrumGD = np.zeros([NC])*1j
+    # bispectrumPD = np.zeros([NC])*1j
+    # bispectrumGD = np.zeros([NC])*1j
     
-    timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
-    for ia in range(NA):
-        for iap in range(ia+1,NA):
-            ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
-            valid1=config.FS['active_ich'][ib]
-            cs1 = np.sum(outputs.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
-            cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
-            cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
-            for iapp in range(iap+1,NA):
-                ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
-                valid2=config.FS['active_ich'][ib]
-                cs2 = np.sum(outputs.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
-                cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
-                cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+    # timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
+    # for ia in range(NA):
+    #     for iap in range(ia+1,NA):
+    #         ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
+    #         valid1=config.FS['active_ich'][ib]
+    #         cs1 = np.sum(outputs.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
+    #         cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
+    #         cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+    #         for iapp in range(iap+1,NA):
+    #             ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+    #             valid2=config.FS['active_ich'][ib]
+    #             cs2 = np.sum(outputs.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
+    #             cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
+    #             cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
                 
-                ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
-                valid3=config.FS['active_ich'][ib]
-                cs3 = np.sum(np.conjugate(outputs.CfPD[timerange,:,ib]),axis=1) # Sum of 
-                cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
-                cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
+    #             ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+    #             valid3=config.FS['active_ich'][ib]
+    #             cs3 = np.sum(np.conjugate(outputs.CfPD[timerange,:,ib]),axis=1) # Sum of 
+    #             cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
+    #             cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
                 
-                # The bispectrum of one time and one triangle adds up to
-                # the Ncp last times
-                ic = ct.poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
-                validcp[ic]=valid1*valid2*valid3
-                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
-                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+    #             # The bispectrum of one time and one triangle adds up to
+    #             # the Ncp last times
+    #             ic = ct.poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
+    #             validcp[ic]=valid1*valid2*valid3
+    #             bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
+    #             bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
     
-    outputs.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
-    outputs.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
+    # outputs.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
+    # outputs.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
     
-    if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
-        for ia in range(1,NA-1):
-            for iap in range(ia+1,NA):
-                k = ct.posk(ia,iap,NA)
-                ic = ct.poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
-                outputs.PDref[it,k] = outputs.ClosurePhasePD[it,ic]
-                outputs.GDref[it,k] = outputs.ClosurePhaseGD[it,ic]
+    # if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
+    #     for ia in range(1,NA-1):
+    #         for iap in range(ia+1,NA):
+    #             k = ct.posk(ia,iap,NA)
+    #             ic = ct.poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
+    #             outputs.PDref[it,k] = outputs.ClosurePhasePD[it,ic]
+    #             outputs.GDref[it,k] = outputs.ClosurePhaseGD[it,ic]
 
     
-    return currPD, currGD
-
-
+#     return currPD, currGD
 
 
 def SimpleIntegrator(*args, init=False, Ngd=1, Npd=1, Ncp = 1, GainPD=0, GainGD=0,
@@ -5265,17 +5482,14 @@ Ngd={Ngd} ; Type={config.FT['Name']} \n\ ***")
     
     currCfEstimated = args[0]
     
-    currPD, currGD = ReadCf(currCfEstimated)
+    CfPD, CfGD = ReadCf(currCfEstimated)
     
-    outputs.PDEstimated[it] = currPD
-    outputs.GDEstimated[it] = currGD#*config.FS['R']
-    
-    currCmd = SimpleCommandCalc(currPD,currGD)
+    currCmd = SimpleCommandCalc(CfPD,CfGD)
     
     return currCmd
     
 
-def SimpleCommandCalc(currPD,currGD, verbose=False):
+def SimpleCommandCalc(CfPD,CfGD, verbose=False):
     """
     Generates the command to send to the optical delay line according to the
     group-delay and phase-delay reduced from the OPDCalculator.
@@ -5296,10 +5510,90 @@ def SimpleCommandCalc(currPD,currGD, verbose=False):
     
     from . import outputs
     
-    from .config import NA,NIN
+    from .config import NA,NIN,MW,NC
     from .config import FT,FS
     
+    Ncross = FT['Ncross']
+    
     it = outputs.it            # Frame number
+    
+    
+    """ Current Phase-Delay """
+    currPD = np.angle(np.sum(CfPD, axis=0))*FS['active_ich']
+    
+    """
+    Group-Delays extration
+    GD_ is a global stack variable [NT, NIN]
+    Eq. 15 & 16
+    """
+    
+    currGD = np.zeros(NIN)
+    for ib in range(NIN):
+        # cs = 0*1j
+        cfGDlmbdas = CfGD[:-Ncross,ib]*np.conjugate(CfGD[Ncross:,ib])
+        cfGDmoy = np.sum(cfGDlmbdas)
+
+        currGD[ib] = np.angle(cfGDmoy)*FS['active_ich'][ib]    # Group-delay on baseline (ib).
+    
+    outputs.PDEstimated[it] = currPD
+    outputs.GDEstimated[it] = currGD
+    
+    """
+    Closure phase calculation
+    cpPD_ is a global stack variable [NT, NC]
+    cpGD_ is a global stack variable [NT, NC]
+    Eq. 17 & 18
+    CORRECTION: Eq. 18 Lacour érronée --> 
+        --> CPgd = arg[sum_{N_l-Ncross}(gamma''_{i,j,l+Ncross}*conj(gamma''_{i,j,l}))*sum(....)]
+    """
+    
+    Ncp = config.FT['Ncp']
+    
+    if it < Ncp:
+        Ncp = it+1
+        
+    bispectrumPD = np.zeros([NC])*1j
+    bispectrumGD = np.zeros([NC])*1j
+    
+    timerange = range(it+1-Ncp,it+1) ; validcp=np.zeros(NC)
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            ib = ct.posk(ia,iap,NA)      # coherent flux (ia,iap)  
+            valid1=config.FS['active_ich'][ib]
+            cs1 = np.sum(outputs.CfPD[timerange,:,ib], axis=1)     # Sum of coherent flux (ia,iap)
+            cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
+            cfGDmoy1 = np.sum(cfGDlmbdas,axis=1)     # Sum of coherent flux (ia,iap)  
+            for iapp in range(iap+1,NA):
+                ib = ct.posk(iap,iapp,NA) # coherent flux (iap,iapp)    
+                valid2=config.FS['active_ich'][ib]
+                cs2 = np.sum(outputs.CfPD[timerange,:,ib], axis=1) # Sum of coherent flux (iap,iapp)    
+                cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy2 = np.sum(cfGDlmbdas,axis=1)
+                
+                ib = ct.posk(ia,iapp,NA) # coherent flux (iapp,ia)    
+                valid3=config.FS['active_ich'][ib]
+                cs3 = np.sum(np.conjugate(outputs.CfPD[timerange,:,ib]),axis=1) # Sum of 
+                cfGDlmbdas = outputs.CfGD[timerange,Ncross:,ib]*np.conjugate(outputs.CfGD[timerange,:-Ncross,ib])
+                cfGDmoy3 = np.sum(cfGDlmbdas,axis=1)
+                
+                # The bispectrum of one time and one triangle adds up to
+                # the Ncp last times
+                ic = ct.poskfai(ia,iap,iapp,NA)        # 0<=ic<NC=(NA-2)(NA-1) 
+                validcp[ic]=valid1*valid2*valid3
+                bispectrumPD[ic]=np.sum(cs1*cs2*cs3)
+                bispectrumGD[ic]=np.sum(cfGDmoy1*cfGDmoy2*np.conjugate(cfGDmoy3))
+    
+    outputs.ClosurePhasePD[it] = np.angle(bispectrumPD)*validcp
+    outputs.ClosurePhaseGD[it] = np.angle(bispectrumGD)*validcp
+    
+    if config.FT['CPref'] and (it>Ncp):                     # At time 0, we create the reference vectors
+        for ia in range(1,NA-1):
+            for iap in range(ia+1,NA):
+                k = ct.posk(ia,iap,NA)
+                ic = ct.poskfai(0,ia,iap,NA)   # Position of the triangle (0,ia,iap)
+                outputs.PDref[it,k] = outputs.ClosurePhasePD[it,ic]
+                outputs.GDref[it,k] = outputs.ClosurePhaseGD[it,ic]
+
     
     """
     Group-Delay tracking
@@ -5853,7 +6147,7 @@ def save_data(simuobj, configobj, filepath, LightSave=True, overwrite=False, ver
         hduL.append(hdu)
     
     # t = PandasToTableHDU()
-    # hdu = fits.BinTableHDU(t, name="Perf")
+    # hdu = fits.BinTableHDU(timestamps, name="Perf")
     
     for newhdu in imhduL:
         hduL.append(newhdu)

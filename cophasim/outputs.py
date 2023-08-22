@@ -23,7 +23,7 @@ NBmes = config.FS['NBmes']
 # Time
 it = 0
 TimeID="notime"
-
+outputsFile = ""
 
 """Coherent flux [NB]""" # Most general formalism: contains photometries information
 CoherentFluxObject = np.zeros([NW, NB])*1j          # Object coherent flux
@@ -94,6 +94,7 @@ TemporalVarianceGD = np.zeros([NT,NINmes])          # Temporal Variance GD estim
 # Commands 
 PDCommand = np.zeros([NT+1,NINmes])                 # OPD-space PD command
 GDCommand = np.zeros([NT+1,NINmes])                 # OPD-space GD command
+GDCommandIntegrator = np.zeros([NT+1,NINmes])       # OPD-space GD command before round
 
 # Search state
 diffOffsets = np.zeros([NT,NINmes])                 # Differential offsets (p1-p2) where the fringes are found
@@ -126,6 +127,8 @@ CommandRelock = np.zeros([NT+1,NA])                 # Piston-space RELOCK comman
 CommandSearch = np.zeros([NT+1,NA])                 # Piston-space SEARCH command
 CommandODL = np.zeros([NT+1,NA])                    # Delay lines positionnal command calculated at time it
 
+PistonGDcorr = np.zeros([NT,NA])
+
 # Photometries
 TransmissionDisturbance = np.ones([NT,NW,NA])       # Transmission disturbance of the telescopes
 PhotometryDisturbance = np.zeros([NT,NW,NA])        # Resulting photometry disturbances (scaled by the object photometry)
@@ -149,6 +152,7 @@ GainGD = np.zeros([NT])                             # Gain GD in real time, usua
 Ipd = np.ones([NT,NINmes,NINmes])                   # Weighting matrix PD command
 Igd = np.ones([NT,NINmes,NINmes])                   # Weighting matrix GD command
 Igdna = np.ones([NT,NA,NA])                         # Matrice with ones everywhere
+singularValuesSqrt = np.zeros([NT,NA-1])            # Squared Root of Singular values of Igd
 IgdRank =np.ones([NT])                              # Rank of the weighting matrix GD
 time_since_loss=np.zeros(NT)                        # Time since the loss of one telescope
 NoPhotometryFiltration = np.zeros([NT,NA,NA])       # Matrix that filters telescopes which have no photometry

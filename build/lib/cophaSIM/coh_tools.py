@@ -2663,11 +2663,95 @@ def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
     # subax.yaxis.set_tick_params(labelsize=y_labelsize)
     return subax
 
+def model(freq,delay,gain):
+    z=np.exp(1J*2*np.pi*freq/(2*np.amax(freq)))
+    ftr=1/(1+z**(-delay)*gain*z/(z-1))
+    return np.abs(ftr)
 
-def setaxelim(ax, xdata=[],ydata=[],xmargin=0.1,ymargin=0.1, ylim_min=[0,0], **kwargs):
+def modelleak(freq,delay,gain,leak,constant):
+    """
+    Parameters
+    ----------
+    freq,delay,gain,leak,constant : float
+        parameters that fit the model
+    """
+    z_i=np.exp(1J*2*np.pi*freq/(2*np.amax(freq)))
+    ftr=1/(1+z_i**(-delay)*gain*z_i/(z_i-leak))
+    return 20*np.log10(np.abs(ftr))+constant
+
+
+def moving_average(x, w):
+    return np.convolve(x, np.ones(w), 'valid') / w
+
+
+def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True, 
+            framealpha=0.7, handlelength=0, handletextpad=0):
+    """
+    Add a text in a legend box. Enables to use the very useful "loc" parameter 
+    of the built-in legend function.
+
+    Parameters
+    ----------
+    ax : TYPE
+        DESCRIPTION.
+    text : TYPE
+        DESCRIPTION.
+    loc : TYPE, optional
+        DESCRIPTION. The default is 'best'.
+    fontsize : TYPE, optional
+        DESCRIPTION. The default is 'small'.
+    fancybox : TYPE, optional
+        DESCRIPTION. The default is True.
+    framealpha : TYPE, optional
+        DESCRIPTION. The default is 0.7.
+    handlelength : TYPE, optional
+        DESCRIPTION. The default is 0.
+    handletextpad : TYPE, optional
+        DESCRIPTION. The default is 0.
+
+    Returns
+    -------
+    None.
+
+    """
+    import matplotlib.patches as mpl_patches
+    # create a list with two empty handles (or more if needed)
+        
+    n = 20
+    textList = [text[i:i+n] for i in range(0, len(text), n)]
+    Nlines = len(textList)
+    handles = [mpl_patches.Rectangle((0, 0), 1, 1, fc="white", ec="white", 
+                                     lw=0, alpha=0)] * Nlines
+
+    labels = []
+    for texttemp in textList:
+        labels.append(texttemp)
+    
+    # create the legend, supressing the blank space of the empty line symbol and the
+    # padding between symbol and label by setting handlelenght and handletextpad
+    ax.legend(handles, labels, loc=loc, fontsize='small', 
+              fancybox=True, framealpha=0.7, 
+              handlelength=0, handletextpad=0)
+
+def setaxelim(ax, xdata=[],ydata=[],xmargin=0.1,ymargin=0.1, ylim_min=[0,0], xlim_min=[0,0],**kwargs):
     
     if len(xdata):
-        xmin = (1+xmargin)*np.min(xdata) ; xmax = (1+xmargin)*np.max(xdata)
+        
+        if not 'xmin' in kwargs.keys():
+            xmin = np.min(xdata) - xmargin * np.abs(np.min(xdata))
+        else:
+            xmin=kwargs['xmin']
+        
+        xmax = np.max(xdata) + xmargin*np.abs(np.max(xdata))
+        # xmin = (1+xmargin)*np.min(xdata) ; xmax = (1+xmargin)*np.max(xdata)
+        # ax.set_xlim([xmin,xmax])
+        
+        xdown_min, xup_min = xlim_min
+        if xup_min !=0:
+            xmax = np.max([xmax,xup_min])
+        if xdown_min !=0:
+            xmin = np.min([xmin,xdown_min])
+        
         ax.set_xlim([xmin,xmax])
         
     if len(ydata):

@@ -228,6 +228,9 @@ I set ThresholdRELOCK to the {NINmes} first values."))
             if verbose:
                 print("No or bad vfactorsRelock given. I create one.")
 
+            if NA==2:
+                config.FT['vfactorsRelock'] = np.array([-0.5,0.5])
+                
             if NA==6:
                 config.FT['vfactorsRelock'] = np.array([-8.25, -7.25, -4.25, 1.75, 3.75, 8.75])
                 
@@ -828,7 +831,7 @@ def ReadCf(currCfEstimated):
         Iap = PhotEst[:,iap]                    # Photometry pupil a'
         outputs.VisibilityEstimated[it,:,ib] = 2*Iaap/(Ia+Iap)          # Estimated Fringe Visibility of the base (a,a')
         outputs.SquaredCoherenceDegree[it,:,ib] = np.abs(Iaap)**2/(Ia*Iap)      # Spatial coherence of the source on the base (a,a')
- 
+
  
     """
     Phase-delays extraction
@@ -865,6 +868,7 @@ def ReadCf(currCfEstimated):
     # Integrates GD with Ngd last frames (from it-Ngd to it)
     timerange = range(it+1-Ngd,it+1)
     for iot in timerange:
+        # Subtract average (estimated) phase-delay to current coherent flux
         cfgd = outputs.CfPD[iot]*np.exp(-1j*outputs.PDEstimated[iot])/Ngd
         
         # If ClosurePhase correction before wrapping
@@ -1175,6 +1179,7 @@ def CommandCalc(CfPD,CfGD):
         
         Ut = np.transpose(U)
         V = np.transpose(Vt)
+        outputs.singularValuesSqrt[it] = np.sqrt(S[:-1])
         
         """
         GD weighting matrix
@@ -1377,10 +1382,10 @@ def CommandCalc(CfPD,CfGD):
     # Integrator (Eq.37)
     if FT['cmdOPD']:     # integrator on OPD
         # Integrator
-        outputs.GDCommand[it+1] = outputs.GDCommand[it] + FT['GainGD']*currGDerr*config.wlOfTrack*R/2/np.pi
+        outputs.GDCommandIntegrator[it+1] = outputs.GDCommandIntegrator[it] + FT['GainGD']*currGDerr*config.wlOfTrack*R/2/np.pi
         
         # From OPD to Pistons
-        uGD = np.dot(FS['OPD2Piston_r'], outputs.GDCommand[it+1])
+        uGD = np.dot(FS['OPD2Piston_r'], outputs.GDCommandIntegrator[it+1])
         
     else:                       # integrator on Pistons
         # From OPD to Piston
@@ -1413,6 +1418,7 @@ def CommandCalc(CfPD,CfGD):
         
         
     outputs.PistonGDCommand[it+1] = uGD
+    outputs.GDCommand[it+1] = np.dot(FS['Piston2OPD'],uGD)
 
     """
     Phase-Delay command
