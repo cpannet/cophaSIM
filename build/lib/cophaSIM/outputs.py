@@ -71,10 +71,10 @@ PDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines PD [ra
 PDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines PD after patch [rad]
 GDEstimated = np.zeros([NT,NINmes])                 # Estimated baselines GD [rad]
 GDEstimated2 = np.zeros([NT,NINmes])                # Estimated baselines GD after patch [rad]
-PDResidual = np.zeros([NT,NINmes])                  # Estimated residual PD = PD-PDref
-PDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref after Ipd (eq.35)
-GDResidual = np.zeros([NT,NINmes])                  # Estimated residual GD = GD-GDref
-GDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref after Igd (eq.35)
+PDResidual = np.zeros([NT,NINmes])                  # Estimated residual PD = PD-PDref after Ipd (eq.35)
+PDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual PD = PD-PDref
+GDResidual = np.zeros([NT,NINmes])                  # Estimated residual GD = GD-GDref after Igd (eq.35)
+GDResidual2 = np.zeros([NT,NINmes])                 # Estimated residual GD = GD-GDref
 GDErr = np.zeros([NT,NINmes])                       # Error that integrates GD integrator
 PDref = np.zeros([NT,NINmes])                       # PD reference vector
 GDref = np.zeros([NT,NINmes])                       # GD reference vector

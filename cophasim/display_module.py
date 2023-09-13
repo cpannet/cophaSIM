@@ -82,7 +82,7 @@ rcParamsForSlides = {"font.size":SS,
 
 global telescopes,baselines,closures
 
-from .config import NA,NIN,NC,ND
+from .config import NA,NIN,ND
 NINmes = config.FS['NINmes']
 NCmes = config.FS['NCmes']
 NCmes = ND
@@ -99,6 +99,7 @@ NAdisp = 10
 nTelFigures = 1+NA//NAdisp - 1*(NA % NAdisp==0)
 telcolors = colors[:NAdisp]*nTelFigures
 
+wl = config.wlOfTrack
 
 def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
               plotObs,generalTitle,SNR=[],obsType='',display=True,
@@ -428,8 +429,8 @@ to {curvesNames[iLastBase]}")
 
 
 def perftable_cp(timestamps, PDobs,GDobs,gdObsInfo,pdObsInfo,
-              plotObs,generalTitle,obsType,display=True,
-              filename='',ext='pdf',infos={"details":''},verbose=False):
+                 plotObs,generalTitle,obsType,display=True,
+                 filename='',ext='pdf',infos={"details":''},verbose=False):
     
     global closures,wl
                 
@@ -1151,6 +1152,90 @@ def plotHisto(obs,generalTitle,plotObs,obsName='GD [µm]',
         else:
             plt.savefig(filename+f"{plottedCurve}.{ext}", dpi=300)
 
+
+
+
+# def perfarray(lwObs,colorObs,):
+    
+#     plt.rcParams.update(rcParamsForBaselines)
+    
+#     from .tol_colors import tol_cmap as tc
+#     import matplotlib as mpl
+#     from .config import NA,NIN,InterfArray,wlOfTrack
+    
+#     #visibilities, _,_,_=ct.VanCittert(wlOfScience,config.Obs,config.Target)
+#     #outputs.VisibilityAtPerfWL = visibilities
+#     visibilities = np.ones(NIN)#ct.NB2NIN(outputs.VisibilityObject[wlIndex])
+#     vismod = np.abs(visibilities) ; visangle = np.angle(visibilities)
+#     PhotometricBalance = config.FS['PhotometricBalance']
+    
+#     cm = tc('rainbow_PuRd').reversed() ; Nnuances = 256
+    
+#     # plt.rcParams['figure.figsize']=(16,12)
+#     # font = {'family' : 'DejaVu Sans',
+#     #         'weight' : 'normal',
+#     #         'size'   : 22}
+    
+#     # plt.rc('font', **font)
+#     title="perfarray"
+#     fig=plt.figure(title, clear=True)
+#     (ax1,ax2)=fig.subplots(ncols=2, sharex=True, sharey=True)
+#     ax1.set_title(f"Target visibility and photometric balance ({wlOfTrack:.3}µm)")
+#     ax2.set_title(f"Fringe contrast and Time on central fringe ({wlOfScience:.3}µm)")
+    
+#     for ia in range(NA):
+#         name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+#         ax1.scatter(x1,y1,color='k',linewidth=10)
+#         ax1.annotate(name1, (x1+6,y1+1),color="k")
+#         ax1.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+#         for iap in range(ia+1,NA):
+#             ib=ct.posk(ia,iap,NA)
+#             x2,y2 = InterfArray.TelCoordinates[iap,:2]
+#             im=ax1.plot([x1,x2],[y1,y2],linestyle='solid',
+#                     linewidth=1,
+#                     color=cm(int(vismod[ib]*Nnuances)))
+#     ax1.set_xlabel("X [m]")
+#     ax1.tick_params(labelleft=False)
+    
+#     for ia in range(NA):
+#         name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+#         ax2.scatter(x1,y1,color='k',linewidth=10)
+#         ax2.annotate(name1, (x1+6,y1+1),color="k")
+#         ax2.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+#         for iap in range(ia+1,NA):
+#             ib=ct.posk(ia,iap,NA)
+#             x2,y2 = InterfArray.TelCoordinates[iap,:2]
+#             ls = (0,(10*outputs.LR4[ib],np.max([0,10*(1-outputs.LR4[ib])])))
+#             if PhotometricBalance[ib]>0:
+#                 im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+#                         linewidth=3,
+#                         color=cm(int(outputs.FringeContrast[ib]*Nnuances)))
+#             else:
+#                 im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+#                         linewidth=1,
+#                         color=cm(int(outputs.FringeContrast[ib]*Nnuances)))
+#     ax2.set_xlabel("X [m]")
+#     ax2.set_ylabel("Y [m]")
+#     ax2.set_xlim([-210,160]) ; ax2.set_ylim([-50,350])
+#     # fig.subplots_adjust(right=0.8)
+#     # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+#     # mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+#     #                           orientation='vertical',
+#     #                           label=f"Fringe Contrast at {wlOfScience:.3}µm")
+
+
+    
+#     fig.subplots_adjust(bottom=0.2)
+#     cbar_ax = fig.add_axes([0.1, 0.05, 0.85, 0.05])
+#     mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+#                               orientation='horizontal')
+
+#     if len(savedir):
+#         if verbose:
+#             print("Saving perfarray figure.")
+#         plt.savefig(savedir+f"{filenamePrefix}_perfarray.{ext}")
+
+#     plt.rcParams.update(plt.rcParamsDefault)
 
 
 def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True, 

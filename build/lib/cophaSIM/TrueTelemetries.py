@@ -557,8 +557,8 @@ def ReadFits(file,computeCp=False,verbose=True):
             
         outputs.PDEstimated = hduL[1].data["PD"] # Estimated baselines PD [NTxNINmes - rad]
         outputs.GDEstimated = hduL[1].data["GD"] # Estimated baselines GD [NTxNINmes - rad]
-        outputs.PDResidual2 = hduL[1].data["curPdErrBaseMicrons"]/lmbda*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
-        outputs.GDResidual2 = hduL[1].data["curGdErrBaseMicrons"]/R/lmbda*2*np.pi # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - rad]
+        outputs.PDResidual = hduL[1].data["curPdErrBaseMicrons"]/lmbda*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
+        outputs.GDResidual = hduL[1].data["curGdErrBaseMicrons"]/R/lmbda*2*np.pi # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - rad]
         outputs.ClosurePhasePD = hduL[1].data["PdClosure"] # PD closure phase [NTxNC - rad]
         outputs.ClosurePhaseGD = hduL[1].data["GdClosure"] # GD closure phase [NTxNC - rad]
         outputs.PDref = hduL[1].data["curRefPD"]/lmbda*2*np.pi # PD reference vector [NTxNINmes - rad]

@@ -1356,13 +1356,10 @@ def CommandCalc(CfPD,CfGD):
     currGDerr[lower_than_mpi] += 2*np.pi
     
     # Store residual GD for display only [radians]
-    outputs.GDResidual[it] = currGDerr
+    outputs.GDResidual2[it] = currGDerr
     
     # Weights the GD (Eq.35)
     currGDerr = np.dot(currIgd,currGDerr)
-     
-    outputs.GDResidual2[it] = currGDerr
-    outputs.GDPistonResidual[it] = np.dot(FS['OPD2Piston_r'], currGDerr*R*config.wlOfTrack/(2*np.pi))
     
     # Threshold function (eq.36)
     if FT['Threshold']:
@@ -1377,7 +1374,8 @@ def CommandCalc(CfPD,CfGD):
             currGDerr[higher_than_pi] -= np.pi/R*FT['switch']
             currGDerr[lower_than_mpi] += np.pi/R*FT['switch']
     
-    outputs.GDErr[it] = currGDerr
+    outputs.GDResidual[it] = currGDerr
+    outputs.GDPistonResidual[it] = np.dot(FS['OPD2Piston_r'], currGDerr*R*config.wlOfTrack/(2*np.pi))
     
     # Integrator (Eq.37)
     if FT['cmdOPD']:     # integrator on OPD
@@ -1439,13 +1437,13 @@ def CommandCalc(CfPD,CfGD):
     currPDerr[higher_than_pi] -= 2*np.pi
     currPDerr[lower_than_mpi] += 2*np.pi
     
-    outputs.PDResidual[it] = currPDerr
+    outputs.PDResidual2[it] = currPDerr
     
     # Weights the PD (Eq.35)
     currPDerr = np.dot(currIpd,currPDerr)
     
     # Store residual PD and piston for display only
-    outputs.PDResidual2[it] = currPDerr
+    outputs.PDResidual[it] = currPDerr
     outputs.PDPistonResidual[it] = np.dot(FS['OPD2Piston_r'], currPDerr*config.wlOfTrack/(2*np.pi))
     
     # Integrator (Eq.37)
