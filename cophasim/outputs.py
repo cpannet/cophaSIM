@@ -13,7 +13,7 @@ saved during and after the simulation.
 
 import numpy as np
 
-from .config import NA,NB,NC,NT,dt,NW,NIN,FS,latency,timestamps
+from .config import NA,NB,NC,NT,dt,NW,NIN,FS,latency
 from . import config
 
 """Basic parameters"""
@@ -24,6 +24,7 @@ NBmes = config.FS['NBmes']
 it = 0
 TimeID="notime"
 outputsFile = ""
+simulatedTelemetries = True         # False = telemetries from spica-ft instrument
 
 """Coherent flux [NB]""" # Most general formalism: contains photometries information
 CoherentFluxObject = np.zeros([NW, NB])*1j          # Object coherent flux
@@ -126,7 +127,7 @@ PistonGDCommand = np.zeros([NT+1,NA])               # Piston-space GD command
 CommandRelock = np.zeros([NT+1,NA])                 # Piston-space RELOCK command
 CommandSearch = np.zeros([NT+1,NA])                 # Piston-space SEARCH command
 CommandODL = np.zeros([NT+1,NA])                    # Delay lines positionnal command calculated at time it
-
+SearchCommand = np.zeros([NT+1,NA])
 PistonGDcorr = np.zeros([NT,NA])
 
 # Photometries

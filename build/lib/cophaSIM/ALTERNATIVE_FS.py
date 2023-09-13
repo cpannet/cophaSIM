@@ -25,6 +25,22 @@ from scipy.special import binom
 from . import tol_colors as tc
 colors=tc.tol_cset('muted')
 
+
+"""
+2 telescopes - S1S2
+"""
+NA=2
+pw2 = np.array([[0,1],[1,0]])
+
+"""
+3 telescopes
+"""
+NA=2
+pw3 = np.array([[0,1,0],[0,0,1],
+                [1,0,0],[0,0,1],
+                [1,0,0],[1,1,0]])/2
+
+
 """
 CHARA - 6 telescopes - S1S2E1E2W1W2
 """
@@ -324,7 +340,8 @@ pw20_40[NA-1,0] = 1/4
 pw20_40[NA-1,1] = 1/4
 
 
-descriptions = {"PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
+descriptions = {"PW2-1-0":pw2,"PW3-3-1":pw3,
+                "PW6-15-10":d0, "PW6-9-4-1":d1,"PW6-9-4-2":d2,"PW6-9-2":d3,"PW6-9-0":d4, "PW6-9-2-b":d5,
                 "PW6-6-1":d6,"PW6-6-0":d7,  "PW6-5-0":d8, "PW6-5-0-0":d9,
                 "PW7-6-0":pw7_6_0,"PW7-7-0":pw7_7_0,"PW7-8-2":pw7_8_2,
                 "PW7-9-3":pw7_9_3,"PW7-11-2":pw7_11_2,"PW7-12-6":pw7_12_6,
@@ -487,7 +504,6 @@ def PAIRWISE(*args, init=False, spectra=[], spectraM=[], T=1, name='',
         config.FS['ichdetails'] = ichdetails
         config.FS['NINmes'] = NINmes            # Number of measured baselines
         config.FS['NBmes'] = NA+2*NINmes        # phot + cos + sin
-        
         
         V2PM,V2PMgrav,V2PM_r = ct.MakeV2PfromA2P(A2P)
         

@@ -2620,20 +2620,37 @@ def check_semiunitary(A2P):
     #     print(f"The matrix absorbs energy.")
     
     return
-
+        
 def check_cp(gd):
     
-    NIN=len(gd) ; 
+    NIN=len(gd)
     NA = int(1/2+np.sqrt(1/4+2*NIN))
-    NC=int(binom(NA,3)/2)
+    NC = int(binom(NA,3))
 
     cp=np.zeros(NC)
-    for iap in range(1,NA):
-        for iapp in range(iap+1,NA):
-            ib1=posk(0,iap,NA); ib2=posk(iap,iapp,NA);ib3=posk(0,iapp,NA)
-            ic=poskfai(0,iap,iapp,NA)
-            cp[ic]=gd[ib1]+gd[ib2]-gd[ib3]
+    for ia in range(NA):
+        for iap in range(ia+1,NA):
+            for iapp in range(iap+1,NA):
+                ib1=posk(ia,iap,NA); ib2=posk(iap,iapp,NA);ib3=posk(ia,iapp,NA)
+                ic=poskfai(ia,iap,iapp,NA)
+                cp[ic]=gd[ib1]+gd[ib2]-gd[ib3]
     return cp
+
+
+# def check_cp(gd):
+    
+#     NIN=len(gd) ; 
+#     NA = int(1/2+np.sqrt(1/4+2*NIN))
+#     # Number of independant closure phases
+#     ND = int((NA-1)*(NA-2)/2)
+
+#     cp=np.zeros(ND)
+#     for iap in range(1,NA):
+#         for iapp in range(iap+1,NA):
+#             ib1=posk(0,iap,NA); ib2=posk(iap,iapp,NA);ib3=posk(0,iapp,NA)
+#             ic=poskfai(0,iap,iapp,NA)
+#             cp[ic]=gd[ib1]+gd[ib2]-gd[ib3]
+#     return cp
 
 def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
     fig = plt.gcf()
@@ -2681,7 +2698,7 @@ def modelleak(freq,delay,gain,leak,constant):
 
 
 def moving_average(x, w):
-    return np.convolve(x, np.ones(w), 'valid') / w
+    return np.apply_along_axis(lambda m: np.convolve(m, np.ones(w), 'valid') / w, axis=0, arr=x)
 
 
 def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True, 

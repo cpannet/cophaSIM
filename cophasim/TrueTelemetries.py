@@ -13,25 +13,19 @@ import struct
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import mmap
 import os
-import sys
-import time
+import datetime
+from importlib import reload
 from .tol_colors import tol_cset
 from . import coh_tools as ct
 from mypackage.plot_tools import setaxelim, addtext
 from scipy.special import binom
-from scipy.optimize import curve_fit
-
-from importlib import reload
 
 import matplotlib.lines as mlines
 from astropy.io import fits
 
 from . import config
-
-from numpy import log10
 
 colors=['blue','red','green','brown','yellow','orange','pink','grey','cyan','black','magenta','lightblue','darkblue','darkgrey','lightgrey','indigo']
 
@@ -147,12 +141,7 @@ rcParamsForFullScreen = {"font.size":SSFF,
 
 def readDump(file, version='current'):
     
-    # file = 'Testbench/ScanTestbench/DebugSNR/Scan_m60_p60_1mic.bin'
     fd=open(file,"r+b")
-    # fd=open('opdCtrlMonitoring2.bin',"r+b")
-    titre='retour_'
-    
-    title = 'Open loop on laboratory disturbances'
     
     buf=mmap.mmap(fd.fileno(),0)
     print(len(buf))
@@ -442,7 +431,7 @@ def readDump(file, version='current'):
 
     return data
 
-def ReadFits(file):
+def ReadFits(file,computeCp=False,verbose=True):
     from cophasim import outputs
     global NT, NA, NINmes, TimeID, dt, timestamps,ich,whichSNR
     # GainPD,GainGD,\
@@ -453,8 +442,6 @@ def ReadFits(file):
     
     with fits.open(file) as hduL:
 
-        outputs.TimeID = time.strftime("%Y%m%d-%H%M%S")
-        outputs.outputsFile = file.split('/')[-1]
         NT, NA = hduL[1].data["pdDlCmdMicrons"].shape # microns
         _, NINmes = hduL[1].data["gD"].shape # microns
         
@@ -464,23 +451,73 @@ def ReadFits(file):
         config.NC = int(binom(NA,3))           # Number of closure phases
         config.ND = int((NA-1)*(NA-2)/2)       # Number of independant closure phases
         
+        reload(outputs)
+        
+        outputs.outputsFile = file.split('/')[-1]
+        timestr = outputs.outputsFile.split('.fits')[0][-20:]
+        
+        # Handle the fact that it can be 'Aug__8_07h08m18_2023' or 'Aug_13_07h08m18_2023'
+        if len(timestr.split('__'))==2:
+            timestr = timestr.split('__')[0] + "_0"+timestr.split('__')[1]
+        
+        recordTime = datetime.datetime.strptime(timestr, '%b_%d_%Hh%Mm%S_%Y')
+        
+        
+        outputs.TimeID = recordTime.strftime("%Y%m%d_%Hh%Mm%Ss")
+        
+        outputs.simulatedTelemetries = False
+        
         config.Beam2Tel = hduL[0].header['Beam2Tel']
+        config.Target = config.ScienceObject()
+        
+        config.FS['Piston2OPD'] = np.zeros([NIN,NA])
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                ib = ct.posk(ia,iap,NA)
+                config.FS['Piston2OPD'][ib,ia] = 1
+                config.FS['Piston2OPD'][ib,iap] = -1
+                
+        config.FS['OPD2Piston'] = np.linalg.pinv(config.FS['Piston2OPD'])   # OPD to pistons matrix
+        config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
+        
         telNameLength=2
         tels = [config.Beam2Tel[i:i+telNameLength] for i in range(0, len(config.Beam2Tel), telNameLength)]
         
-        TelConventionalArrangement =  ['S1','S2','E1','E2','W1','W2']
+        basenames = []
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                basenames.append(f"{tels[ia]}{tels[iap]}")
         
-        Tel2Beam = np.zeros([6,6])
+        
+        TelConventionalArrangement =  ['S1','S2','E1','E2','W1','W2']
+        basenamesConventional = []
+        for ia in range(NA):
+            for iap in range(ia+1,NA):
+                basenamesConventional.append(f"{TelConventionalArrangement[ia]}{TelConventionalArrangement[iap]}")
+                
+        Tel2Beam = np.zeros([NA,NA])
         for ia in range(NA):
             tel0 = TelConventionalArrangement[ia] 
             pos = np.argwhere(np.array(tels)==tel0)[0][0]
             Tel2Beam[pos,ia]=1
             
-        Sort2Conventional = np.zeros([6,6])
+        sortPistons2Conventional = np.zeros([NA,NA])
         for ia in range(NA):
             tel0 = tels[ia] 
             pos = np.argwhere(np.array(TelConventionalArrangement)==tel0)[0][0]
-            Sort2Conventional[pos,ia]=1
+            sortPistons2Conventional[pos,ia]=1
+        config.sortPistons2Conventional = sortPistons2Conventional
+        
+        sortBases2Conventional = np.zeros([NIN,NIN])
+        for ib in range(NIN):
+            base0 = basenames[ib]
+            if len(np.argwhere(np.array(basenamesConventional)==base0)):
+                pos = np.argwhere(np.array(basenamesConventional)==base0)[0][0]
+            else:
+                base0 = base0[telNameLength:]+base0[0:telNameLength]
+                pos = np.argwhere(np.array(basenamesConventional)==base0)[0][0]
+            sortBases2Conventional[pos,ia]=1
+        config.sortBases2Conventional = sortBases2Conventional
         
         config.FT['whichSNR'] = 'pd'
         
@@ -561,29 +598,53 @@ def ReadFits(file):
         
         outputs.PistonGDcorr = hduL[1].data["gdDlCorMicrons"] # GD before round [NTxNA - microns]
         
-        outputs.PistonPDCommand = np.zeros([NT+1,NA])
-        outputs.PistonGDCommand = np.zeros([NT+1,NA])
-        outputs.SearchCommand = np.zeros([NT+1,NA])
-        outputs.CommandODL = np.zeros([NT+1,NA])
+        # outputs.PistonPDCommand = np.zeros([NT+1,NA])
+        # outputs.PistonGDCommand = np.zeros([NT+1,NA])
+        # outputs.SearchCommand = np.zeros([NT+1,NA])
+        # outputs.CommandODL = np.zeros([NT+1,NA])
         
         outputs.PistonPDCommand[:-1] = 2*hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
         outputs.PistonGDCommand[:-1] = 2*hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
         outputs.SearchCommand[:-1] = 2*hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
         outputs.CommandODL[:-1] = 2*hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
         
-    # #ALL DATA WHICH ARE COMMANDS RELATED NEED TO BE SORTED RELATED TO
-    # The telemetries are sorted in the order "S1
+    
+    # #ALL DATA WHICH ARE COMMANDS-RELATED NEED TO BE SORTED IN SAME ORDER
+    # THAN OPD, i.e. in the ordre of Beam2Tel
+
     for it in range(NT):
         outputs.PistonPDCommand[it] = np.dot(Tel2Beam,outputs.PistonPDCommand[it])
         outputs.PistonGDCommand[it] = np.dot(Tel2Beam,outputs.PistonGDCommand[it])
         outputs.SearchCommand[it] = np.dot(Tel2Beam,outputs.SearchCommand[it])
         outputs.CommandODL[it] = np.dot(Tel2Beam,outputs.CommandODL[it])
         outputs.PistonGDcorr[it] = np.dot(Tel2Beam,outputs.PistonGDcorr[it])
-
+        outputs.GDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.GDResidual2[it])
+        outputs.PDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.PDResidual2[it])
     
-    outputs.PDCommand = np.zeros([NT+1,NIN])
-    outputs.GDCommand = np.zeros([NT+1,NIN])
-    outputs.OPDCommand = np.zeros([NT+1,NIN])
+    if computeCp:
+        
+        outputs.ClosurePhaseGDafter=np.zeros([config.NT,config.NC])
+        outputs.ClosurePhasePDafter=np.zeros([config.NT,config.NC])
+        cpGdAfter=np.zeros([config.NT,config.NC])
+        cpPdAfter=np.zeros([config.NT,config.NC])
+        
+        for it in range(NT):
+            cpPdAfter[it]=ct.check_cp(outputs.PDEstimated[it])
+            cpGdAfter[it]=ct.check_cp(outputs.GDEstimated[it])
+            
+        for it in range(NT):
+            Ncp=300
+            if it<Ncp:
+                Ncp=it
+            timerangeCp=range(it-Ncp,it+1)
+            outputs.ClosurePhasePDafter[it]=np.mean(cpPdAfter[timerangeCp],axis=0)
+            outputs.ClosurePhaseGDafter[it]=np.mean(cpGdAfter[timerangeCp],axis=0)
+    # outputs.ClosurePhaseGDafter = ct.moving_average(outputs.ClosurePhaseGDafter, 300)
+    # outputs.ClosurePhasePDafter = ct.moving_average(outputs.ClosurePhasePDafter, 300)
+    
+    # outputs.PDCommand = np.zeros([NT+1,NIN])
+    # outputs.GDCommand = np.zeros([NT+1,NIN])
+    # outputs.OPDCommand = np.zeros([NT+1,NIN])
     for ia in range(NA):
         for iap in range(ia+1,NA):
             ib = ct.posk(ia,iap,NA)
@@ -594,9 +655,10 @@ def ReadFits(file):
     # Reload outputs parameters.
     # reload(outputs)
     
-    print("Load telemetries into outputs module:")
-    for key in CommonOutputs+AdditionalOutputs:
-        print(f"- {key}")
+    if verbose:
+        print("Load telemetries into outputs module:")
+        for key in CommonOutputs+AdditionalOutputs:
+            print(f"- {key}")
     
     return
         
@@ -623,8 +685,8 @@ def moving_average(x, w):
 #     ftr=1/(1+z**(-delay)*gain*z/(z-leak))
 #     return np.abs(ftr)
 
-def BodeDiagrams(Output,Command,timestamps,Input=[],
-                 fbonds=[], mov_average=0, lmbda0=0.55, gain=0, details='', window='hanning',
+def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
+                 fbonds=[], mov_average=0, lmbda0=0.55, gain=0, details='', window='no',
                  display=True, figsave=False, figdir='',ext='pdf',only='ftbo',
                  displaytemporal=False):
     """
@@ -695,6 +757,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     else:
         windowsequence = np.ones(nNT)
         
+    # pseudoOpenLoop = Command+Output
     
     Output2 = Output*windowsequence
     Command2 = Command*windowsequence
@@ -702,6 +765,9 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     FTResidues = np.fft.fft(Output2,norm="forward")[PresentFrequencies]
     FTCommands = np.fft.fft(Command2,norm="forward")[PresentFrequencies]
     
+    # ftPseudoOpenLoop = np.fft.fft(pseudoOpenLoop,norm="forward")[PresentFrequencies]
+    
+    # FTrej = FTResidues/ftPseudoOpenLoop
     FTBO = FTCommands/FTResidues
     
     ModFTBO = np.abs(FTBO) ; AngleFTBO = np.angle(FTBO)
@@ -715,16 +781,35 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
         ModFTCommands = moving_average(ModFTCommands, mov_average)
         FrequencySampling = moving_average(FrequencySampling,mov_average)
     
+    # For model fitting later in the code
+    NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
+    logFrequencySampling = np.log10(FrequencySampling)
+    
     if not only:
         Input2 = Input*windowsequence
         FTTurb = np.fft.fft(Input2,norm="forward")[PresentFrequencies]    
+        ModFTTurb = np.abs(FTTurb)
         
-        FTrej = FTResidues/FTTurb
-        FTBF = FTCommands/FTTurb
- 
-    f1 = 0.3 ; f2 = 10
-    NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
-    logFrequencySampling = np.log10(FrequencySampling)
+        if mov_average:
+            ModFTTurb = moving_average(ModFTTurb,mov_average)
+            
+        coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(ModFTTurb[NominalRegime]), 1)
+        poly1d_fn = np.poly1d(coefs)
+        ModFTTurbfit = 10**poly1d_fn(logFrequencySampling)
+        coefDisturb = coefs[0]
+        
+        ModFTrej = ModFTResidues/ModFTTurbfit
+        ModFTBF = ModFTCommands/ModFTTurbfit
+        
+        # ModFTrej = np.abs(FTrej) ; AngleFTrej = np.angle(FTrej)
+        # ModFTBF = np.abs(FTBF) ; AngleFTBF = np.angle(FTBF)
+        
+        # if mov_average:
+        #     ModFTrej = moving_average(ModFTrej,mov_average)
+        #     # AngleFTrej = moving_average(AngleFTrej,mov_average)
+        #     ModFTBF = moving_average(ModFTBF,mov_average)
+        #     # AngleFTBF = moving_average(AngleFTBF,mov_average) 
+
     coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTBO[NominalRegime])), 1)
     poly1d_fn = np.poly1d(coefs)
     ModFTBOfit = 10**poly1d_fn(logFrequencySampling)
@@ -734,15 +819,23 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     poly1d_fn = np.poly1d(coefs)
     ModFTCommandsfit = 10**poly1d_fn(logFrequencySampling)
     
+    # coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTTurb[NominalRegime])), 1)
+    # poly1d_fn = np.poly1d(coefs)
+    # ModFTTurbfit = 10**poly1d_fn(logFrequencySampling)
+    
     index1Hz = np.argmin(np.abs(logFrequencySampling-1))
-    PSDat1Hz = ModFTCommandsfit[index1Hz]
+    PSDat1Hz = ModFTTurbfit[index1Hz]**2
     EstimatedT0 = (PSDat1Hz/2.84e-4/lmbda0**2)**(-3/5)
     
     results = {"CutoffFrequency0dB":CutoffFrequency0dB,
-               "EstimatedT0":EstimatedT0}
+               "EstimatedT0":EstimatedT0,
+               "FrequencySampling":FrequencySampling,
+               "ModFTrej":ModFTrej,"ModFTBO":FTBO,"ModFTBF":ModFTBF}
     
+    """ Something to implement: fit a model on the rejection function transfer
     # popt, *remain=curve_fit(model,freqs[f_plus],20*np.log10(np.abs(transfer_function[i,:][f_plus]))
     #                       ,p0=[2,0.1,0.99,0],bounds=[[0,0,0,-100],[5,1,0.999,100]])
+    """
     
     if display:
         
@@ -757,7 +850,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             fig.suptitle(title)
             ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
             
-            ax1.plot(FrequencySampling, np.abs(FTrej))
+            ax1.plot(FrequencySampling, ModFTrej,color='k')
             
             if gain:
                 gains = [gain] ; delays=np.arange(10,60,10)
@@ -779,11 +872,11 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
             ax1.set_ylabel('FTrej')
             
-            ax2.plot(FrequencySampling, np.abs(FTBO))
+            ax2.plot(FrequencySampling, ModFTBO,color='k')
             ax2.set_yscale('log') #; ax2.set_ylim(1e-3,5)
             ax2.set_ylabel("FTBO")
             
-            ax3.plot(FrequencySampling, np.abs(FTBF))
+            ax3.plot(FrequencySampling, ModFTBF,color='k')
         
             ax3.set_xlabel('Frequencies [Hz]')
             ax3.set_ylabel('FTBF')
@@ -818,6 +911,71 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
             ax3.set_xlabel('Timestamps [s]')
             ax3.set_ylabel('Command')
 
+            fig.show()
+            
+            """
+            Display FTrej and PSD of input (disturbance) and output (residues) signals
+            """
+            
+            plt.rcParams.update(rcParamsForBaselines)
+            if not details:
+                title = 'FTrej'
+            else:
+                title = f'FTrej - {details}'
+            plt.close(title)
+            fig = plt.figure(title)
+            fig.suptitle(title)
+            ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+            
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTrej), "k")
+            # ax1.plot(FrequencySampling, 40*np.log10(ModFTBOfit), 
+            #          color=colors[0], linestyle='--')
+            
+            if gain:
+                gains = [gain] ; delays=np.arange(10,60,10)
+                styles=['-','--',':']
+                linestyles = []
+                for ig in range(len(gains)):
+                    gain=gains[ig]
+                    linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
+                    for idel in range(len(delays)):
+                        gain=gains[ig];delay=delays[idel]
+                        ftr=model(FrequencySampling,delay,gain)
+                        ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
+                        if ig==len(gains)-1:
+                            linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
+                ax1.legend(handles=linestyles)
+    
+            ax1.set_ylabel('Gain [dB]')
+            addtext(ax1,"|FTrej|²",loc='upper center',fontsize='x-large')
+            
+            ax2.plot(FrequencySampling, ModFTResidues**2, "k")
+            
+            ax2.set_ylabel("PSD [µm²/Hz]")
+            ax2.set_yscale("log")
+            addtext(ax2,"Residue",loc='upper center',fontsize='x-large')
+            
+            ax3.plot(FrequencySampling, ModFTTurb**2, "k")
+            ax3.plot(FrequencySampling, ModFTTurbfit**2, color=colors[0])
+            ax3.set_ylabel('PSD [µm²/Hz]')
+            
+            annX = 2
+            annYindex = np.argmin(np.abs(FrequencySampling-annX))
+            annY = ModFTTurbfit[annYindex]**2*2
+            ax3.annotate(f"{round(2*coefDisturb*3,2)}/3",(annX,annY),color=colors[0])
+            
+            addtext(ax3,"Disturbance",loc='upper center',fontsize='x-large')
+            
+            
+            ax3.set_xlabel('Frequencies [Hz]')
+            ax3.set_xscale('log')
+            ax3.set_yscale("log")
+            
+            ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
+            ax3.sharey(ax2)
+            
+            setaxelim(ax3, ydata=ModFTTurbfit**2)
+            
             fig.show()
         
         if only == 'ftbo':
@@ -984,8 +1142,453 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],
     return results
 
 
+def BodeDiagrams_pseudoloop(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
+                 fbonds=[], mov_average=0, lmbda0=0.55, gain=0, details='', window='no',
+                 display=True, figsave=False, figdir='',ext='pdf',only='ftbo',
+                 displaytemporal=False):
+    """
+    Display the Bode Diagrams of FTBO, FTBF, FTrej and returns some characteristical values.
+
+    Parameters
+    ----------
+    Output : TYPE
+        DESCRIPTION.
+    Command : TYPE
+        DESCRIPTION.
+    timestamps : TYPE
+        DESCRIPTION.
+    Input : TYPE, optional
+        DESCRIPTION. The default is [].
+    fbonds : TYPE, optional
+        DESCRIPTION. The default is [].
+    mov_average : TYPE, optional
+        DESCRIPTION. The default is 0.
+    lmbda0 : FLOAT, optional
+        Wavelength of the measurement in microns. The default is 1.6.
+        For computing the coherence time T0 (in ms).
+    gain : TYPE, optional
+        DESCRIPTION. The default is 0.
+    details : TYPE, optional
+        DESCRIPTION. The default is ''.
+    window : TYPE, optional
+        DESCRIPTION. The default is 'hanning'.
+    display : TYPE, optional
+        DESCRIPTION. The default is True.
+    figsave : TYPE, optional
+        DESCRIPTION. The default is False.
+    figdir : TYPE, optional
+        DESCRIPTION. The default is ''.
+    ext : TYPE, optional
+        DESCRIPTION. The default is 'pdf'.
+    only : TYPE, optional
+        DESCRIPTION. The default is 'ftbo'.
+
+    Raises
+    ------
+    ValueError
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    """
+    
+    nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
+
+    FrequencySampling1 = np.fft.fftfreq(nNT, dt)
+    if len(fbonds):
+        fmin, fmax = fbonds
+    else:
+        fmin=0
+        fmax=np.max(FrequencySampling1)
+    
+    PresentFrequencies = (FrequencySampling1 > fmin) \
+        & (FrequencySampling1 < fmax)
+        
+    FrequencySampling = FrequencySampling1[PresentFrequencies]
+    
+    if window =='hanning':
+        windowsequence = np.hanning(nNT)
+    else:
+        windowsequence = np.ones(nNT)
+        
+    # pseudoOpenLoop = Command+Output
+    
+    Output2 = Output*windowsequence
+    Command2 = Command*windowsequence
+    
+    FTResidues = np.fft.fft(Output2,norm="forward")[PresentFrequencies]
+    FTCommands = np.fft.fft(Command2,norm="forward")[PresentFrequencies]
+    
+    # ftPseudoOpenLoop = np.fft.fft(pseudoOpenLoop,norm="forward")[PresentFrequencies]
+    
+    # FTrej = FTResidues/ftPseudoOpenLoop
+    FTBO = FTCommands/FTResidues
+    
+    ModFTBO = np.abs(FTBO) ; AngleFTBO = np.angle(FTBO)
+    ModFTCommands = np.abs(FTCommands)
+    ModFTResidues = np.abs(FTResidues)
+    
+    if mov_average:
+        ModFTBO = moving_average(ModFTBO,mov_average)
+        AngleFTBO = moving_average(AngleFTBO,mov_average)
+        ModFTResidues = moving_average(ModFTResidues, mov_average)
+        ModFTCommands = moving_average(ModFTCommands, mov_average)
+        FrequencySampling = moving_average(FrequencySampling,mov_average)
+    
+    if not only:
+        Input2 = Input*windowsequence
+        FTTurb = np.fft.fft(Input2,norm="forward")[PresentFrequencies]    
+        
+        FTrej = FTResidues/FTTurb
+        FTBF = FTCommands/FTTurb
+        
+        ModFTrej = np.abs(FTrej) ; AngleFTrej = np.angle(FTrej)
+        ModFTBF = np.abs(FTBF) ; AngleFTBF = np.angle(FTBF)
+        ModFTTurb = np.abs(FTTurb)
+        
+        if mov_average:
+            ModFTrej = moving_average(ModFTrej,mov_average)
+            AngleFTrej = moving_average(AngleFTrej,mov_average)
+            ModFTBF = moving_average(ModFTBF,mov_average)
+            AngleFTBF = moving_average(AngleFTBF,mov_average)
+            ModFTTurb = moving_average(ModFTTurb,mov_average)
+ 
+    f1 = 0.3 ; f2 = 10
+    NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
+    logFrequencySampling = np.log10(FrequencySampling)
+    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTBO[NominalRegime])), 1)
+    poly1d_fn = np.poly1d(coefs)
+    ModFTBOfit = 10**poly1d_fn(logFrequencySampling)
+    CutoffFrequency0dB = FrequencySampling[np.argmin(np.abs(20*np.log10(ModFTBOfit)))]
+    
+    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTCommands[NominalRegime])), 1)
+    poly1d_fn = np.poly1d(coefs)
+    ModFTCommandsfit = 10**poly1d_fn(logFrequencySampling)
+    
+    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTTurb[NominalRegime])), 1)
+    poly1d_fn = np.poly1d(coefs)
+    ModFTTurbfit = 10**poly1d_fn(logFrequencySampling)
+    
+    index1Hz = np.argmin(np.abs(logFrequencySampling-1))
+    PSDat1Hz = ModFTCommandsfit[index1Hz]
+    EstimatedT0 = (PSDat1Hz/2.84e-4/lmbda0**2)**(-3/5)
+    
+    results = {"CutoffFrequency0dB":CutoffFrequency0dB,
+               "EstimatedT0":EstimatedT0}
+    
+    """ Something to implement: fit a model on the rejection function transfer
+    # popt, *remain=curve_fit(model,freqs[f_plus],20*np.log10(np.abs(transfer_function[i,:][f_plus]))
+    #                       ,p0=[2,0.1,0.99,0],bounds=[[0,0,0,-100],[5,1,0.999,100]])
+    """
+    
+    if display:
+        
+        if not only:
+            if not len(Input):
+                raise ValueError('The "Input" parameter must be given. It is empty.')
+                
+            plt.rcParams.update(rcParamsForBaselines)
+            title = f'{details} - Bode diagrams'
+            plt.close(title)
+            fig = plt.figure(title)
+            fig.suptitle(title)
+            ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+            
+            ax1.plot(FrequencySampling, ModFTrej)
+            
+            if gain:
+                gains = [gain] ; delays=np.arange(10,60,10)
+                styles=['-','--',':']
+                linestyles = []
+                for ig in range(len(gains)):
+                    gain=gains[ig]
+                    linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
+                    for idel in range(len(delays)):
+                        gain=gains[ig];delay=delays[idel]
+                        ftr=model(FrequencySampling,delay,gain)
+                        ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
+                        if ig==len(gains)-1:
+                            linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
+                ax1.legend(handles=linestyles)
+                
+    
+            # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
+            ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
+            ax1.set_ylabel('FTrej')
+            
+            ax2.plot(FrequencySampling, ModFTBO)
+            ax2.set_yscale('log') #; ax2.set_ylim(1e-3,5)
+            ax2.set_ylabel("FTBO")
+            
+            ax3.plot(FrequencySampling, ModFTBF)
+        
+            ax3.set_xlabel('Frequencies [Hz]')
+            ax3.set_ylabel('FTBF')
+            ax3.set_xscale('log')
+            ax3.set_yscale('log')
+            ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
+
+            if figsave:
+                prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+                figname = "TransferFunctions"
+                if isinstance(ext,list):
+                    for extension in ext:
+                        plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+                else:
+                    plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
+    
+            generaltitle=f'{details} - Temporal sampling used'
+            plt.close(generaltitle)
+            fig = plt.figure(generaltitle)
+            ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+            
+            ax1.plot(timestamps, Input)
+            # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
+        
+            ax1.set_ylabel('Open loop')
+            
+            ax2.plot(timestamps, Output)
+            ax2.set_ylabel("Close loop")
+            
+            ax3.plot(timestamps,Command)
+        
+            ax3.set_xlabel('Timestamps [s]')
+            ax3.set_ylabel('Command')
+
+            fig.show()
+            
+            """
+            Display FTrej and PSD of input (disturbance) and output (residues) signals
+            """
+            
+            plt.rcParams.update(rcParamsForBaselines)
+            if not details:
+                title = 'FTrej'
+            else:
+                title = f'FTrej - {details}'
+            plt.close(title)
+            fig = plt.figure(title)
+            fig.suptitle(title)
+            ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+            
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTrej), "k")
+            # ax1.plot(FrequencySampling, 40*np.log10(ModFTBOfit), 
+            #          color=colors[0], linestyle='--')
+            
+            if gain:
+                gains = [gain] ; delays=np.arange(10,60,10)
+                styles=['-','--',':']
+                linestyles = []
+                for ig in range(len(gains)):
+                    gain=gains[ig]
+                    linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
+                    for idel in range(len(delays)):
+                        gain=gains[ig];delay=delays[idel]
+                        ftr=model(FrequencySampling,delay,gain)
+                        ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
+                        if ig==len(gains)-1:
+                            linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
+                ax1.legend(handles=linestyles)
+    
+            ax1.set_ylabel('Gain [dB]')
+            addtext(ax1,"|FTrej|²",loc='upper center',fontsize='x-large')
+            
+            ax2.plot(FrequencySampling, ModFTResidues**2, "k")
+            
+            ax2.set_ylabel("PSD [µm²/Hz]")
+            ax2.set_yscale("log")
+            addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
+            
+            
+            ax3.plot(FrequencySampling, ModFTTurb**2, "k")
+            ax3.plot(FrequencySampling, ModFTTurbfit**2, color=colors[0])
+            ax3.set_ylabel('PSD [µm²/Hz]')
+            addtext(ax3,"Disturbances",loc='upper center',fontsize='x-large')
+            
+            
+            ax3.set_xlabel('Frequencies [Hz]')
+            ax3.set_xscale('log')
+            ax3.set_yscale("log")
+            
+            ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
+            ax3.sharey(ax2)
+            
+            setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
+            
+            fig.show()
+        
+        if only == 'ftbo':
+            
+            
+            """ Display gain and phase of FTBO """
+            
+            plt.rcParams.update(rcParamsForBaselines)
+            if not details:
+                title = 'Bode Diagrams FTBO'
+            else:
+                title = f'Bode Diagrams FTBO - {details}'
+            
+            plt.close(title)
+            fig = plt.figure(title)
+            fig.suptitle(title)
+            ax1,ax2 = fig.subplots(nrows=2,sharex=True)
+            
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTBO), "k")
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTBOfit), 
+                     color=colors[0], linestyle='--')
+            
+            ax2.plot(FrequencySampling, AngleFTBO*180/np.pi, "k")
+            
+            ax1.set_ylabel('Gain [dB]')
+            ax2.set_ylabel("Phase [°]")
+            
+            ax1.grid(True) ; ax2.grid(True)
+            
+            ax2.set_xscale('log')
+            
+            fig.show()
+            
+            if figsave:
+                prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+                figname = f"BodeDiagrams_{only}"
+                if isinstance(ext,list):
+                    for extension in ext:
+                        plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+                else:
+                    plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
+            
+            """
+            Display FTBO and PSD of command and residues
+            """
+            
+            plt.rcParams.update(rcParamsForBaselines)
+            if not details:
+                title = 'FTBO'
+            else:
+                title = f'FTBO - {details}'
+            plt.close(title)
+            fig = plt.figure(title)
+            fig.suptitle(title)
+            ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
+            
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTBO), "k")
+            ax1.plot(FrequencySampling, 40*np.log10(ModFTBOfit), 
+                     color=colors[0], linestyle='--')
+            
+            if gain:
+                gains = [gain] ; delays=np.arange(10,60,10)
+                styles=['-','--',':']
+                linestyles = []
+                for ig in range(len(gains)):
+                    gain=gains[ig]
+                    linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
+                    for idel in range(len(delays)):
+                        gain=gains[ig];delay=delays[idel]
+                        ftr=model(FrequencySampling,delay,gain)
+                        ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
+                        if ig==len(gains)-1:
+                            linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
+                ax1.legend(handles=linestyles)
+    
+            ax1.set_ylabel('Gain [dB]')
+            addtext(ax1,"|FTBO|²",loc='upper center',fontsize='x-large')
+            
+            ax2.plot(FrequencySampling, ModFTResidues**2, "k")
+            
+            ax2.set_ylabel("PSD [µm²/Hz]")
+            ax2.set_yscale("log")
+            addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
+            
+            
+            ax3.plot(FrequencySampling, ModFTCommands**2, "k")
+            ax3.plot(FrequencySampling, ModFTCommandsfit**2, color=colors[0])
+            ax3.set_ylabel('PSD [µm²/Hz]')
+            addtext(ax3,"Commands",loc='upper center',fontsize='x-large')
+            
+            
+            ax3.set_xlabel('Frequencies [Hz]')
+            ax3.set_xscale('log')
+            ax3.set_yscale("log")
+            
+            ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
+            ax3.sharey(ax2)
+            
+            setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
+            
+            fig.show()
+            
+            if figsave:
+                prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+                figname = f"Amplitude_{only}"
+                if isinstance(ext,list):
+                    for extension in ext:
+                        plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+                else:
+                    plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
+            
+            
+            if displaytemporal:
+                """
+                Display temporal sequences of command and residues
+                """
+                 
+                plt.rcParams.update(rcParamsForBaselines)
+                if not details:
+                    title = 'FTBO and temporal sequences'
+                else:
+                    title = f'FTBO and temporal sequences - {details}'
+                plt.close(title)
+                fig = plt.figure(title)
+                fig.suptitle(title)
+                ax1,axGhost,ax2,ax3 = fig.subplots(nrows=4, gridspec_kw={"height_ratios":[2,0.5,2,2]})
+                axGhost.remove()
+                
+                ax1.plot(FrequencySampling, 20*np.log10(ModFTBO**2), "k")
+                
+                if gain:
+                    gains = [gain] ; delays=np.arange(10,60,10)
+                    styles=['-','--',':']
+                    linestyles = []
+                    for ig in range(len(gains)):
+                        gain=gains[ig]
+                        linestyles.append(mlines.Line2D([],[],color='k',linestyle=styles[ig],label=f"Gain={gain}"))
+                        for idel in range(len(delays)):
+                            gain=gains[ig];delay=delays[idel]
+                            ftr=model(FrequencySampling,delay,gain)
+                            ax1.plot(FrequencySampling, ftr, color=colors[idel], linestyle=styles[ig])
+                            if ig==len(gains)-1:
+                                linestyles.append(mlines.Line2D([],[],color=colors[idel],linestyle='-',label=f'\u03C4={delay}'))
+                    ax1.legend(handles=linestyles)
+                    
+                #ax1.set_yscale('log')
+                ax1.set_xscale('log')
+                ax1.set_ylabel('G(|FTBO|²)')
+                ax1.set_xlabel('Frequencies [Hz]')
+                
+                ax2.plot(timestamps, Output, "k")
+                ax2.set_ylabel("Residues\n[µm]")
+                ax2.set_ylim(-1.5*lmbda/2,1.5*lmbda/2)
+                
+                ax3.plot(timestamps, Command, "k")
+                
+                ax3.set_ylabel('Command\n[µm]')
+                ax3.set_xlabel('Time [s]')
+                ax2.sharex(ax3)
+                
+                ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
+                fig.show()
+        
+    return results
+
+
+
+
 def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Signal [µm]',
-                         fbonds=[], details='', window='hanning',mov_average=0,model=True,
+                         f1 = 0.3 , f2 = 5,
+                         fbonds=[], details='', window='no',mov_average=0,model=True,
                          cumStd=False,
                          display=True, figsave=False, figdir='',ext='pdf'):
     
@@ -1020,11 +1623,177 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
     if mov_average:
         PSD = moving_average(PSD, mov_average)
         FrequencySampling = moving_average(FrequencySampling,mov_average)
+
+    # print(np.var(signal)) ; print(np.var(signal_filtered))
+    # print(np.sum(np.abs(signal_filtered)**2*dt))
+    # print(np.sum(np.abs(PSD)))
+    
+    # f1 = 0.3 ; f2 = 10
+    logFrequencySampling = np.log10(FrequencySampling)
+    NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
+    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(PSD[NominalRegime]), 1)
+    poly1d_fn = np.poly1d(coefs)
+    psdFit = 10**poly1d_fn(logFrequencySampling)   # model sampled in direct space
+    powPsd=coefs[0]
+    # val0 = 10**coefs[0]#FTSignalfit[np.abs(np.argmin(logFrequencySampling-1))]
+    
+    if len(AdditionalSignals):
+        addSig=[] ; addPSD=[] ; addCumStd=[]
+    
+    for sig in AdditionalSignals:
+        addSig.append(sig)
+        tempPSD = 2*np.abs(np.fft.fft(sig*windowsequence, norm="forward")[PresentFrequencies])**2
+        
+        if mov_average:
+            addPSD.append(moving_average(tempPSD, mov_average))
+        else:
+            addPSD.append(tempPSD)
+    
+        addCumStd.append(np.cumsum(tempPSD))
+    
+    if display:
+        
+        linestyles = [mlines.Line2D([],[],color='k',label="Signal"),
+                      mlines.Line2D([],[],color='k',linestyle='--', label="Window")]
+                      
+        plt.rcParams.update(rcParamsForBaselines)
+        # plt.rcParams.update({"figure.subplot.hspace":0.2})
+        title = f'{details} - PSD'
+        plt.close(title)
+        fig = plt.figure(title)
+        fig.suptitle(title)
+        
+        if not cumStd:
+            ax1,ax2 = fig.subplots(nrows=2)
+            
+            ax1.plot(FrequencySampling, PSD,'k')
+            ax2.plot(timestamps, signal, 'k')
+            
+            for i in range(len(AdditionalSignals)):
+                ax1.plot(FrequencySampling, addPSD[i],color=colors[i])
+                ax2.plot(timestamps, addSig[i], colors[i])
+            
+            if model:
+                ax1.plot(FrequencySampling, psdFit)#10*FrequencySampling**(-8/3))
+                annX = 2
+                annYindex = np.argmin(np.abs(FrequencySampling-annX))
+                annY = psdFit[annYindex]*2
+                ax1.annotate(f"{round(powPsd*3,2)}/3",(annX,annY),color=colors[0])
+            # ax3.plot(timestamps, windowsequence,'k--', label='Window')
+            
+            # ct.setaxelim(ax1, 
+            ax1.set_yscale('log') ; ax1.set_xscale('log')
+            ax1.set_ylabel('PSD [µm²/Hz]')
+            ax2.set_ylabel(SignalName)
+            #ax2.legend()#handles=linestyles)
+            
+            ax1.set_xlabel('Frequencies [Hz]')
+            ax2.set_xlabel('Time (s)')
+            #ax3.set_ylabel("Window amplitude")
+            ax1.grid(True); ax2.grid(True);# ax3.grid(False)
+
+        else:
+            ax1,ax2,axGhost,ax3 = fig.subplots(nrows=4,gridspec_kw={"height_ratios":[5,5,1.5,5]})
+            axGhost.axis("off")
+            ax1.plot(FrequencySampling, PSD,'k')
+            ax2.plot(cumFrequencySampling, cumulativeStd, 'k')
+            ax3.plot(timestamps, signal, 'k')
+            
+            for i in range(len(AdditionalSignals)):
+                ax1.plot(FrequencySampling, addPSD[i],color=colors[i])
+                ax2.plot(cumFrequencySampling, addCumStd[i],color=colors[i])
+                ax3.plot(timestamps, addSig[i], colors[i])
+            
+            if model:
+                ax1.plot(FrequencySampling, psdFit)#10*FrequencySampling**(-8/3))
+                annX = 2
+                annYindex = np.argmin(np.abs(FrequencySampling-annX))
+                annY = psdFit[annYindex]*2
+                ax1.annotate(f"{round(powPsd*3,2)}/3",(annX,annY),color=colors[0])
+            # ax3.plot(timestamps, windowsequence,'k--', label='Window')
+            
+            ax1.set_yscale('log') ; ax1.set_xscale('log')
+            ax2.set_xscale('log')
+            ax2.sharex(ax1) ;# ax1.tick_params.labelbottom(False)
+            ax1.set_ylabel('PSD [µm²/Hz]')
+            ax2.set_ylabel("Cumulative STD [µm]")
+            ax3.set_ylabel(SignalName)
+            
+            ax2.set_xlabel('Frequencies [Hz]')
+            ax3.set_xlabel('Time (s)')
+            ax1.grid(True); ax2.grid(True); ax3.grid(True)
+
+        if figsave:
+            prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+            figname = "PSD"
+            if isinstance(ext,list):
+                for extension in ext:
+                    plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+            else:
+                plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
+        
+        fig.show()
+    
+    if cumStd:
+        return FrequencySampling, PSD, cumStd, psdFit
+
+    else:
+        return FrequencySampling, PSD, psdFit
+
+
+
+def FitAtmospherePsd(signal, timestamps, *AdditionalSignals, SignalName='Signal [µm]',
+                     fbonds=[], details='', window='no',mov_average=0,model=True,
+                     cumStd=False,
+                     atmParams={"V":10,"L0":30,"d":1,"pows":(-2/3,-8/3,-17/3)},
+                     display=True, figsave=False, figdir='',ext='pdf'):    
+    
+    nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
+    # T = timestamps[-1]
+    
+    FrequencySampling1 = np.fft.fftfreq(nNT, dt)
+    if len(fbonds):
+        fmin, fmax = fbonds
+    else:
+        fmin=0
+        fmax=np.max(FrequencySampling1)
+    
+    PresentFrequencies = (FrequencySampling1 > fmin) \
+        & (FrequencySampling1 < fmax)
+        
+    FrequencySampling = FrequencySampling1[PresentFrequencies]
+    
+    if window =='hanning':
+        windowsequence = np.hanning(nNT)
+    else:
+        windowsequence = np.ones(nNT)
+        
+    signal_filtered = signal*windowsequence
+    
+    PSD = 2*np.abs(np.fft.fft(signal_filtered,norm="forward")[PresentFrequencies])**2
+
+    if cumStd:
+        cumulativeStd = np.sqrt(np.cumsum(PSD))
+        cumFrequencySampling = np.copy(FrequencySampling)
+
+    if mov_average:
+        PSD = moving_average(PSD, mov_average)
+        FrequencySampling = moving_average(FrequencySampling,mov_average)
         
     df = FrequencySampling[1]-FrequencySampling[0]
     # print(np.var(signal)) ; print(np.var(signal_filtered))
     # print(np.sum(np.abs(signal_filtered)**2*dt))
     # print(np.sum(np.abs(PSD)))
+    
+    V = atmParams["V"] ; L0 = atmParams["L0"] ; d=atmParams["d"]
+    nu1 = V/L0                          # Low cut-off frequency
+    nu2 = 0.3*V/d                       # High cut-off frequency
+        
+    if not "pows" in atmParams.keys():
+        atmParams["pows"] = (-2/3, -8/3, -17/3) # Conan et al
+    
+    pows = atmParams["pows"]
+    filtre = modelAtmosphere(FrequencySampling,nu1,nu2, pows)
     
     f1 = 0.3 ; f2 = 10
     logFrequencySampling = np.log10(FrequencySampling)
@@ -1128,6 +1897,38 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
 
     else:
         return FrequencySampling, PSD, psdFit
+
+
+def modelAtmosphere(FrequencySampling, nu1,nu2,pows):
+    
+    """"""""""""""""""""""""
+    """  modelAtmosphere """
+    """"""""""""""""""""""""
+    
+    # V = 0.31*r0/t0*1e3              # Average wind velocity in its direction [m/s]
+    pow1, pow2, pow3 = pows
+        
+    b0 = nu1**(pow1-pow2)           # offset for continuity
+    b1 = b0*nu2**(pow2-pow3)        # offset for continuity
+
+    # if verbose:
+    #     print(f'Atmospheric cutoff frequencies: {nu1:.2}Hz and {nu2:.2}Hz')
+    
+    nNT = len(FrequencySampling)
+    filtre = np.zeros(nNT)
+    
+    # Define the three frequency regimes
+    lowregim = (np.abs(FrequencySampling)>0) * (np.abs(FrequencySampling)<nu1)
+    medregim = (np.abs(FrequencySampling)>=nu1) * (np.abs(FrequencySampling)<nu2)
+    highregim = np.abs(FrequencySampling)>=nu2
+    
+    filtre[lowregim] = np.abs(FrequencySampling[lowregim])**pow1
+    filtre[medregim] = np.abs(FrequencySampling[medregim])**pow2*b0
+    filtre[highregim] = np.abs(FrequencySampling[highregim])**pow3*b1
+    
+    return filtre
+
+
 
 def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
                      bonds=[],window='no',
