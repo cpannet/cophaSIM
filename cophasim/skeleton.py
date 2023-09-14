@@ -1281,7 +1281,7 @@ The simulation might experience aliasing. /!\\n")
 
 
 def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
-            withsnr=True,infos={'title':''},
+            withsnr=True,infos={'details':''},
             pause=False, display=True,verbose=False,
             savedir='',ext='pdf',):
     """

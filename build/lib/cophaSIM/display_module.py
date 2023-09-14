@@ -782,8 +782,8 @@ to {curvesNames[iLastBase]}")
                 plt.savefig(filename+f"_{rangeCurves}.{ext}", dpi=300)                
                 
 def simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotObs,mov_average=0,
-               obsName='PD [µm]',barName='RMS',display=True,filename='',ext='pdf',infos={"details":''},
-               verbose=False):
+                    obsName='PD [µm]',barName='RMS',display=True,filename='',ext='pdf',infos={"details":''},
+                    verbose=False):
     """
     Each figure only shows up to 10 telescopes, distributed on two subplots
     If there are more than 10 telescopes, multiple figures will be created 
@@ -1155,87 +1155,109 @@ def plotHisto(obs,generalTitle,plotObs,obsName='GD [µm]',
 
 
 
-# def perfarray(lwObs,colorObs,):
+def axPerfarray(ax,lsObs,colorObs,axTitle,lwObs=[]):
     
-#     plt.rcParams.update(rcParamsForBaselines)
+    for ia in range(NA):
+        name1,(x1,y1) = telescopes[ia],InterfArray.TelCoordinates[ia,:2]
+        ax.scatter(x1,y1,color='k',linewidth=10)
+        ax.annotate(name1, (x1+6,y1+1),color="k")
+        ax.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+        for iap in range(ia+1,NA):
+            ib=ct.posk(ia,iap,NA)
+            x2,y2 = InterfArray.TelCoordinates[iap,:2]
+            im=ax1.plot([x1,x2],[y1,y2],linestyle='solid',
+                    linewidth=1,
+                    color=cm(int(vismod[ib]*nShades)))
+    ax.set_xlabel("X [m]")
+    ax.tick_params(labelleft=False)
     
-#     from .tol_colors import tol_cmap as tc
-#     import matplotlib as mpl
-#     from .config import NA,NIN,InterfArray,wlOfTrack
+    for ia in range(NA):
+        name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+        ax2.scatter(x1,y1,color='k',linewidth=10)
+        ax2.annotate(name1, (x1+6,y1+1),color="k")
+        ax2.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+        for iap in range(ia+1,NA):
+            ib=ct.posk(ia,iap,NA)
+            x2,y2 = InterfArray.TelCoordinates[iap,:2]
+            ls = (0,(10*lsObs[ib],np.max([0,10*(1-lsObs[ib])])))
+            if PhotometricBalance[ib]>0:
+                im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+                        linewidth=3,
+                        color=cm(int(outputs.FringeContrast[ib]*nShades)))
+            else:
+                im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+                        linewidth=1,
+                        color=cm(int(outputs.FringeContrast[ib]*nShades)))
+    ax2.set_xlabel("X [m]")
+    ax2.set_ylabel("Y [m]")
+    ax2.set_xlim([-210,160]) ; ax2.set_ylim([-50,350])
+
+
+
+def perfarray(lsObs,colorObs,generalTitle,lwObs1=[],axTitle="Standard deviation",
+              lsObs2=[],colorObs2=[],lwObs2=[],axTitle2="Standard deviation",
+              infos={}):
     
-#     #visibilities, _,_,_=ct.VanCittert(wlOfScience,config.Obs,config.Target)
-#     #outputs.VisibilityAtPerfWL = visibilities
-#     visibilities = np.ones(NIN)#ct.NB2NIN(outputs.VisibilityObject[wlIndex])
-#     vismod = np.abs(visibilities) ; visangle = np.angle(visibilities)
-#     PhotometricBalance = config.FS['PhotometricBalance']
+    plt.rcParams.update(rcParamsForBaselines)
     
-#     cm = tc('rainbow_PuRd').reversed() ; Nnuances = 256
+    from .tol_colors import tol_cmap as tc
+    import matplotlib as mpl
+    from .config import NA,NIN,InterfArray,wlOfTrack
     
-#     # plt.rcParams['figure.figsize']=(16,12)
-#     # font = {'family' : 'DejaVu Sans',
-#     #         'weight' : 'normal',
-#     #         'size'   : 22}
+    twoAxes=False
+    if len(lsObs2):
+        twoAxes = True
+        
+    #visibilities, _,_,_=ct.VanCittert(wlOfScience,config.Obs,config.Target)
+    #outputs.VisibilityAtPerfWL = visibilities
+    # visibilities = np.ones(NIN)  #ct.NB2NIN(outputs.VisibilityObject[wlIndex])
+    # vismod = np.abs(visibilities) ; #visangle = np.angle(visibilities)
+    # PhotometricBalance = config.FS['PhotometricBalance']
     
-#     # plt.rc('font', **font)
-#     title="perfarray"
-#     fig=plt.figure(title, clear=True)
-#     (ax1,ax2)=fig.subplots(ncols=2, sharex=True, sharey=True)
-#     ax1.set_title(f"Target visibility and photometric balance ({wlOfTrack:.3}µm)")
-#     ax2.set_title(f"Fringe contrast and Time on central fringe ({wlOfScience:.3}µm)")
+    cm = tc('rainbow_PuRd').reversed() ; nShades = 256
     
-#     for ia in range(NA):
-#         name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
-#         ax1.scatter(x1,y1,color='k',linewidth=10)
-#         ax1.annotate(name1, (x1+6,y1+1),color="k")
-#         ax1.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
-#         for iap in range(ia+1,NA):
-#             ib=ct.posk(ia,iap,NA)
-#             x2,y2 = InterfArray.TelCoordinates[iap,:2]
-#             im=ax1.plot([x1,x2],[y1,y2],linestyle='solid',
-#                     linewidth=1,
-#                     color=cm(int(vismod[ib]*Nnuances)))
-#     ax1.set_xlabel("X [m]")
-#     ax1.tick_params(labelleft=False)
+    # plt.rcParams['figure.figsize']=(16,12)
+    # font = {'family' : 'DejaVu Sans',
+    #         'weight' : 'normal',
+    #         'size'   : 22}
     
-#     for ia in range(NA):
-#         name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
-#         ax2.scatter(x1,y1,color='k',linewidth=10)
-#         ax2.annotate(name1, (x1+6,y1+1),color="k")
-#         ax2.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
-#         for iap in range(ia+1,NA):
-#             ib=ct.posk(ia,iap,NA)
-#             x2,y2 = InterfArray.TelCoordinates[iap,:2]
-#             ls = (0,(10*outputs.LR4[ib],np.max([0,10*(1-outputs.LR4[ib])])))
-#             if PhotometricBalance[ib]>0:
-#                 im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
-#                         linewidth=3,
-#                         color=cm(int(outputs.FringeContrast[ib]*Nnuances)))
-#             else:
-#                 im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
-#                         linewidth=1,
-#                         color=cm(int(outputs.FringeContrast[ib]*Nnuances)))
-#     ax2.set_xlabel("X [m]")
-#     ax2.set_ylabel("Y [m]")
-#     ax2.set_xlim([-210,160]) ; ax2.set_ylim([-50,350])
-#     # fig.subplots_adjust(right=0.8)
-#     # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-#     # mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
-#     #                           orientation='vertical',
-#     #                           label=f"Fringe Contrast at {wlOfScience:.3}µm")
+    # plt.rc('font', **font)
+    plt.close(generalTitle)
+    fig=plt.figure(generalTitle)
+    if twoAxes:
+        (ax1,ax2)=fig.subplots(ncols=2, sharex=True, sharey=True)
+        ax2.set_title(axTitle2)
+    else:
+        ax1 = fig.subplots()
+    
+    ax1.set_title(axTitle)
+    
+    axPerfarray(lsObs,colorObs,axTitle,lsObs=lsObs)
+    
+    if twoAxes:
+        axPerfarray(lsObs2,colorObs2,axTitle2,lsObs=lsObs2)
+    
+    
+
+    # fig.subplots_adjust(right=0.8)
+    # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    # mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+    #                           orientation='vertical',
+    #                           label=f"Fringe Contrast at {wlOfScience:.3}µm")
 
 
     
-#     fig.subplots_adjust(bottom=0.2)
-#     cbar_ax = fig.add_axes([0.1, 0.05, 0.85, 0.05])
-#     mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
-#                               orientation='horizontal')
+    fig.subplots_adjust(bottom=0.2)
+    cbar_ax = fig.add_axes([0.1, 0.05, 0.85, 0.05])
+    mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+                              orientation='horizontal')
 
-#     if len(savedir):
-#         if verbose:
-#             print("Saving perfarray figure.")
-#         plt.savefig(savedir+f"{filenamePrefix}_perfarray.{ext}")
+    if len(savedir):
+        if verbose:
+            print("Saving perfarray figure.")
+        plt.savefig(savedir+f"{filenamePrefix}_perfarray.{ext}")
 
-#     plt.rcParams.update(plt.rcParamsDefault)
+    plt.rcParams.update(plt.rcParamsDefault)
 
 
 def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True, 
