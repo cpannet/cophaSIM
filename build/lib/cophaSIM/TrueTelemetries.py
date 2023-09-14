@@ -573,26 +573,29 @@ def ReadFits(file,computeCp=False,verbose=True):
         # outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["avPdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
         
         """ After 2023-07-11 """
-        
+        whichCurPdVar = hduL[0].header['whichCurPdVar']
+        if whichCurPdVar == "Sylvestre":
+            config.FT['whichSNR'] = "pd"
+        else:
+            config.FT['whichSNR'] = "gd"
+            
         outputs.varPD = hduL[1].data["pdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
         outputs.varGD = hduL[1].data["alternatePdVar"] # Estimated "GD variance" = 1/SNR² [NTxNINmes]
         outputs.SquaredSnrGD = 1/outputs.varGD
         outputs.SquaredSnrPD = 1/outputs.varPD
         
         # outputs.whichVar = hduL[1].data['whichCurPdVar'][0]    # 0: varPd ; 1:varGd
-        outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
-        outputs.SquaredSNRMovingAverageGD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        if config.FT['whichSNR']=="pd":
+            outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        else:
+            outputs.SquaredSNRMovingAverageGD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
         outputs.singularValuesSqrt = np.sqrt(hduL[1].data["sPdSingularValues"])
         
         config.FT['ThresholdPD'] = hduL[1].data['pdThreshold'][0]
         config.FT['ThresholdGD'] = hduL[1].data['gdThresholds'][0]
         outputs.ThresholdPD = hduL[1].data['pdThreshold']
         outputs.ThresholdGD = hduL[1].data['gdThresholds']
-        whichCurPdVar = hduL[0].header['whichCurPdVar']
-        if whichCurPdVar == "Sylvestre":
-            config.FT['whichSNR'] = "pd"
-        else:
-            config.FT['whichSNR'] = "gd"
+
         
         outputs.VisibilityEstimated = np.nan_to_num(1/hduL[1].data["VisiNorm"],posinf=0) # Estimated fringe visibility [NTxNINmes]
         
@@ -605,17 +608,17 @@ def ReadFits(file,computeCp=False,verbose=True):
         
         outputs.PistonPDCommand[:-1] = 2*hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
         outputs.PistonGDCommand[:-1] = 2*hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
-        outputs.SearchCommand[:-1] = 2*hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
-        outputs.CommandODL[:-1] = 2*hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns]
+        outputs.CommandRelock[:-1] = 2*hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
+        outputs.CommandODL[:-1] = 2*hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns] A VERIFIER
         
     
     # #ALL DATA WHICH ARE COMMANDS-RELATED NEED TO BE SORTED IN SAME ORDER
-    # THAN OPD, i.e. in the ordre of Beam2Tel
+    # THAN OPD, i.e. in the order of Beam2Tel
 
     for it in range(NT):
         outputs.PistonPDCommand[it] = np.dot(Tel2Beam,outputs.PistonPDCommand[it])
         outputs.PistonGDCommand[it] = np.dot(Tel2Beam,outputs.PistonGDCommand[it])
-        outputs.SearchCommand[it] = np.dot(Tel2Beam,outputs.SearchCommand[it])
+        outputs.CommandRelock[it] = np.dot(Tel2Beam,outputs.CommandRelock[it])
         outputs.CommandODL[it] = np.dot(Tel2Beam,outputs.CommandODL[it])
         outputs.PistonGDcorr[it] = np.dot(Tel2Beam,outputs.PistonGDcorr[it])
         outputs.GDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.GDResidual2[it])
@@ -650,6 +653,7 @@ def ReadFits(file,computeCp=False,verbose=True):
             ib = ct.posk(ia,iap,NA)
             outputs.PDCommand[:,ib] = outputs.PistonPDCommand[:,iap]-outputs.PistonPDCommand[:,ia]
             outputs.GDCommand[:,ib] = outputs.PistonGDCommand[:,iap]-outputs.PistonGDCommand[:,ia]
+            outputs.OPDCommandRelock[:,ib] = outputs.CommandRelock[:,iap]-outputs.CommandRelock[:,ia]
             outputs.OPDCommand[:,ib] = outputs.CommandODL[:,iap]-outputs.CommandODL[:,ia]
 
     # Reload outputs parameters.

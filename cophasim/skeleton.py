@@ -1487,6 +1487,10 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     
     if (len(args)==0) and (len(outputsData)==0):
         args = ['perftable','estFlux','fluxHist','gdHist']
+        
+    if 'focusRelock' in args:
+        args = ['gdPdEst','snr','gdPdCmd']
+        outputsData=['OPDCommandRelock','CommandRelock']
     
     NAdisp = 10
     NumberOfTelFigures = 1+NA//NAdisp - 1*(NA % NAdisp==0)
