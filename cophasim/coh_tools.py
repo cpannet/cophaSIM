@@ -238,17 +238,17 @@ def get_array(name='',band='H',getcoords=False,
     elif name == 'CHARA':         
             
         #official coordinates in [µm]
-        TelCoordinates= np.array([[125333989.819,305932632.737,-5909735.735],\
-                                 [70396607.118,269713282.258,-2796743.645],\
-                                     [0,0,0],\
-                                         [-5746854.437,33580641.636,636719.086],\
-                                             [-175073332.211,216320434.499,-10791111.235],\
-                                                 [-69093582.796,199334733.235,467336.023]])
+        TelCoordinates= np.array([[0,0,0],\
+                                  [-5746854.437,33580641.636,636719.086],\
+                                      [125333989.819,305932632.737,-5909735.735],\
+                                          [70396607.118,269713282.258,-2796743.645],\
+                                              [-175073332.211,216320434.499,-10791111.235],\
+                                                  [-69093582.796,199334733.235,467336.023]])
         TelCoordinates=TelCoordinates*1e-6      # [m]
         
         NA = np.shape(TelCoordinates)[0]
         
-        TelNames = ['E1','E2','S1','S2','W1','W2']
+        TelNames = ['S1','S2','E1','E2','W1','W2']
         BaseNames = []
         BaseCoordinates =[]
 
@@ -263,6 +263,7 @@ def get_array(name='',band='H',getcoords=False,
 
         InterfArray.NA = NA
         InterfArray.TelNames=TelNames
+        InterfArray.telNameLength=2
         InterfArray.BaseNorms=BaseNorms
         InterfArray.BaseNames = BaseNames
         InterfArray.TelCoordinates = TelCoordinates
@@ -810,6 +811,7 @@ def create_obsfile(spectra, Obs, Target, savingfilepath='',
         BaseData = hdu[2].data
         
         TelNames = TelData['TelNames']
+        telNameLength = 2
         TelCoordinates = TelData['TelCoordinates']
         TelTransmissions = TelData['TelTransmissions']
         TelSurfaces = TelData['TelSurfaces']

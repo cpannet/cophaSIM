@@ -1711,7 +1711,7 @@ Then asks for the user to choose a smart threshold.
         config.FT['ThresholdPD'] = newThresholdPD
         config.FT['state'] = state
 
-        sk.display('opd','snr','detector',wlOfTrack=1.6, pause=True,display=display)
+        sk.display('opd','snr','detector',pause=True,display=display)
         
         sk.update_config(NT=InitNT, foreground=[],verbose=verbose)
         sk.updateFTparams(GainPD=gainPD, GainGD=gainGD, relock=relock,
@@ -1745,7 +1745,7 @@ Then asks for the user to choose a smart threshold.
         sk.loop(verbose)
         
         if manual:
-            sk.display('snr',wlOfTrack=1.6, pause=True)
+            sk.display('snr', pause=True)
             test1 = input("Set all threshold to same value? [y/n]")
             if (test1=='y') or (test1=='yes'):    
                 newThresholdGD = float(input("Set the Threshold GD: "))
@@ -1774,7 +1774,7 @@ Then asks for the user to choose a smart threshold.
                     
             config.FT['ThresholdGD'] = newThresholdGD
             
-            sk.display('snr',wlOfTrack=1.6, pause=True, display=display)
+            sk.display('snr',pause=True, display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)
@@ -1803,7 +1803,7 @@ Then asks for the user to choose a smart threshold.
         sk.loop(verbose=verbose)
         
         if manual:
-            sk.display('snr','detector',wlOfTrack=1.6, pause=True)
+            sk.display('snr','detector', pause=True)
             test1 = input("Set all threshold to same value? [y/n]")
             if (test1=='y') or (test1=='yes'):    
                 newThresholdGD = float(input("Set the Threshold GD: "))
@@ -1846,7 +1846,7 @@ Then asks for the user to choose a smart threshold.
             config.FT['ThresholdPD'] = newThresholdPD
             config.FT['state'] = state
 
-            sk.display('opd','snr','detector',wlOfTrack=1.6, pause=True,display=display)
+            sk.display('opd','snr','detector', pause=True,display=display)
             
         sk.update_config(DisturbanceFile=InitialDisturbanceFile, NT=InitNT,
                          verbose=verbose)

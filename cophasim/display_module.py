@@ -102,7 +102,7 @@ telcolors = colors[:NAdisp]*nTelFigures
 wl = config.wlOfTrack
 
 def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
-              plotObs,generalTitle,SNR=[],obsType='',display=True,
+              plotObs,generalTitle,SNR=[],dispersion=[],obsType='',display=True,
               filename='',ext='pdf',infos={"details":''},verbose=False):
     
     global telescopes, baselines, closures,wl,\
@@ -117,13 +117,23 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
 
     nObsToPlot = np.sum(plotObs)
     plotObsIndex = np.argwhere(plotObs).ravel()
-
-    plotSNR=False
+    
+    plotTopAxe=False ; plotSnr=False ; plotDispersion=False
     if len(SNR):
-        plotSNR=True
+        plotTopAxe=True ; plotSnr=True
         linestyles=[mlines.Line2D([],[], color='black',
                                   linestyle='--', label='Threshold GD')]
-
+        topAxeRatio = 1
+        topObs = SNR ; topAxeLabel = "SNR"
+        
+    if len(dispersion):
+        if len(SNR):
+            raise Exception("You can't plot simulatenously SNR and dispersion. Choose one of them.")
+        linestyles=[]
+        plotTopAxe=True ; plotDispersion=True
+        topAxeRatio = 3
+        topObs = dispersion ; topAxeLabel = "Dispersion [µm]"
+        
     
     # Each figure only shows 15 baselines, distributed on two subplots
     # If there are more than 15 baselines, multiple figures will be created
@@ -156,13 +166,13 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
         fig=plt.figure(title, clear=True)
         fig.suptitle(title)
         
-        if plotSNR:
+        if plotTopAxe:
             axGhost=[0]*5       # will contain axes that I remove directly after creation
             
             if oneAxe:
                 plt.rcParams.update(rcParamsForOneAxe)
 
-                axs = fig.subplots(nrows=3,ncols=4, gridspec_kw={"height_ratios":[1,3,3],"width_ratios":[8,0.5,1,1]})
+                axs = fig.subplots(nrows=3,ncols=4, gridspec_kw={"height_ratios":[topAxeRatio,3,3],"width_ratios":[8,0.5,1,1]})
                 
                 ax1,ax2,ax3 = axs[:,0]
                 
@@ -191,7 +201,7 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
                 plt.rcParams.update(rcParamsForBaselines_withSNR)
                 (ax1,ax6,axLegend),(ax2,ax7,axGhost[0]), \
                     (ax3,ax8,axGhost[1]),(ax11,ax12,axGhost[2]),\
-                        (ax4,ax9,axGhost[3]),(ax5,ax10,axGhost[4]) = fig.subplots(nrows=6,ncols=3, gridspec_kw={"height_ratios":[1,4,4,0.7,1,1],"width_ratios":[5,5,1]})
+                        (ax4,ax9,axGhost[3]),(ax5,ax10,axGhost[4]) = fig.subplots(nrows=6,ncols=3, gridspec_kw={"height_ratios":[3,4,4,0.7,1,1],"width_ratios":[5,5,1]})
                 
                 ax1.set_title(f"From {curvesNames[iFirstCurve]} \
     to {curvesNames[iFirstCurve+len1-1]}")
@@ -217,8 +227,9 @@ to {curvesNames[iLastBase]}")
             curvesNamesOneAxe = [curvesNames[iCurve] for iCurve in plotObsIndex]
             iColor=0
             for iCurve in plotObsIndex:   # First serie
-                if plotSNR:
-                    ax1.plot(timestamps,SNR[:,iCurve],color=colorsArray[iColor])
+                if plotTopAxe:
+                    ax1.plot(timestamps,topObs[:,iCurve],color=colorsArray[iColor])
+                if plotSnr:
                     ax1.hlines(config.FT['ThresholdGD'][iCurve], timestamps[0],timestamps[-1], color=colorsArray[iColor], linestyle='dashed')
                 ax2.plot(timestamps,GDobs[:,iCurve],color=colorsArray[iColor])
                 ax2.plot(timestamps,GDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
@@ -235,8 +246,9 @@ to {curvesNames[iLastBase]}")
             SecondSet = range(iFirstCurve+len1,iLastBase+1)
             iColor=0
             for iCurve in FirstSet:   # First serie
-                if plotSNR:
-                    ax1.plot(timestamps,SNR[:,iCurve],color=colorsArray[iColor])
+                if plotTopAxe:
+                    ax1.plot(timestamps,topObs[:,iCurve],color=colorsArray[iColor])
+                if plotSnr:
                     ax1.hlines(config.FT['ThresholdGD'][iCurve], timestamps[0],timestamps[-1], color=colorsArray[iColor], linestyle='dashed')
                 ax2.plot(timestamps,GDobs[:,iCurve],color=colorsArray[iColor])
                 ax2.plot(timestamps,GDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
@@ -244,8 +256,9 @@ to {curvesNames[iLastBase]}")
                 ax3.plot(timestamps,PDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
                 iColor+=1
             for iCurve in SecondSet:   # Second serie
-                if plotSNR:
-                    ax6.plot(timestamps,SNR[:,iCurve],color=colorsArray[iColor])
+                if plotTopAxe:
+                    ax6.plot(timestamps,topObs[:,iCurve],color=colorsArray[iColor])
+                if plotSnr:
                     ax6.hlines(config.FT['ThresholdGD'][iCurve],timestamps[0],timestamps[-1],color=colorsArray[iColor], linestyle='dashed')
                 ax7.plot(timestamps,GDobs[:,iCurve],color=colorsArray[iColor])
                 ax7.plot(timestamps,GDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
@@ -260,56 +273,14 @@ to {curvesNames[iLastBase]}")
             p4=ax10.bar(curvesNames[SecondSet],RMSpdobs[SecondSet], color=colorsArray[len1:])
         
         """
-        if plotSNR:
-            ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-            ax6.get_shared_x_axes().join(ax6,ax7,ax8)
-        else:
-            ax2.sharex(ax3)
-            ax7.sharex(ax8)
-            
-        ax4.get_shared_x_axes().join(ax4,ax5)
-        ax9.get_shared_x_axes().join(ax9,ax10)
-        
-        if plotSNR:
-            ax1.get_shared_y_axes().join(ax1,ax6)
-            ax6.tick_params(labelleft=False) ;
-            ax1.set_ylabel('SNR')
-            axLegend.legend(handles = linestyles)
-            
-        ax2.get_shared_y_axes().join(ax2,ax7)
-        ax3.get_shared_y_axes().join(ax3,ax8)
-        ax4.get_shared_y_axes().join(ax4,ax9)
-        ax5.get_shared_y_axes().join(ax5,ax10)
-        
-        ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=GDobs,ylim_min=[-wl/2,wl/2])
-        ax8.tick_params(labelleft=False) ; ax3.set_ylim([-wl/2,wl/2])
-        ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdobs),[1]]),ymin=0)
-        ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdobs)]),ymin=0)
-        
-        ax4.tick_params(labelbottom=False)
-        ax9.tick_params(labelbottom=False)
-        
-        
-        ax2.set_ylabel('Group-Delays [µm]')
-        ax3.set_ylabel('Phase-Delays [µm]')
-        ax4.set_ylabel('GD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        ax5.set_ylabel('PD rms\n[µm]',rotation=1,labelpad=60,loc='bottom')
-        
-        ax11.remove() ; ax12.remove()       # These axes are here to let space for ax3 and ax8 labels
-        
-        ax3.set_xlabel('Time [s]', labelpad=0) ; ax8.set_xlabel('Time [s]', labelpad=0)
-        ax5.set_xlabel('Baselines') ; ax10.set_xlabel('Baselines')
-        """
-        
-        
-        """
         Tune the axis
         """
                
-        if plotSNR:
+        if plotTopAxe:
             ax1.get_shared_x_axes().join(ax1,ax2,ax3)
-            ax1.set_ylabel('SNR')
-            axLegend.legend(handles = linestyles, loc='upper left')
+            if plotSnr:
+                axLegend.legend(handles = linestyles, loc='upper left')
+                
             ax1.tick_params(labelbottom=False);
             
         else:
@@ -324,7 +295,24 @@ to {curvesNames[iLastBase]}")
         else:
             gdBarLabel = 'GD rms\n[µm]'
         
-        if not oneAxe:
+        if oneAxe:
+        
+            ax2.set_ylabel('Group-Delays [µm]')
+            ax3.set_ylabel('Phase-Delays [µm]')
+            ax1.set_ylabel(topAxeLabel)
+            
+            ct.setaxelim(ax4,xdata=np.concatenate([np.stack(RMSgdobs),[1]]),
+                         ymargin=0.2,xmin=0)
+            ct.setaxelim(ax5,xdata=np.concatenate([np.stack(RMSpdobs)]),
+                         ymargin=0.2,xmin=0)
+            ax4.bar_label(p1,label_type='edge',fmt='%.2f')
+            ax5.bar_label(p3,label_type='edge',fmt='%.2f')
+            ax4.set_xlabel(gdBarLabel)
+            ax5.set_xlabel('PD rms\n[µm]')
+            ax4.set_ylabel('Baselines',rotation=90,fontsize=14)
+            ax5.tick_params(labelleft=False)
+        
+        else:
             
             ct.setaxelim(ax4,ydata=np.concatenate([np.stack(RMSgdobs),[1]]),ymargin=0.2,ymin=0)
             ct.setaxelim(ax5,ydata=np.concatenate([np.stack(RMSpdobs)]),ymargin=0.2,ymin=0)
@@ -356,15 +344,24 @@ to {curvesNames[iLastBase]}")
             ax8.set_xlabel('Time [s]', labelpad=0)
             ax10.set_xlabel('Baselines')
             
-            if plotSNR:
+            if plotTopAxe:
                 ax6.get_shared_x_axes().join(ax6,ax7,ax8)
                 ax1.get_shared_y_axes().join(ax1,ax6)
                 ax6.tick_params(labelbottom=False, labelleft=False) ;
+                ax1.tick_params(labelbottom=False, labelleft=False) ;
                 
                 ax7b=ax7.twinx() ; ax7b.set_ylabel('Group-Delays\n[µm]',
                                                    rotation=1,labelpad=50)
                 ax8b=ax8.twinx() ; ax8b.set_ylabel('Phase-Delays\n[µm]',
                                                    rotation=1,labelpad=50)
+                if plotDispersion:
+                    ax6b=ax6.twinx() ; ax6b.set_ylabel('Dispersion\n(GD-PD)[µm]',
+                                                       rotation=1,labelpad=50)
+                    ax6.tick_params(labelleft=False, labelbottom=False)
+                    ct.setaxelim(ax6b,ydata=topObs,ylim_min=[-wl/2,wl/2])
+                    ax6.grid(False)
+                else:
+                    ax1.set_ylabel(topAxeLabel)
                 
                 ct.setaxelim(ax7b,ydata=GDobs,ylim_min=[-wl/2,wl/2])
                 ax8b.set_ylim([-wl/2,wl/2])
@@ -395,23 +392,7 @@ to {curvesNames[iLastBase]}")
                 ax5.bar_label(p3,label_type='edge',fmt='%.2f')
                 
                 ct.setaxelim(ax2,ydata=GDobs,ylim_min=[-wl/2,wl/2],ymargin=0.2)
-        
-        else:
-                
-            ax2.set_ylabel('Group-Delays [µm]')
-            ax3.set_ylabel('Phase-Delays [µm]')
-            
-            ct.setaxelim(ax4,xdata=np.concatenate([np.stack(RMSgdobs),[1]]),
-                         ymargin=0.2,xmin=0)
-            ct.setaxelim(ax5,xdata=np.concatenate([np.stack(RMSpdobs)]),
-                         ymargin=0.2,xmin=0)
-            ax4.bar_label(p1,label_type='edge',fmt='%.2f')
-            ax5.bar_label(p3,label_type='edge',fmt='%.2f')
-            ax4.set_xlabel(gdBarLabel)
-            ax5.set_xlabel('PD rms\n[µm]')
-            ax4.set_ylabel('Baselines',rotation=90,fontsize=14)
-            ax5.tick_params(labelleft=False)
-        
+
         
         if display:
             fig.show()

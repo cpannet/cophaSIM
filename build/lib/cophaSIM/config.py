@@ -127,6 +127,7 @@ class Interferometer():
             BaseData = hdu[2].data
         
             self.TelNames = TelData['TelNames']
+            self.telNameLength = 2
             self.TelCoordinates = TelData['TelCoordinates']
             self.TelTransmissions = TelData['TelTransmissions']
             self.TelSurfaces = TelData['TelSurfaces']

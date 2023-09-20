@@ -8,6 +8,7 @@
 
 !CHARA*.fits
 !MROI*.fits
+!*exampleTelemetry*.fits
 
 # Ignore all observation files but Unresolved, 1mas, 2mas and 3mas
 !mag*.fits

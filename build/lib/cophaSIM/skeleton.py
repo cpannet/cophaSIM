@@ -1281,9 +1281,9 @@ The simulation might experience aliasing. /!\\n")
 
 
 def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
-            withsnr=True,infos={'details':''},
+            topAxe='snr',infos={'details':''},
             pause=False, display=True,verbose=False,
-            savedir='',ext='pdf',):
+            savedir='',ext='pdf'):
     """
     
     Purpose
@@ -1304,7 +1304,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     ----------
     *args : LIST OF STRING, optional argument
         Quantities to display among available ones (see below).
-        If args is empty, the function displays main plots:
+        If args is empty, the function displays four main plots:
             - pertable
             - perfarray
             - gdHist
@@ -1320,17 +1320,10 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         Integration time for the variances, averages, etc...
     wlOfScience : FLOAT, optional. The default is 0.75.
         Wavelength at which the science instrument is working, for SNR computation.
-    pause : BOOLEAN, optional. The default is False.
-        Enables to show plots during a simulation.
-    display : BOOLEAN, optional. The default is True.
-        If True, displays plots.
-        If False, generate plots but don't display. 
-    verbose : BOOLEAN, optional. The default is False.
-        If True, writes information in the terminal.
-    savedir : STRING, optional. The default is ''.
-        Directory path for saving the files. If empty, don't save plots.
-    ext : STRING, optional. The default is 'pdf'.
-        Extension of the file.
+    topAxe : STRING. The default is 'snr'.
+        If 'snr': adds an axe at the top of some figures and plots SNR.
+        If 'dispersion': adds an axe at the top of some figures and plots dispersion (GD-PD).
+        Else: don't add axe.
     infos : DICTIONARY, optional. The default is {'title':''}.
         Enables to:
             - personnalise a title for the plot thanks to 'title' keyword.
@@ -1343,6 +1336,18 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         Example: to plot baselines concerning only S1S2E1, you can either write:
             - 'telsToDisplay':['S1','S2','E1'] or
             - 'basesToDisplay':['S1S2','S1E1','S2E1']
+    pause : BOOLEAN, optional. The default is False.
+        Enables to show plots during a simulation.
+    display : BOOLEAN, optional. The default is True.
+        If True, displays plots.
+        If False, generate plots but don't display. 
+    verbose : BOOLEAN, optional. The default is False.
+        If True, writes information in the terminal.
+    savedir : STRING, optional. The default is ''.
+        Directory path for saving the files. If empty, don't save plots.
+    ext : STRING or LIST OF STRINGS, optional. The default is 'pdf'.
+        Extension of the file.
+        If a list of file is given, it saves in all extensions included in the list.
         
     Returns
     -------
@@ -1386,14 +1391,14 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     
     ### MULTIPLE VARIABLE PLOT ###
     
-    - 'perftable': snr*, PDest, GDest, fringe jumps and rms(pd)
-    - 'gdPdEst': snr*, gdEst, pdEst, rms(gdEst), rms(pdEst)
-    - 'gdPdLsq': snr*, gdRes, pdLsq, rms(gdLsq), rms(pdLsq)
-    - 'gdPdCmd': snr*, gdCmd, pdCmd, rms(gdCmd), rms(pdCmd)
-    - 'gdPdCmdDiff': snr*, gdCmdDiff, pdCmdDiff, fringe jumps, rms(pdCmdDiff)
+    - 'perftable': snr/dispersion*, PDest, GDest, fringe jumps and rms(pd)
+    - 'gdPdEst': snr/dispersion*, gdEst, pdEst, rms(gdEst), rms(pdEst)
+    - 'gdPdLsq': snr/dispersion*, gdRes, pdLsq, rms(gdLsq), rms(pdLsq)
+    - 'gdPdCmd': snr/dispersion*, gdCmd, pdCmd, rms(gdCmd), rms(pdCmd)
+    - 'gdPdCmdDiff': snr/dispersion*, gdCmdDiff, pdCmdDiff, fringe jumps, rms(pdCmdDiff)
     - 'cgdCpd': cgd, cpd, rms(cgd), rms(cpd)
     - 'cgdCpd_all': cgd, cpd, rms(cgd), rms(cpd) computed for all triangles using gdEst and pdEst
-    *optional: for display, withsnr=True (by default)
+    *plotted depending on 'topAxe' input parameter. It plots SNR by default.
     
     ### GLOBAL PERFORMANCE IN ARRAY VISUALISATION ###
     
@@ -1425,7 +1430,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     
     - 'gdPdEst2': gdEst, pdEst, rms(gdEst), rms(pdEst)
     - 'gdPdErr': gdErr, pdErr, rms(gdErr), rms(pdErr)
-
+    - 'detector': evolution of the images with time.
 
     """
     
@@ -1489,7 +1494,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         args = ['perftable','estFlux','fluxHist','gdHist']
         
     if 'focusRelock' in args:
-        args = ['gdPdEst','snr','gdPdCmd']
+        args = ['gdPdEst','snr','gdPdCmd','gd']
         outputsData=['OPDCommandRelock','CommandRelock']
     
     NAdisp = 10
@@ -1510,6 +1515,10 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     else:
         telescopes = TelConventionalArrangement
         
+    # to be validated (it unvalidates the 10 lines above) - must be coherent with TrueTelemetries module
+    telescopes = TelConventionalArrangement
+    #
+    
     display_module.telescopes = telescopes
         
     beam_patches = []
@@ -1799,13 +1808,18 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         
         GDobs = GDmic
         PDobs = PDmic
+        dispersion = GDobs-PDobs
         
-        gdBar = outputs.fringeJumpsPeriod#np.std(GDobs,axis=0)
+        gdBar = outputs.fringeJumpsPeriod
         pdBar = np.std(PDobs,axis=0)
 
-        if withsnr:
+        if topAxe.casefold()=='snr':
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,obsType=obsType, 
+                                     display=display,filename=filename,ext=ext,infos=infos)
+        elif topAxe.casefold()=='dispersion':
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+                                     plotBaseline,generalTitle,dispersion=dispersion, obsType=obsType, 
                                      display=display,filename=filename,ext=ext,infos=infos)
         else:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
@@ -1822,14 +1836,20 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         
         GDobs = GDmic
         PDobs = PDmic
+        dispersion = GDobs-PDobs
         
         gdBar = np.std(GDobs,axis=0)
         pdBar = np.std(PDobs,axis=0)
         
-        if withsnr:
+        if topAxe.casefold()=='snr':
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
-                                     plotBaseline,generalTitle,SNR=SNR,display=display,
-                                     filename=filename,ext=ext,infos=infos)
+                                     plotBaseline,generalTitle,SNR=SNR,obsType=obsType, 
+                                     display=display,filename=filename,ext=ext,infos=infos)
+        elif topAxe.casefold()=='dispersion':
+            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+                                     plotBaseline,generalTitle,dispersion=dispersion, obsType=obsType, 
+                                     display=display,filename=filename,ext=ext,infos=infos)
+            
         else:
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,display=display,
@@ -1849,7 +1869,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         gdBar = np.std(GDobs,axis=0)
         pdBar = np.std(PDobs,axis=0)
         
-        if withsnr:
+        if topAxe.casefold()=='snr':
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
@@ -1873,7 +1893,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         gdBar = np.std(GDobs,axis=0)
         pdBar = np.std(PDobs,axis=0)
         
-        if withsnr:
+        if topAxe.casefold()=='snr':
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
@@ -1896,7 +1916,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         gdBar = np.std(GDobs,axis=0)
         pdBar = np.std(PDobs,axis=0)
         
-        if withsnr:
+        if topAxe.casefold()=='snr':
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
@@ -1919,7 +1939,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         gdBar = np.std(GDobs,axis=0)
         pdBar = np.std(PDobs,axis=0)
         
-        if withsnr:
+        if topAxe.casefold()=='snr':
             display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
@@ -1940,8 +1960,8 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         PDobs = outputs.PDCommand[timerange][1:] - outputs.PDCommand[timerange][:-1]
         GDobs[-1] = 0 ; PDobs[-1] = 0
         
-        fringeJumpsPeriod = durationSeconds/np.sum(np.abs(GDobs),axis=0)
-        fringeJumpsPeriod[fringeJumpsPeriod==np.inf] = durationSeconds
+        fringeJumpsPeriod = outputs.fringeJumpsPeriod#durationSeconds/np.sum(np.abs(GDobs),axis=0)
+        # fringeJumpsPeriod[fringeJumpsPeriod==np.inf] = durationSeconds
         pdBar = np.std(PDobs,axis=0)
         
         timestmp = timestamps[1:]
@@ -1949,7 +1969,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         GDrefmic_short = GDrefmic[1:]
         SNR_short = SNR[1:]
         
-        if withsnr:
+        if topAxe.casefold()=='snr':
             display_module.perftable(timestmp, PDobs,GDobs,GDrefmic_short,PDrefmic_short,fringeJumpsPeriod,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR_short,obsType=obsType,display=display,
                                      filename=filename,ext=ext,infos=infos)
@@ -2920,8 +2940,10 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     pdCmdDiff = outputs.PDCommand[1:] - outputs.PDCommand[:-1]
     gdCmdDiff[-1] = 0 ; pdCmdDiff[-1] = 0
     
-    outputs.fringeJumpsPeriod = periodSeconds/np.sum(np.abs(gdCmdDiff),axis=0)
-    outputs.fringeJumpsPeriod[outputs.fringeJumpsPeriod==np.inf] = periodSeconds
+    nJumps = np.sum(np.abs(gdCmdDiff),axis=0)
+    periodSecondsArr = np.ones_like(nJumps)*periodSeconds
+    outputs.fringeJumpsPeriod = np.divide(periodSecondsArr,nJumps,out=periodSecondsArr,where=nJumps!=0)
+    # outputs.fringeJumpsPeriod[outputs.fringeJumpsPeriod==np.inf] = periodSeconds
     
     # if 'ThresholdGD' in config.FT.keys():
     #     outputs.WLR3 = np.mean(outputs.TrackedBaselines * outputs.SquaredSNRMovingAveragePD, axis=0)

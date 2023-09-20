@@ -433,6 +433,7 @@ def readDump(file, version='current'):
 
 def ReadFits(file,computeCp=False,verbose=True):
     from cophasim import outputs
+    from cophasim import coh_tools as ct
     global NT, NA, NINmes, TimeID, dt, timestamps,ich,whichSNR
     # GainPD,GainGD,\
     #     PDEstimated,GDEstimated,PDResidual2, GDResidual2,\
@@ -462,13 +463,13 @@ def ReadFits(file,computeCp=False,verbose=True):
         
         recordTime = datetime.datetime.strptime(timestr, '%b_%d_%Hh%Mm%S_%Y')
         
-        
         outputs.TimeID = recordTime.strftime("%Y%m%d_%Hh%Mm%Ss")
         
         outputs.simulatedTelemetries = False
         
         config.Beam2Tel = hduL[0].header['Beam2Tel']
         config.Target = config.ScienceObject()
+        InterfArray = ct.get_array('CHARA')
         
         config.FS['Piston2OPD'] = np.zeros([NIN,NA])
         for ia in range(NA):
@@ -480,43 +481,56 @@ def ReadFits(file,computeCp=False,verbose=True):
         config.FS['OPD2Piston'] = np.linalg.pinv(config.FS['Piston2OPD'])   # OPD to pistons matrix
         config.FS['OPD2Piston'][np.abs(config.FS['OPD2Piston'])<1e-8]=0
         
-        telNameLength=2
-        tels = [config.Beam2Tel[i:i+telNameLength] for i in range(0, len(config.Beam2Tel), telNameLength)]
+        telNameLength=InterfArray.telNameLength
+        beam2Tel = [config.Beam2Tel[i:i+telNameLength] for i in range(0, len(config.Beam2Tel), telNameLength)]
         
-        basenames = []
+        basenamesInFile = []
         for ia in range(NA):
             for iap in range(ia+1,NA):
-                basenames.append(f"{tels[ia]}{tels[iap]}")
+                basenamesInFile.append(f"{beam2Tel[ia]}{beam2Tel[iap]}")
         
+        """
+        Commands are sent to beams, which are associated to telescopes according
+        to the Beam2Tel string. So they need to be sorted to correspond to
+        the conventional order S1S2E1E2W1W2.
+        """
         
-        TelConventionalArrangement =  ['S1','S2','E1','E2','W1','W2']
+        TelConventionalArrangement = InterfArray.TelNames# ['S1','S2','E1','E2','W1','W2']
         basenamesConventional = []
         for ia in range(NA):
             for iap in range(ia+1,NA):
                 basenamesConventional.append(f"{TelConventionalArrangement[ia]}{TelConventionalArrangement[iap]}")
                 
-        Tel2Beam = np.zeros([NA,NA])
-        for ia in range(NA):
-            tel0 = TelConventionalArrangement[ia] 
-            pos = np.argwhere(np.array(tels)==tel0)[0][0]
-            Tel2Beam[pos,ia]=1
-            
-        sortPistons2Conventional = np.zeros([NA,NA])
-        for ia in range(NA):
-            tel0 = tels[ia] 
-            pos = np.argwhere(np.array(TelConventionalArrangement)==tel0)[0][0]
-            sortPistons2Conventional[pos,ia]=1
-        config.sortPistons2Conventional = sortPistons2Conventional
+        sortBeams2Tels = np.zeros([NA,NA])
         
+        for ia in range(NA):
+            tel0 = TelConventionalArrangement[ia]
+            associatedBeam = np.argwhere(np.array(beam2Tel)==tel0)[0][0]
+            sortBeams2Tels[ia,associatedBeam]=1
+            
+        sortBeams2Tels = np.diag(np.ones(NA))
         sortBases2Conventional = np.zeros([NIN,NIN])
+        # sortBases2Conventional = np.diag(np.ones(NIN))
         for ib in range(NIN):
-            base0 = basenames[ib]
+            base0 = basenamesInFile[ib]
             if len(np.argwhere(np.array(basenamesConventional)==base0)):
                 pos = np.argwhere(np.array(basenamesConventional)==base0)[0][0]
+                
             else:
                 base0 = base0[telNameLength:]+base0[0:telNameLength]
                 pos = np.argwhere(np.array(basenamesConventional)==base0)[0][0]
-            sortBases2Conventional[pos,ia]=1
+            sortBases2Conventional[pos,ib]=1
+            
+        # sortPistons2Conventional = np.zeros([NA,NA])
+        # for ia in range(NA):
+        #     tel0 = beam2Tel[ia]
+        #     pos = np.argwhere(np.array(TelConventionalArrangement)==tel0)[0][0]
+        #     sortPistons2Conventional[pos,ia]=1
+        # config.sortPistons2Conventional = sortPistons2Conventional.T
+        
+
+            
+        # sortBases2Conventional = sortBases2Conventional.T
         config.sortBases2Conventional = sortBases2Conventional
         
         config.FT['whichSNR'] = 'pd'
@@ -555,14 +569,14 @@ def ReadFits(file,computeCp=False,verbose=True):
         if (np.std(outputs.GainGD,axis=0) == 0).all():
             config.FT['GainGD'] = outputs.GainGD[0]
             
-        outputs.PDEstimated = hduL[1].data["PD"] # Estimated baselines PD [NTxNINmes - rad]
-        outputs.GDEstimated = hduL[1].data["GD"] # Estimated baselines GD [NTxNINmes - rad]
-        outputs.PDResidual = hduL[1].data["curPdErrBaseMicrons"]/lmbda*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
-        outputs.GDResidual = hduL[1].data["curGdErrBaseMicrons"]/R/lmbda*2*np.pi # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - rad]
+        outputs.PDEstimated = np.matmul(sortBases2Conventional,hduL[1].data["PD"].T).T # Estimated baselines PD [NTxNINmes - rad]
+        outputs.GDEstimated = np.matmul(sortBases2Conventional,hduL[1].data["GD"].T).T # Estimated baselines GD [NTxNINmes - rad]
+        outputs.PDResidual = np.matmul(sortBases2Conventional,hduL[1].data["curPdErrBaseMicrons"].T).T/lmbda*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
+        outputs.GDResidual = np.matmul(sortBases2Conventional,hduL[1].data["curGdErrBaseMicrons"].T).T/R/lmbda*2*np.pi # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - rad]
         outputs.ClosurePhasePD = hduL[1].data["PdClosure"] # PD closure phase [NTxNC - rad]
         outputs.ClosurePhaseGD = hduL[1].data["GdClosure"] # GD closure phase [NTxNC - rad]
-        outputs.PDref = hduL[1].data["curRefPD"]/lmbda*2*np.pi # PD reference vector [NTxNINmes - rad]
-        outputs.GDref = hduL[1].data["curRefGD"]/R/lmbda*2*np.pi # GD reference vector [NTxNINmes - rad]
+        outputs.PDref = np.matmul(sortBases2Conventional,hduL[1].data["curRefPD"].T).T/lmbda*2*np.pi # PD reference vector [NTxNINmes - rad]
+        outputs.GDref = np.matmul(sortBases2Conventional,hduL[1].data["curRefGD"].T).T/R/lmbda*2*np.pi # GD reference vector [NTxNINmes - rad]
         
         outputs.PhotometryEstimated = hduL[1].data["Photometry"] # Estimated photometries [NTxNA - ADU]
         
@@ -579,25 +593,24 @@ def ReadFits(file,computeCp=False,verbose=True):
         else:
             config.FT['whichSNR'] = "gd"
             
-        outputs.varPD = hduL[1].data["pdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
-        outputs.varGD = hduL[1].data["alternatePdVar"] # Estimated "GD variance" = 1/SNR² [NTxNINmes]
+        outputs.varPD = np.matmul(sortBases2Conventional,hduL[1].data["pdVar"].T).T # Estimated "PD variance" = 1/SNR² [NTxNINmes]
+        outputs.varGD = np.matmul(sortBases2Conventional,hduL[1].data["alternatePdVar"].T).T # Estimated "GD variance" = 1/SNR² [NTxNINmes]
         outputs.SquaredSnrGD = 1/outputs.varGD
         outputs.SquaredSnrPD = 1/outputs.varPD
         
         # outputs.whichVar = hduL[1].data['whichCurPdVar'][0]    # 0: varPd ; 1:varGd
         if config.FT['whichSNR']=="pd":
-            outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+            outputs.SquaredSNRMovingAveragePD = np.nan_to_num(np.matmul(sortBases2Conventional,1/hduL[1].data["averagePdVar"].T).T,posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
         else:
-            outputs.SquaredSNRMovingAverageGD = np.nan_to_num(1/hduL[1].data["averagePdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+            outputs.SquaredSNRMovingAverageGD = np.nan_to_num(1/np.matmul(sortBases2Conventional,hduL[1].data["averagePdVar"].T).T,posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
         outputs.singularValuesSqrt = np.sqrt(hduL[1].data["sPdSingularValues"])
         
         config.FT['ThresholdPD'] = hduL[1].data['pdThreshold'][0]
         config.FT['ThresholdGD'] = hduL[1].data['gdThresholds'][0]
         outputs.ThresholdPD = hduL[1].data['pdThreshold']
         outputs.ThresholdGD = hduL[1].data['gdThresholds']
-
         
-        outputs.VisibilityEstimated = np.nan_to_num(1/hduL[1].data["VisiNorm"],posinf=0) # Estimated fringe visibility [NTxNINmes]
+        outputs.VisibilityEstimated = np.nan_to_num(1/np.matmul(sortBases2Conventional,hduL[1].data["VisiNorm"].T).T,posinf=0) # Estimated fringe visibility [NTxNINmes]
         
         outputs.PistonGDcorr = hduL[1].data["gdDlCorMicrons"] # GD before round [NTxNA - microns]
         
@@ -606,21 +619,21 @@ def ReadFits(file,computeCp=False,verbose=True):
         # outputs.SearchCommand = np.zeros([NT+1,NA])
         # outputs.CommandODL = np.zeros([NT+1,NA])
         
-        outputs.PistonPDCommand[:-1] = 2*hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
-        outputs.PistonGDCommand[:-1] = 2*hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
-        outputs.CommandRelock[:-1] = 2*hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
-        outputs.CommandODL[:-1] = 2*hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns] A VERIFIER
+        outputs.PistonPDCommand[:-1] = hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
+        outputs.PistonGDCommand[:-1] = hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
+        outputs.CommandRelock[:-1] = hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
+        outputs.CommandODL[:-1] = hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns] A VERIFIER
         
     
     # #ALL DATA WHICH ARE COMMANDS-RELATED NEED TO BE SORTED IN SAME ORDER
     # THAN OPD, i.e. in the order of Beam2Tel
 
     for it in range(NT):
-        outputs.PistonPDCommand[it] = np.dot(Tel2Beam,outputs.PistonPDCommand[it])
-        outputs.PistonGDCommand[it] = np.dot(Tel2Beam,outputs.PistonGDCommand[it])
-        outputs.CommandRelock[it] = np.dot(Tel2Beam,outputs.CommandRelock[it])
-        outputs.CommandODL[it] = np.dot(Tel2Beam,outputs.CommandODL[it])
-        outputs.PistonGDcorr[it] = np.dot(Tel2Beam,outputs.PistonGDcorr[it])
+        outputs.PistonPDCommand[it] = np.dot(sortBeams2Tels,outputs.PistonPDCommand[it])
+        outputs.PistonGDCommand[it] = np.dot(sortBeams2Tels,outputs.PistonGDCommand[it])
+        outputs.CommandRelock[it] = np.dot(sortBeams2Tels,outputs.CommandRelock[it])
+        outputs.CommandODL[it] = np.dot(sortBeams2Tels,outputs.CommandODL[it])
+        outputs.PistonGDcorr[it] = np.dot(sortBeams2Tels,outputs.PistonGDcorr[it])
         outputs.GDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.GDResidual2[it])
         outputs.PDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.PDResidual2[it])
     
@@ -789,30 +802,25 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
     NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
     logFrequencySampling = np.log10(FrequencySampling)
     
-    if not only:
+    if len(Input):
         Input2 = Input*windowsequence
-        FTTurb = np.fft.fft(Input2,norm="forward")[PresentFrequencies]    
-        ModFTTurb = np.abs(FTTurb)
         
-        if mov_average:
-            ModFTTurb = moving_average(ModFTTurb,mov_average)
-            
-        coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(ModFTTurb[NominalRegime]), 1)
-        poly1d_fn = np.poly1d(coefs)
-        ModFTTurbfit = 10**poly1d_fn(logFrequencySampling)
-        coefDisturb = coefs[0]
+    else:
+        Input2 = Command*windowsequence
         
-        ModFTrej = ModFTResidues/ModFTTurbfit
-        ModFTBF = ModFTCommands/ModFTTurbfit
+    FTTurb = np.fft.fft(Input2,norm="forward")[PresentFrequencies]    
+    ModFTTurb = np.abs(FTTurb)
+    
+    if mov_average:
+        ModFTTurb = moving_average(ModFTTurb,mov_average)
         
-        # ModFTrej = np.abs(FTrej) ; AngleFTrej = np.angle(FTrej)
-        # ModFTBF = np.abs(FTBF) ; AngleFTBF = np.angle(FTBF)
-        
-        # if mov_average:
-        #     ModFTrej = moving_average(ModFTrej,mov_average)
-        #     # AngleFTrej = moving_average(AngleFTrej,mov_average)
-        #     ModFTBF = moving_average(ModFTBF,mov_average)
-        #     # AngleFTBF = moving_average(AngleFTBF,mov_average) 
+    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(ModFTTurb[NominalRegime]), 1)
+    poly1d_fn = np.poly1d(coefs)
+    ModFTTurbfit = 10**poly1d_fn(logFrequencySampling)
+    coefDisturb = coefs[0]        
+    
+    ModFTrej = ModFTResidues/ModFTTurbfit
+    ModFTBF = ModFTCommands/ModFTTurbfit
 
     coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(np.abs(ModFTBO[NominalRegime])), 1)
     poly1d_fn = np.poly1d(coefs)
@@ -1941,14 +1949,14 @@ def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
     
     from config import NA
     
-    telNameLength=2
+    TelConventionalArrangement = config.InterfArray.TelNames
+    telNameLength=len(TelConventionalArrangement[0])
     if 'TelescopeArrangement' in infos.keys():
         TelArrangement = infos['TelescopeArrangement']
     elif 'Beam2Tel' in vars(config):
-        TelNameLength=2
-        TelArrangement = [config.Beam2Tel[i:i+telNameLength] for i in range(0, len(config.Beam2Tel), telNameLength)]
+        telNameLength2 = int(len(config.Beam2Tel)/NA)
+        TelArrangement = [config.Beam2Tel[i:i+telNameLength2] for i in range(0, NA, telNameLength2)]
     else:
-        TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
         TelArrangement = TelConventionalArrangement
         
     base = infos['Base']
@@ -1958,10 +1966,8 @@ def SpectralAnalysis(BOTelemetries, BFTelemetries, infos, details='',
     else:
         gainGD,gainPD = 0,0
         
-    TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
-    
-    tel1, tel2 = base[:TelNameLength],base[telNameLength:]
-    
+    tel1, tel2 = base[:telNameLength],base[telNameLength:]
+        
     iTel1mes = np.argwhere(tel1==np.array(TelArrangement))[0][0]
     iTel2mes = np.argwhere(tel2==np.array(TelArrangement))[0][0]
     
@@ -2249,7 +2255,7 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
     Telescope Arrangements
     """
     
-    TelConventionalArrangement = ['S1','S2','E1','E2','W1','W2']
+    TelConventionalArrangement = config.InterfArray.TelNames
     if 'TelescopeArrangement' in infos.keys():
         tels = infos['TelescopeArrangement']
     else:

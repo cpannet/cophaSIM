@@ -23,6 +23,7 @@ NBmes = config.FS['NBmes']
 # Time
 it = 0
 TimeID="notime"
+timestamps = np.arange(NT)*config.dt
 outputsFile = ""
 simulatedTelemetries = True         # False = telemetries from spica-ft instrument
 
