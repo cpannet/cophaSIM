@@ -2886,7 +2886,6 @@ def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
     return subax
 
 
-
 def setaxelim(ax, xdata=[],ydata=[],xmargin=0.1,ymargin=0.1, ylim_min=[0,0], xlim_min=[0,0],**kwargs):
     
     if isinstance(xdata,(float,int)):

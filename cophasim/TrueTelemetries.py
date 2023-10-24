@@ -18,7 +18,6 @@ import datetime
 from importlib import reload
 from .tol_colors import tol_cset
 from . import coh_tools as ct
-from mypackage.plot_tools import setaxelim, addtext
 from scipy.special import binom
 
 import matplotlib.lines as mlines
@@ -981,13 +980,13 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
                 ax1.legend(handles=linestyles)
     
             ax1.set_ylabel('Gain [dB]')
-            addtext(ax1,"|FTrej|²",loc='upper center',fontsize='x-large')
+            ct.addtext(ax1,"|FTrej|²",loc='upper center',fontsize='x-large')
             
             ax2.plot(FrequencySampling, ModFTResidues**2, "k")
             
             ax2.set_ylabel("PSD [µm²/Hz]")
             ax2.set_yscale("log")
-            addtext(ax2,"Residue",loc='upper center',fontsize='x-large')
+            ct.addtext(ax2,"Residue",loc='upper center',fontsize='x-large')
             
             ax3.plot(FrequencySampling, ModFTTurb**2, "k")
             ax3.plot(FrequencySampling, ModFTTurbfit**2, color=colors[0])
@@ -998,7 +997,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
             annY = ModFTTurbfit[annYindex]**2*2
             ax3.annotate(f"{round(2*coefDisturb*3,2)}/3",(annX,annY),color=colors[0])
             
-            addtext(ax3,"Disturbance",loc='upper center',fontsize='x-large')
+            ct.addtext(ax3,"Disturbance",loc='upper center',fontsize='x-large')
             
             ax3.set_xlabel('Frequencies [Hz]')
             ax3.set_xscale('log')
@@ -1007,7 +1006,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
             ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
             ax3.sharey(ax2)
             
-            setaxelim(ax3, ydata=ModFTTurbfit**2)
+            ct.setaxelim(ax3, ydata=ModFTTurbfit**2)
             
             fig.show()
         
@@ -1085,19 +1084,19 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
                 ax1.legend(handles=linestyles)
     
             ax1.set_ylabel('Gain [dB]')
-            addtext(ax1,"|FTBO|²",loc='upper center',fontsize='x-large')
+            ct.addtext(ax1,"|FTBO|²",loc='upper center',fontsize='x-large')
             
             ax2.plot(FrequencySampling, ModFTResidues**2, "k")
             
             ax2.set_ylabel("PSD [µm²/Hz]")
             ax2.set_yscale("log")
-            addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
+            ct.addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
             
             
             ax3.plot(FrequencySampling, ModFTCommands**2, "k")
             ax3.plot(FrequencySampling, ModFTCommandsfit**2, color=colors[0])
             ax3.set_ylabel('PSD [µm²/Hz]')
-            addtext(ax3,"Commands",loc='upper center',fontsize='x-large')
+            ct.addtext(ax3,"Commands",loc='upper center',fontsize='x-large')
             
             
             ax3.set_xlabel('Frequencies [Hz]')
@@ -1107,7 +1106,7 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
             ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
             ax3.sharey(ax2)
             
-            setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
+            ct.setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
             
             fig.show()
             
@@ -1427,19 +1426,19 @@ def BodeDiagrams_pseudoloop(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5
                 ax1.legend(handles=linestyles)
     
             ax1.set_ylabel('Gain [dB]')
-            addtext(ax1,"|FTrej|²",loc='upper center',fontsize='x-large')
+            ct.addtext(ax1,"|FTrej|²",loc='upper center',fontsize='x-large')
             
             ax2.plot(FrequencySampling, ModFTResidues**2, "k")
             
             ax2.set_ylabel("PSD [µm²/Hz]")
             ax2.set_yscale("log")
-            addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
+            ct.addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
             
             
             ax3.plot(FrequencySampling, ModFTTurb**2, "k")
             ax3.plot(FrequencySampling, ModFTTurbfit**2, color=colors[0])
             ax3.set_ylabel('PSD [µm²/Hz]')
-            addtext(ax3,"Disturbances",loc='upper center',fontsize='x-large')
+            ct.addtext(ax3,"Disturbances",loc='upper center',fontsize='x-large')
             
             
             ax3.set_xlabel('Frequencies [Hz]')
@@ -1449,7 +1448,7 @@ def BodeDiagrams_pseudoloop(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5
             ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
             ax3.sharey(ax2)
             
-            setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
+            ct.setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
             
             fig.show()
         
@@ -1527,19 +1526,19 @@ def BodeDiagrams_pseudoloop(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5
                 ax1.legend(handles=linestyles)
     
             ax1.set_ylabel('Gain [dB]')
-            addtext(ax1,"|FTBO|²",loc='upper center',fontsize='x-large')
+            ct.addtext(ax1,"|FTBO|²",loc='upper center',fontsize='x-large')
             
             ax2.plot(FrequencySampling, ModFTResidues**2, "k")
             
             ax2.set_ylabel("PSD [µm²/Hz]")
             ax2.set_yscale("log")
-            addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
+            ct.addtext(ax2,"Residues",loc='upper center',fontsize='x-large')
             
             
             ax3.plot(FrequencySampling, ModFTCommands**2, "k")
             ax3.plot(FrequencySampling, ModFTCommandsfit**2, color=colors[0])
             ax3.set_ylabel('PSD [µm²/Hz]')
-            addtext(ax3,"Commands",loc='upper center',fontsize='x-large')
+            ct.addtext(ax3,"Commands",loc='upper center',fontsize='x-large')
             
             
             ax3.set_xlabel('Frequencies [Hz]')
@@ -1549,7 +1548,7 @@ def BodeDiagrams_pseudoloop(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5
             ax1.grid(True) ; ax2.grid(True) ; ax3.grid(True)
             ax3.sharey(ax2)
             
-            setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
+            ct.setaxelim(ax3, ydata=[ModFTCommands**2,ModFTResidues**2])
             
             fig.show()
             
@@ -2483,7 +2482,7 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax2.plot(t[timerange],SNRgd[timerange],color=telcolors[3])
 
         ax1.set_ylim(ylimGainsPD) ; ax3.set_ylim(ylimGainsGD) ; 
-        setaxelim(ax2,ydata=np.concatenate([SNRpd,SNRgd]),ymin=0)
+        ct.setaxelim(ax2,ydata=np.concatenate([SNRpd,SNRgd]),ymin=0)
         
         ax1.set_ylabel('Gains PD')
         ax2.set_ylabel('SNR thresholds')
@@ -2540,7 +2539,7 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax6.sharey(ax5) ; ax6.tick_params(labelleft=False)
 
         ax4.set_ylim(ylimGD)
-        setaxelim(ax5, ydata=RMSgd*R*lmbda/2/np.pi, ymargin=0.4,ymin=0)
+        ct.setaxelim(ax5, ydata=RMSgd*R*lmbda/2/np.pi, ymargin=0.4,ymin=0)
 
         ax1.set_ylabel('SNR²')
         ax2.set_ylabel('Group-Delays [µm]')
@@ -2675,8 +2674,8 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
             ax1.set_title("First serie of baselines")
             ax3.set_title("Second serie of baselines")
         
-        setaxelim(ax1, ydata=1/averagePdVar[:,PlotBaseline], ymargin=0.2, ymin=0)
-        setaxelim(ax2, ydata=MeanSquaredSNR[PlotBaseline]+RMSSquaredSNR[PlotBaseline], ymargin=0.2,ymin=0)
+        ct.setaxelim(ax1, ydata=1/averagePdVar[:,PlotBaseline], ymargin=0.2, ymin=0)
+        ct.setaxelim(ax2, ydata=MeanSquaredSNR[PlotBaseline]+RMSSquaredSNR[PlotBaseline], ymargin=0.2,ymin=0)
     
         ax1.set_xlabel("Time (s)")
         ax1.set_ylabel('SNR²')
@@ -2762,7 +2761,7 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax3.sharey(ax1) ; ax3.tick_params(labelleft=False)
         ax4.sharey(ax2) ; ax4.tick_params(labelleft=False)
         ax6.sharey(ax5) ; ax6.tick_params(labelleft=False)
-        setaxelim(ax5, ydata=RMSpd*lmbda/2/np.pi*1e3, ymargin=0.4,ymin=0)
+        ct.setaxelim(ax5, ydata=RMSpd*lmbda/2/np.pi*1e3, ymargin=0.4,ymin=0)
         #setaxelim(ax6, ydata=RMSpd, ymargin=0.2,ymin=0)
 
         ax4.set_ylim(ylimPD)
@@ -2866,8 +2865,8 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
             p4=ax8.bar(baselines[len1:],RMSpd[len1:]*lmbda/2/np.pi, color=barbasecolors[len1:])
     
             #ax7.sharex(ax8) ; ax8.sharex(ax4)
-            ax5.sharey(ax1) ; ax5.tick_params(labelleft=False, labelbottom=False) ; setaxelim(ax1,ydata=gD[timerange]*R*lmbda/2/np.pi)
-            ax6.sharey(ax2) ; ax6.tick_params(labelleft=False) ; setaxelim(ax2,ydata=pD[timerange]*lmbda/2/np.pi)
+            ax5.sharey(ax1) ; ax5.tick_params(labelleft=False, labelbottom=False) ; ct.setaxelim(ax1,ydata=gD[timerange]*R*lmbda/2/np.pi)
+            ax6.sharey(ax2) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=pD[timerange]*lmbda/2/np.pi)
             ax7.sharey(ax3) ; ax7.tick_params(labelleft=False, labelbottom=False)
             ax8.sharey(ax4) ; ax8.tick_params(labelleft=False)
 
@@ -2879,8 +2878,8 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
             
             axghost2.set_visible(False)
 
-        setaxelim(ax3,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0, ymargin=0.5)
-        setaxelim(ax4,ydata=RMSpd*lmbda/2/np.pi,ymin=0, ymargin=0.5)
+        ct.setaxelim(ax3,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0, ymargin=0.5)
+        ct.setaxelim(ax4,ydata=RMSpd*lmbda/2/np.pi,ymin=0, ymargin=0.5)
         ax3.bar_label(p1,label_type='center',fmt='%.2f')
         ax4.bar_label(p2,label_type='center',fmt='%.2f')
             
@@ -2932,12 +2931,12 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
                     ax9.plot(t[zoomrange],curRefGD[zoomrange,iBase]*R*lmbda/2/np.pi,color=basecolors[iBase])
                     ax10.plot(t[zoomrange],curRefPD[zoomrange,iBase]*lmbda/2/np.pi,color=basecolors[iBase])
     
-            ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=[1/averagePdVar[zoomrange,iBase] for iBase in PlotBaselineIndex],ymin=0)
-            ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=[gD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex]+
+            ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=[1/averagePdVar[zoomrange,iBase] for iBase in PlotBaselineIndex],ymin=0)
+            ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=[gD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex]+
                                                                                       [gdCommand_zoom[:,PlotBaseline]])
-            ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; setaxelim(ax3,ydata=[pD[zoomrange,iBase]*lmbda/2/np.pi for iBase in PlotBaselineIndex])
-            ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=[curRefGD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex],ymargin=0.3,absmargin=True)
-            ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=lmbda/2,ymargin=0,absmargin=True)
+            ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ct.setaxelim(ax3,ydata=[pD[zoomrange,iBase]*lmbda/2/np.pi for iBase in PlotBaselineIndex])
+            ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=[curRefGD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex],ymargin=0.3,absmargin=True)
+            ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=lmbda/2,ymargin=0,absmargin=True)
     
             ax1.set_ylabel('SNR²')
             ax2.set_ylabel('Group-Delays [µm]')
@@ -2991,11 +2990,11 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax10.bar(baselines[len1:],RMSpd[len1:]*lmbda/2/np.pi, color=basecolors[len1:])
 
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=1/averagePdVar[timerange],ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=gD[timerange]*R*lmbda/2/np.pi)
-        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; setaxelim(ax3,ydata=pD[timerange]*lmbda/2/np.pi)
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=RMSpd*lmbda/2/np.pi,ymin=0)
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=1/averagePdVar[timerange],ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=gD[timerange]*R*lmbda/2/np.pi)
+        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ct.setaxelim(ax3,ydata=pD[timerange]*lmbda/2/np.pi)
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=RMSpd*lmbda/2/np.pi,ymin=0)
 
         ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
         ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
@@ -3058,12 +3057,12 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
                     ax9.plot(t[zoomrange],curRefGD[zoomrange,iBase]*R*lmbda/2/np.pi,color=basecolors[iBase])
                     ax10.plot(t[zoomrange],curRefPD[zoomrange,iBase]*lmbda/2/np.pi,color=basecolors[iBase])
     
-            ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=[1/averagePdVar[zoomrange,iBase] for iBase in PlotBaselineIndex],ymin=0)
-            ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=[gD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex]+
+            ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=[1/averagePdVar[zoomrange,iBase] for iBase in PlotBaselineIndex],ymin=0)
+            ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=[gD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex]+
                                                                                       [gdCommand_zoom[:,PlotBaseline]])
-            ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; setaxelim(ax3,ydata=[pD[zoomrange,iBase]*lmbda/2/np.pi for iBase in PlotBaselineIndex])
-            ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=[curRefGD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex],ymargin=0.3,absmargin=True)
-            ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=[curRefPD[zoomrange,iBase]*lmbda/2/np.pi for iBase in PlotBaselineIndex],ymargin=0.3,absmargin=True)
+            ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ct.setaxelim(ax3,ydata=[pD[zoomrange,iBase]*lmbda/2/np.pi for iBase in PlotBaselineIndex])
+            ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=[curRefGD[zoomrange,iBase]*R*lmbda/2/np.pi for iBase in PlotBaselineIndex],ymargin=0.3,absmargin=True)
+            ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=[curRefPD[zoomrange,iBase]*lmbda/2/np.pi for iBase in PlotBaselineIndex],ymargin=0.3,absmargin=True)
     
             ax1.set_ylabel('SNR²')
             ax2.set_ylabel('Group-Delays [µm]')
@@ -3121,11 +3120,11 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax10.bar(baselines[len1:],RMSpd[len1:]*lmbda/2/np.pi, color=basecolors[len1:])
 
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=1/averagePdVar[timerange[200:1000]],ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=(gD-curRefGD)[timerange[200:]]*R*lmbda/2/np.pi)
-        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; setaxelim(ax3,ydata=(pD-curRefPD)[timerange[200:]]*lmbda/2/np.pi)
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=RMSpd*lmbda/2/np.pi,ymin=0)
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=1/averagePdVar[timerange[200:1000]],ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=(gD-curRefGD)[timerange[200:]]*R*lmbda/2/np.pi)
+        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ct.setaxelim(ax3,ydata=(pD-curRefPD)[timerange[200:]]*lmbda/2/np.pi)
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=RMSpd*lmbda/2/np.pi,ymin=0)
 
         ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
         ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
@@ -3180,11 +3179,11 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax10.bar(baselines[len1:],RMSpderr[len1:]*lmbda/2/np.pi, color=basecolors[len1:])
 
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=1/averagePdVar[timerange[200:1000]],ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=curGdErrBaseMicrons[timerange[200:]])
-        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; setaxelim(ax3,ydata=(pD-curRefPD)[timerange[200:]]*lmbda/2/np.pi)
-        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; setaxelim(ax4,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0)
-        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; setaxelim(ax5,ydata=RMSpd*lmbda/2/np.pi,ymin=0)
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=1/averagePdVar[timerange[200:1000]],ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=curGdErrBaseMicrons[timerange[200:]])
+        ax8.sharey(ax3) ; ax8.tick_params(labelleft=False) ; ct.setaxelim(ax3,ydata=(pD-curRefPD)[timerange[200:]]*lmbda/2/np.pi)
+        ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ; ct.setaxelim(ax4,ydata=RMSgd*R*lmbda/2/np.pi,ymin=0)
+        ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ; ct.setaxelim(ax5,ydata=RMSpd*lmbda/2/np.pi,ymin=0)
 
         ax4.sharex(ax5) ; ax4.tick_params(labelbottom=False)
         ax9.sharex(ax10) ; ax9.tick_params(labelbottom=False)
@@ -3240,9 +3239,9 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax10.bar(baselines[len1:],Meanpdref[len1:]*lmbda/2/np.pi, yerr=RMSpdref[len1:]*lmbda/2/np.pi,color=basecolors[len1:])
 
         ax1.sharex(ax3) ; ax2.sharex(ax3); ax6.sharex(ax8) ; ax7.sharex(ax8)
-        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; setaxelim(ax1,ydata=1/averagePdVar[timerange[200:1000]], ymin=0)
-        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; setaxelim(ax2,ydata=curRefGD[timerange[200:]]*R*lmbda/2/np.pi)
-        ax3.sharey(ax8) ; ax8.tick_params(labelleft=False) ; setaxelim(ax3,ydata=curRefPD[timerange[200:]]*lmbda/2/np.pi)
+        ax6.sharey(ax1) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=1/averagePdVar[timerange[200:1000]], ymin=0)
+        ax7.sharey(ax2) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=curRefGD[timerange[200:]]*R*lmbda/2/np.pi)
+        ax3.sharey(ax8) ; ax8.tick_params(labelleft=False) ; ct.setaxelim(ax3,ydata=curRefPD[timerange[200:]]*lmbda/2/np.pi)
         ax9.sharey(ax4) ; ax9.tick_params(labelleft=False) ;# setaxelim(ax4,ydata=Meangdref*R*lmbda/2/np.pi,absmargin=True)
         ax10.sharey(ax5) ; ax10.tick_params(labelleft=False) ;# setaxelim(ax5,ydata=Meanpdref*lmbda/2/np.pi,absmargin=True)
 
@@ -3357,8 +3356,8 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
         ax1.sharex(ax2) ; ax3.sharex(ax4)
         ax1.tick_params(labelbottom=False) ; ax3.tick_params(labelbottom=False)
 
-        ax3.sharey(ax1) ; ax3.tick_params(labelleft=False) ; setaxelim(ax1,ydata=OPDCmdGD_rearranged[timerange])
-        ax4.sharey(ax2) ; ax4.tick_params(labelleft=False) ; setaxelim(ax2,ydata=OPDCmdPD_rearranged[timerange])
+        ax3.sharey(ax1) ; ax3.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=OPDCmdGD_rearranged[timerange])
+        ax4.sharey(ax2) ; ax4.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=OPDCmdPD_rearranged[timerange])
 
         ax1.set_ylabel('GD Commands [µm]')
         ax2.set_ylabel('PD Commands [µm]')
@@ -3398,7 +3397,7 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
                 ax2.plot(t[timerange],normVisibility[timerange,iBase],color=basecolors[iBase], label=baselines[iBase])
 
         ax1.sharex(ax2)
-        setaxelim(ax1,ydata=normVisibility[timerange[200:]],ymin=0)
+        ct.setaxelim(ax1,ydata=normVisibility[timerange[200:]],ymin=0)
 
         ax1.set_ylabel('Norm Visibility')
         ax1.legend() ; ax2.legend()
@@ -3446,9 +3445,9 @@ def DisplayAll(Telemetries, infos, *args, figsave=False,figdir='',ext='pdf',**kw
             ax7.errorbar(iClosure,Meanpdc[iClosure]*180/np.pi,yerr=RMSpdc[iClosure]*180/np.pi, marker='x',color=basecolors[iClosure],ecolor='k')
     
         ax1.sharex(ax2) ; ax5.sharex(ax6)
-        ax5.sharey(ax1) ; ax5.tick_params(labelleft=False) ; setaxelim(ax1,ydata=gdClosure[timerange[200:]]*R*180/np.pi)
-        ax6.sharey(ax2) ; ax6.tick_params(labelleft=False) ; setaxelim(ax2,ydata=pdClosure[timerange[200:]]*180/np.pi)
-        ax7.sharey(ax3) ; ax7.tick_params(labelleft=False) ; setaxelim(ax3,ydata=Meangdc*R*180/np.pi,absmargin=True)
+        ax5.sharey(ax1) ; ax5.tick_params(labelleft=False) ; ct.setaxelim(ax1,ydata=gdClosure[timerange[200:]]*R*180/np.pi)
+        ax6.sharey(ax2) ; ax6.tick_params(labelleft=False) ; ct.setaxelim(ax2,ydata=pdClosure[timerange[200:]]*180/np.pi)
+        ax7.sharey(ax3) ; ax7.tick_params(labelleft=False) ; ct.setaxelim(ax3,ydata=Meangdc*R*180/np.pi,absmargin=True)
     
         ax3.set_xticks(np.arange(len1cp))
         ax7.set_xticks(np.arange(len1cp,NC))
