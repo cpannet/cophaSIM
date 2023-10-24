@@ -166,6 +166,7 @@ def info_array(array, band):
     return transmission, surface
     
 
+
 def get_array(name='',band='H',getcoords=False,
               verbose=False):
     """
@@ -2654,33 +2655,116 @@ def check_cp(gd):
 #             cp[ic]=gd[ib1]+gd[ib2]-gd[ib3]
 #     return cp
 
-def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
-    fig = plt.gcf()
-    box = ax.get_position()
-    width = box.width
-    height = box.height
-    inax_position  = ax.transAxes.transform(rect[0:2])
-    transFigure = ax.figure.transFigure.inverted()
-    infig_position = transFigure.transform(inax_position)
-    x = infig_position[0]
-    y = infig_position[1]
-    width *= rect[2]
-    height = width*box.width/box.height
-    # height *= rect[3]  # <= Typo was here
-    subax = fig.add_axes([x,y,width,height],polar=polar)
-    subax.set_rticks([])
+def unwrapPhase(pd,gd,wl):
     
-    if label:
-        subax.set_xticks([0,np.pi/2,np.pi,3*np.pi/2])
+    k = np.round((gd-pd)/wl)
+    unwrappedPhase = pd + k*wl
+    
+    return unwrappedPhase
+
+def filterUnwrap(pd,wl):
+    NT = len(pd)
+    filteredpd = np.copy(pd)
+    if pd.ndim == 2:
+        NT,NIN = pd.shape
     else:
-        subax.set_thetagrids([0,90,180,270],labels=[])
-    # x_labelsize = subax.get_xticklabels()[0].get_size()
-    # y_labelsize = subax.get_yticklabels()[0].get_size()
-    # x_labelsize *= rect[2]**0.5
-    # y_labelsize *= rect[3]**0.5
-    # subax.xaxis.set_tick_params(labelsize=x_labelsize)
-    # subax.yaxis.set_tick_params(labelsize=y_labelsize)
-    return subax
+        NIN=0
+    
+    if NIN:
+        for ib in range(NIN):
+            for it in range(NT-1):
+                if filteredpd[it+1,ib]-filteredpd[it,ib]>2*wl/3:
+                    filteredpd[it+1,ib]-=wl
+                elif filteredpd[it+1,ib]-filteredpd[it,ib]<-2*wl/3:
+                    filteredpd[it+1,ib]+=wl
+                    
+    else:
+        for it in range(NT-1):
+            if filteredpd[it+1]-filteredpd[it]>2*wl/3:
+                filteredpd[it+1]-=wl
+            elif filteredpd[it+1]-filteredpd[it]<-2*wl/3:
+                filteredpd[it+1]+=wl
+    
+    return filteredpd
+
+
+def reconstructOpenLoop(pd,gd,wl):
+    
+    unwrappedSignal = unwrapPhase(pd,gd,wl)
+    openloop = filterUnwrap(unwrappedSignal,wl)
+    
+    return openloop
+    
+
+def getPsd(signal, timestamps, cumStd=False,mov_average=10,timebonds=(0,-1),fbonds=()):
+    
+    NT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
+    
+    if timebonds[1]==-1:
+        timerange = range(np.argmin(np.abs(timestamps-timebonds[0])),NT)
+    else:
+        timerange = range(np.argmin(np.abs(timestamps-timebonds[0])),np.argmin(np.abs(timestamps-timebonds[1])))
+    
+    timestamps = timestamps[timerange] ; signal = signal[timerange]
+    NT = len(timestamps)
+    
+    frequencySampling1 = np.fft.fftfreq(NT, dt)
+    if len(fbonds):
+        fmin, fmax = fbonds
+    else:
+        fmin=0
+        fmax=np.max(frequencySampling1)
+    
+    PresentFrequencies = (frequencySampling1 > fmin) \
+        & (frequencySampling1 < fmax)
+        
+    frequencySampling = frequencySampling1[PresentFrequencies]
+    
+    psd = 2*np.abs(np.fft.fft(signal,norm="forward",axis=0)[PresentFrequencies])**2
+    
+    if cumStd:
+        cumulativeStd = np.sqrt(np.cumsum(psd,axis=0))
+        
+    if mov_average:
+        psdSmoothed = moving_average(psd, mov_average)
+        frequencySamplingSmoothed = moving_average(frequencySampling,mov_average)
+
+    
+    
+    if cumStd:
+        return frequencySampling, psd, frequencySamplingSmoothed, psdSmoothed, cumulativeStd
+
+    return frequencySampling, psd, frequencySamplingSmoothed, psdSmoothed
+
+
+def estimateT0(frequencySampling,atmospherePsd,f1=0.3,f2=5):
+    if atmospherePsd.ndim==2:
+        NT,NIN = atmospherePsd.shape
+    else:
+        NIN=0
+        
+    NominalRegime = (frequencySampling>f1)*(frequencySampling<f2)
+    logFrequencySampling = np.log10(frequencySampling)
+    
+    coefs = np.polynomial.polynomial.polyfit(logFrequencySampling[NominalRegime], np.nan_to_num(np.log10(np.abs(atmospherePsd[NominalRegime]))), 1)
+    
+    if NIN:
+        fitAtmospherePsd= np.zeros([NT,NIN])
+        for ib in range(NIN):
+            poly1d_fn = np.poly1d(coefs[::-1,ib])
+            fitAtmospherePsd[:,ib] = 10**poly1d_fn(logFrequencySampling)
+    else:
+        poly1d_fn = np.poly1d(coefs[::-1])
+        fitAtmospherePsd = 10**poly1d_fn(logFrequencySampling)
+        
+    index1Hz = np.argmin(np.abs(frequencySampling-1))
+    psdAt1Hz = fitAtmospherePsd[index1Hz]
+    # See Buscher et al 1995 - I divide psdAt1Hz by 2 for being compatible with
+    # the two-sided PSD definition
+    estimatedT0 = (psdAt1Hz/2/2.84e-4/0.55**2)**(-3/5)
+    
+    return estimatedT0, coefs[1]
+    
 
 def model(freq,delay,gain):
     z=np.exp(1J*2*np.pi*freq/(2*np.amax(freq)))
@@ -2699,8 +2783,28 @@ def modelleak(freq,delay,gain,leak,constant):
     return 20*np.log10(np.abs(ftr))+constant
 
 
+
 def moving_average(x, w):
-    return np.apply_along_axis(lambda m: np.convolve(m, np.ones(w), 'valid') / w, axis=0, arr=x)
+    """
+    Simple homogeneous smooth (moving) average along the first axis.
+
+    Parameters
+    ----------
+    x : ARRAY
+        Array of 1D or more dimensions.
+    w : INT
+        Length of the smoothing window.
+
+    Returns
+    -------
+    y : ARRAY
+        Array of same dimensions as x in dim>1 and dim=dim(x)-w+1 on first axis.
+
+    """
+    
+    y = np.apply_along_axis(lambda m: np.convolve(m, np.ones(w), 'valid') / w, axis=0, arr=x)
+    
+    return y
 
 
 def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True, 
@@ -2752,8 +2856,44 @@ def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True,
               fancybox=True, framealpha=0.7, 
               handlelength=0, handletextpad=0)
 
+
+def add_subplot_axes(ax,rect,polar=False,label=False,facecolor='w'):
+    fig = plt.gcf()
+    box = ax.get_position()
+    width = box.width
+    height = box.height
+    inax_position  = ax.transAxes.transform(rect[0:2])
+    transFigure = ax.figure.transFigure.inverted()
+    infig_position = transFigure.transform(inax_position)
+    x = infig_position[0]
+    y = infig_position[1]
+    width *= rect[2]
+    height = width*box.width/box.height
+    # height *= rect[3]  # <= Typo was here
+    subax = fig.add_axes([x,y,width,height],polar=polar)
+    subax.set_rticks([])
+    
+    if label:
+        subax.set_xticks([0,np.pi/2,np.pi,3*np.pi/2])
+    else:
+        subax.set_thetagrids([0,90,180,270],labels=[])
+    # x_labelsize = subax.get_xticklabels()[0].get_size()
+    # y_labelsize = subax.get_yticklabels()[0].get_size()
+    # x_labelsize *= rect[2]**0.5
+    # y_labelsize *= rect[3]**0.5
+    # subax.xaxis.set_tick_params(labelsize=x_labelsize)
+    # subax.yaxis.set_tick_params(labelsize=y_labelsize)
+    return subax
+
+
+
 def setaxelim(ax, xdata=[],ydata=[],xmargin=0.1,ymargin=0.1, ylim_min=[0,0], xlim_min=[0,0],**kwargs):
     
+    if isinstance(xdata,(float,int)):
+        xdata=[xdata]
+    if isinstance(ydata,(float,int)):
+        ydata=[ydata]
+        
     if len(xdata):
         
         if not 'xmin' in kwargs.keys():
@@ -2788,6 +2928,5 @@ def setaxelim(ax, xdata=[],ydata=[],xmargin=0.1,ymargin=0.1, ylim_min=[0,0], xli
             ymin = np.min([ymin,ydown_min])
         
         ax.set_ylim([ymin,ymax])
-        
-        
-        
+    
+    

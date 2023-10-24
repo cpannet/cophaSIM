@@ -8,6 +8,7 @@ import matplotlib.lines as mlines
 import numpy as np
 import pandas as pd
 from astropy.io import fits
+import datetime
 
 from importlib import reload
 
@@ -17,6 +18,7 @@ from . import config
 from .decorators import timer
 
 import pkg_resources #Enable to load data included in this package
+from matplotlib.backends.backend_pdf import PdfPages
 
 from cophasim.tol_colors import tol_cset
 colors = tol_cset('muted')
@@ -1132,7 +1134,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
 
     from .config import NT, NA,timestamps, spectra, OW, MW, checktime, checkperiod, foreground
     
-    outputs.TimeID=time.strftime("%Y%m%d_%Hh%Mm%Ss")
+    outputs.TimeID=time.strftime("%Y-%m-%dT%H-%M-%S")
     outputs.simulatedTelemetries = True
     # Reload outputs module for initialising the observables with their shape
     if verbose:
@@ -1281,8 +1283,8 @@ The simulation might experience aliasing. /!\\n")
 
 
 def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
-            topAxe='snr',infos={'details':''},
-            pause=False, display=True,verbose=False,
+            topAxe='snr',infos={'details':''},smoothObs=0,
+            pause=False, display=True,verbose=False,mergedPdf=True,
             savedir='',ext='pdf'):
     """
     
@@ -1457,7 +1459,8 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         filenamePrefix = f"Simu{TimeID}"
         
     else:
-        filenamePrefix = f"TT{TimeID}"
+        filenamePrefix = outputs.outputsFile.split('.fits')[0]
+        #filenamePrefix = f"TT{TimeID}"
     
     InterfArray = config.InterfArray
 
@@ -1472,9 +1475,9 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         timerange = np.arange(stationaryregim_start,NT)
         
     display_module.timerange = timerange
-    durationSeconds = (timerange[-1] - timerange[0])*dt
     
     effDIT = min(DIT, config.NT - config.starttracking -1)
+
     if not ('opdcontrol' in args):
         timeBonds = [timestamps[timerange][0],timestamps[timerange][-1]]
         ShowPerformance(timeBonds, wlOfScience, effDIT, display=False)
@@ -1491,7 +1494,8 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         print(f'First fig is Figure {config.newfig}')
     
     if (len(args)==0) and (len(outputsData)==0):
-        args = ['perftable','estFlux','fluxHist','gdHist']
+        args = ['perftable','gdEstMatricial','pdEstMatricial','gdCmdMatricial',
+                'estFlux','fluxHist','gdHist','pdPsd','pdCumStd','cmdPsd']
         
     if 'focusRelock' in args:
         args = ['gdPdEst','snr','gdPdCmd','gd']
@@ -1505,7 +1509,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     HANDLE THE POSSILIBITY TO SHOW ONLY A PART OF THE TELESCOPES/BASELINES/CLOSURES
     """
     
-    TelConventionalArrangement = InterfArray.TelNames        
+    TelConventionalArrangement = InterfArray.TelNames    
     telNameLength=len(TelConventionalArrangement[0])
     if 'TelescopeArrangement' in infos.keys():
         telescopes = infos['TelescopeArrangement']
@@ -1544,6 +1548,8 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         baselines.append(f'{tel1}{tel2}')
         
     baselines = np.array(baselines)
+    if isinstance(config.baselineArrangement,(list,np.ndarray)):
+        baselines = np.array(config.baselineArrangement)
     display_module.baselines = baselines
     
     if NC>=1:
@@ -1564,33 +1570,33 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         display_module.closures = closures
     
     
-    PlotTel = [False]*NA ; PlotTelOrigin=[False]*NA
+    plotTel = [False]*NA ; plotTelOrigin=[False]*NA
     plotBaselineNIN = [False]*NIN
     plotBaseline = [False]*NINmes
-    PlotClosure = [False]*NC
-    PlotClosureND = [False]*ND
-    TelNameLength = len(InterfArray.TelNames[0])
+    plotClosure = [False]*NC
+    plotClosureND = [False]*ND
+    telNameLength = len(InterfArray.TelNames[0])
     
     if 'telsToDisplay' in infos.keys():
         telsToDisplay = infos['telsToDisplay']
         for ia in range(NA):
             tel = telescopes[ia] ; tel2 = TelConventionalArrangement[ia]
             if tel in telsToDisplay:
-                PlotTel[ia]=True
+                plotTel[ia]=True
             if tel2 in telsToDisplay:
-                PlotTelOrigin[ia]=True
+                plotTelOrigin[ia]=True
                 
         if not 'basesToDisplay' in infos.keys():
             for ib in range(NIN):
                 baseline = baselinesNIN[ib]
-                tel1,tel2=baseline[:TelNameLength],baseline[TelNameLength:]
+                tel1,tel2=baseline[:telNameLength],baseline[telNameLength:]
                 if (tel1 in telsToDisplay) \
                     and (tel2 in telsToDisplay):
                         plotBaselineNIN[ib] = True
                         
             for ib in range(NINmes):
                 baseline = baselines[ib]
-                tel1,tel2=baseline[:TelNameLength],baseline[TelNameLength:]
+                tel1,tel2=baseline[:telNameLength],baseline[telNameLength:]
                 if (tel1 in telsToDisplay) \
                     and (tel2 in telsToDisplay):
                         plotBaseline[ib] = True
@@ -1598,64 +1604,64 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         if (not 'trianglesToDisplay' in infos.keys()) and (NC>=1):
             for ic in range(NC):
                 closure = closures[ic]
-                tel1,tel2,tel3=closure[:TelNameLength],closure[TelNameLength:2*TelNameLength],closure[2*TelNameLength:]
+                tel1,tel2,tel3=closure[:telNameLength],closure[telNameLength:2*telNameLength],closure[2*telNameLength:]
                 if (tel1 in telsToDisplay) \
                     and (tel2 in telsToDisplay) \
                         and (tel3 in telsToDisplay):
-                            PlotClosure[ic] = True
+                            plotClosure[ic] = True
                             
             for ic in range(config.ND):
                 closure = closures[ic]
-                tel1,tel2,tel3=closure[:TelNameLength],closure[TelNameLength:2*TelNameLength],closure[2*TelNameLength:]
+                tel1,tel2,tel3=closure[:telNameLength],closure[telNameLength:2*telNameLength],closure[2*telNameLength:]
                 if (tel1 in telsToDisplay) \
                     and (tel2 in telsToDisplay) \
                         and (tel3 in telsToDisplay):
-                            PlotClosureND[ic] = True
+                            plotClosureND[ic] = True
                 
     if 'basesToDisplay' in infos.keys():
         basesToDisplay = infos['basesToDisplay']
         for ia in range(NA):
             tel = telescopes[ia] ; tel2 = TelConventionalArrangement[ia]
             if tel in "".join(basesToDisplay):
-                PlotTel[ia]=True
+                plotTel[ia]=True
             if tel2 in "".join(basesToDisplay):  
-                PlotTelOrigin[ia]=True
+                plotTelOrigin[ia]=True
                     
         for ib in range(NIN):
             baseline = baselinesNIN[ib]
-            if (baseline in basesToDisplay) or (baseline[TelNameLength:]+baseline[:TelNameLength] in basesToDisplay):
+            if (baseline in basesToDisplay) or (baseline[telNameLength:]+baseline[:telNameLength] in basesToDisplay):
                 plotBaselineNIN[ib] = True
         
         for ib in range(NINmes):
             baseline = baselines[ib]
-            if (baseline in basesToDisplay) or (baseline[TelNameLength:]+baseline[:TelNameLength] in basesToDisplay):
+            if (baseline in basesToDisplay) or (baseline[telNameLength:]+baseline[:telNameLength] in basesToDisplay):
                 plotBaseline[ib] = True
         
         if (not 'trianglesToDisplay' in infos.keys()) and (NC>=1):
             for ic in range(NC):
                 closure = closures[ic]
-                base1, base2,base3=closure[:2*TelNameLength],closure[TelNameLength:],"".join([closure[:TelNameLength],closure[2*TelNameLength:]])
+                base1, base2,base3=closure[:2*telNameLength],closure[telNameLength:],"".join([closure[:telNameLength],closure[2*telNameLength:]])
                 if (base1 in basesToDisplay) \
                     and (base2 in basesToDisplay) \
                         and (base3 in basesToDisplay):
-                            PlotClosure[ic] = True
+                            plotClosure[ic] = True
                             
             for ic in range(ND):
                 closure = closures[ic]
-                base1, base2,base3=closure[:2*TelNameLength],closure[TelNameLength:],"".join([closure[:TelNameLength],closure[2*TelNameLength:]])
+                base1, base2,base3=closure[:2*telNameLength],closure[telNameLength:],"".join([closure[:telNameLength],closure[2*telNameLength:]])
                 if (base1 in basesToDisplay) \
                     and (base2 in basesToDisplay) \
                         and (base3 in basesToDisplay):
-                            PlotClosureND[ic] = True
+                            plotClosureND[ic] = True
                             
     if ('trianglesToDisplay' in infos.keys()) and (NC>=1):
         trianglesToDisplay = infos['trianglesToDisplay']
         for ia in range(NA):
             tel = telescopes[ia] ; tel2 = TelConventionalArrangement[ia]
             if tel in "".join(trianglesToDisplay):
-                PlotTel[ia]=True
+                plotTel[ia]=True
             if tel2 in "".join(trianglesToDisplay):
-                PlotTelOrigin[ia]=True
+                plotTelOrigin[ia]=True
         
         for ib in range(NIN):
             baseline = baselinesNIN[ib]
@@ -1672,32 +1678,32 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         for ic in range(NC):
             closure = closures[ic]
             if closure in trianglesToDisplay:
-                PlotClosure[ic] = True
+                plotClosure[ic] = True
                 
         for ic in range(ND):
             closure = closures[ic]
             if closure in trianglesToDisplay:
-                PlotClosureND[ic] = True
+                plotClosureND[ic] = True
                 
     if not (('telsToDisplay' in infos.keys()) \
             or ('basesToDisplay' in infos.keys()) \
                 or ('trianglesToDisplay' in infos.keys())):
-        PlotTel = [True]*NA ; PlotTelOrigin = [True]*NA
+        plotTel = [True]*NA ; plotTelOrigin = [True]*NA
         plotBaselineNIN = [True]*NIN
         plotBaseline = [True]*NINmes
-        PlotClosure = [True]*NC
-        PlotClosureND = [True]*ND
+        plotClosure = [True]*NC
+        plotClosureND = [True]*ND
         
     # plotBaselineNINIndex = np.argwhere(plotBaselineNIN).ravel()
     # plotBaselineIndex = np.argwhere(plotBaseline).ravel()
     
-    # display_module.PlotTel = PlotTel
-    # display_module.PlotTelOrigin = PlotTelOrigin
-    # display_module.plotBaselineNIN = plotBaselineNIN
-    # display_module.plotBaseline = plotBaseline
-    # display_module.PlotClosure = PlotClosure
-    # display_module.PlotClosureND = PlotClosureND
-    # display_module.TelNameLength = TelNameLength
+    display_module.plotTel = plotTel
+    display_module.plotTelOrigin = plotTelOrigin
+    display_module.plotBaselineNIN = plotBaselineNIN
+    display_module.plotBaseline = plotBaseline
+    display_module.plotClosure = plotClosure
+    display_module.plotClosureND = plotClosureND
+    display_module.telNameLength = telNameLength
     # display_module.plotBaselineIndex = plotBaselineIndex
     # display_module.plotBaselineNINIndex = plotBaselineNINIndex
 
@@ -1744,6 +1750,46 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     else:
         SNR = SNR_gd
     
+    
+    """
+    POWER SPECTRAL DISTRIBUTION AND CUMULATIVE STANDARD DEVIATION
+    """
+    
+    if 'psd' in ''.join(args).casefold():
+        if 'cumstd' in ''.join(args).casefold():
+            if 'pdcumstd' in [x.casefold() for x in args]:
+                frequencySampling,pdPsd,frequencySamplingSmoothed,pdPsdSmoothed,pdCumStd = ct.getPsd(PDmic,timestamps,cumStd=True,mov_average=20)
+
+            if 'gdcumstd' in [x.casefold() for x in args]:
+                frequencySampling,gdPsd,frequencySamplingSmoothed,gdPsdSmoothed,gdCumStd = ct.getPsd(GDmic,timestamps,cumStd=True,mov_average=20)
+            
+        else:   # only computes psd because cumStd computation takes time
+            if 'pdpsd' in [x.casefold() for x in args]:
+                frequencySampling,pdPsd,frequencySamplingSmoothed,pdPsdSmoothed = ct.getPsd(PDmic,timestamps,mov_average=20)
+
+            if 'gd' in [x.casefold() for x in args]:
+                frequencySampling,gdPsd,frequencySamplingSmoothed,gdPsdSmoothed = ct.getPsd(GDmic,timestamps,mov_average=20)
+    
+        if 'cmdpsd' in [x.casefold() for x in args]:
+            frequencySampling,cmdPsd,frequencySamplingSmoothed,cmdPsdSmoothed = ct.getPsd(outputs.OPDCommand,timestamps,mov_average=20)
+        
+        outputs.frequencySampling = frequencySampling
+        
+    
+    """""""""""""""""""""""""""""""""""""""""""""""""""""
+    """""""" PREPARE PDF FILE FOR SAVING FIGURES """"""""
+    """""""""""""""""""""""""""""""""""""""""""""""""""""
+    
+    saveIndividualFigs = False
+    if mergedPdf:
+        pdf = PdfPages(savedir+outputs.outputsFile.split('.fits')[0]+"_figures.pdf")
+        d = pdf.infodict()
+        d['Title'] = 'Performance Plots'
+        d['AttachedFile'] = outputs.outputsFile
+        d['CreationDate'] = datetime.datetime.today()
+    elif len(savedir):
+        saveIndividualFigs = True
+    
     """""""""""""""""""""""""""""""""""""""
     """"""""  NOW YOU CAN DISPLAY  """"""""
     """""""""""""""""""""""""""""""""""""""
@@ -1760,21 +1806,21 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
             
             generalTitle = obsName
             obsType = obsName
-            if len(savedir):
+            if saveIndividualFigs:
                 filename= savedir+f"{filenamePrefix}_{obsType}"
             else:
                 filename=''
             
-            if "pis".casefold() in obsName.casefold():
-                display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+            if "pis" in obsName.casefold():
+                fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                           obsName=obsName,
                                           display=display,filename=filename,ext=ext,infos=infos,
                                           verbose=verbose)
                 
-            elif ("opd".casefold() in obsName.casefold())\
-                or ("snr".casefold() in obsName.casefold()):
+            elif ("opd" in obsName.casefold())\
+                or ("snr" in obsName.casefold()):
                     
-                display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
+                fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
                                           obsName=obsName,
                                           display=display,filename=filename,ext=ext,infos=infos,
                                           verbose=verbose)
@@ -1782,17 +1828,18 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
             else:
                 if obs.shape[-1] < 10:
                     print(f"{obsName} plotted with piston-oriented display.")
-                    display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+                    fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                               obsName=obsName,
                                               display=display,filename=filename,ext=ext,infos=infos,
                                               verbose=verbose)
                 else:
                     print(f"{obsName} plotted with OPD-oriented display.")
-                    display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
+                    fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
                                               obsName=obsName,
                                               display=display,filename=filename,ext=ext,infos=infos,
                                               verbose=verbose)
-
+            if mergedPdf:
+                pdf.savefig(fig)
 
 
 
@@ -1801,7 +1848,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
     if 'perftable' in args:
         generalTitle = "GD and PD estimated"
         obsType = "perftable"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1811,25 +1858,27 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         dispersion = GDobs-PDobs
         
         gdBar = outputs.fringeJumpsPeriod
-        pdBar = np.std(PDobs,axis=0)
+        pdBar = np.sqrt(outputs.VarPDEst)*config.wlOfTrack/2/np.pi
 
         if topAxe.casefold()=='snr':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,obsType=obsType, 
                                      display=display,filename=filename,ext=ext,infos=infos)
         elif topAxe.casefold()=='dispersion':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,dispersion=dispersion, obsType=obsType, 
                                      display=display,filename=filename,ext=ext,infos=infos)
         else:
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,obsType=obsType, 
                                      display=display,filename=filename,ext=ext,infos=infos)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdPdEst' in args:
         generalTitle = "GD and PD estimated"
         obsType = "GDPDest"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1838,27 +1887,29 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         PDobs = PDmic
         dispersion = GDobs-PDobs
         
-        gdBar = np.std(GDobs,axis=0)
-        pdBar = np.std(PDobs,axis=0)
+        gdBar = np.sqrt(outputs.VarGDEst)*config.wlOfTrack*config.FS['R']/2/np.pi
+        pdBar = np.sqrt(outputs.VarPDEst)*config.wlOfTrack/2/np.pi
         
         if topAxe.casefold()=='snr':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,obsType=obsType, 
                                      display=display,filename=filename,ext=ext,infos=infos)
         elif topAxe.casefold()=='dispersion':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,dispersion=dispersion, obsType=obsType, 
                                      display=display,filename=filename,ext=ext,infos=infos)
             
         else:
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,display=display,
                                      filename=filename,ext=ext,infos=infos)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdPdEst2' in args:
         generalTitle = "GD and PD estimated, after patch"
         obsType = "GDPDest2"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1870,19 +1921,20 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         pdBar = np.std(PDobs,axis=0)
         
         if topAxe.casefold()=='snr':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
         else:
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,display=display,
                                      filename=filename,ext=ext,infos=infos)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if 'gdPdLsq' in args:
         generalTitle = "GD and PD estimated, after filtered least square"
         obsType = "gdPdLsq"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1890,22 +1942,24 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         GDobs = GDerrmic
         PDobs = PDerrmic
         
-        gdBar = np.std(GDobs,axis=0)
-        pdBar = np.std(PDobs,axis=0)
+        gdBar = np.sqrt(outputs.VarGDRes)*config.wlOfTrack*config.FS['R']/2/np.pi
+        pdBar = np.sqrt(outputs.VarPDRes)*config.wlOfTrack/2/np.pi
         
         if topAxe.casefold()=='snr':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
         else:
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,display=display,
                                      filename=filename,ext=ext,infos=infos)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdPdErr' in args:
         generalTitle = "GD and PD errors"
         obsType = "gdPdErr"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1917,18 +1971,20 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         pdBar = np.std(PDobs,axis=0)
         
         if topAxe.casefold()=='snr':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
         else:
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,display=display,
                                      filename=filename,ext=ext,infos=infos)
-
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdPdCmd' in args:
         generalTitle = "GD and PD commands in OPD-space"
         obsType = "gdPdCmd"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1940,18 +1996,20 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         pdBar = np.std(PDobs,axis=0)
         
         if topAxe.casefold()=='snr':
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR,display=display,
                                      filename=filename,ext=ext,infos=infos)
         else:
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,gdBar,pdBar,
                                      plotBaseline,generalTitle,display=display,
                                      filename=filename,ext=ext,infos=infos)
-
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdPdCmdDiff' in args:
         generalTitle = "GD and PD commands diff in OPD-space"
         obsType = "gdPdCmdDiff"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1970,19 +2028,20 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         SNR_short = SNR[1:]
         
         if topAxe.casefold()=='snr':
-            display_module.perftable(timestmp, PDobs,GDobs,GDrefmic_short,PDrefmic_short,fringeJumpsPeriod,pdBar,
+            fig = display_module.perftable(timestmp, PDobs,GDobs,GDrefmic_short,PDrefmic_short,fringeJumpsPeriod,pdBar,
                                      plotBaseline,generalTitle,SNR=SNR_short,obsType=obsType,display=display,
                                      filename=filename,ext=ext,infos=infos)
         else:
-            display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,fringeJumpsPeriod,pdBar,
+            fig = display_module.perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,fringeJumpsPeriod,pdBar,
                                      plotBaseline,generalTitle,obsType=obsType,display=display,
                                      filename=filename,ext=ext,infos=infos)
-
+        if mergedPdf:
+            pdf.savefig(fig)
 
     if 'cgdCpd' in args:
         generalTitle = "GD and PD closure phases"
         obsType = "closure"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -1990,19 +2049,20 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         GDobs = outputs.ClosurePhaseGD[timerange]*180/np.pi
         PDobs = outputs.ClosurePhasePD[timerange]*180/np.pi
         
-        GDObsInfo = np.mean(GDobs,axis=0)
-        PDObsInfo = np.mean(PDobs,axis=0)
+        GDObsInfo = np.sqrt(outputs.VarCGD)*180/np.pi
+        PDObsInfo = np.sqrt(outputs.VarCPD)*180/np.pi
 
-        display_module.perftable_cp(timestamps, PDobs,GDobs,GDObsInfo,PDObsInfo,
-                                    PlotClosureND,generalTitle,obsType=obsType,
+        fig = display_module.perftable_cp(timestamps, PDobs,GDobs,GDObsInfo,PDObsInfo,
+                                    plotClosureND,generalTitle,obsType=obsType,
                                     display=display,
                                     filename=filename,ext=ext,infos=infos)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if 'cgdCpd_all' in args:
         generalTitle = "GD and PD closure phases"
         obsType = "closureAfter"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -2013,17 +2073,19 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         GDObsInfo = np.mean(GDobs,axis=0)
         PDObsInfo = np.mean(PDobs,axis=0)
 
-        display_module.perftable_cp(timestamps, PDobs,GDobs,GDObsInfo,PDObsInfo,
-                                    PlotClosure,generalTitle,obsType=obsType,
+        fig = display_module.perftable_cp(timestamps, PDobs,GDobs,GDObsInfo,PDObsInfo,
+                                    plotClosure,generalTitle,obsType=obsType,
                                     display=display,
                                     filename=filename,ext=ext,infos=infos)
+        if mergedPdf:
+            pdf.savefig(fig)
 
     """ PLOT OF A SINGLE OBSERVABLES (flux, PD,GD,OPD,SNR,etc...) IN OPD-SPACE """
 
     if 'distOpd' in args:
         generalTitle = 'OPD Disturbances'
         obsType = "distOpd"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -2031,15 +2093,17 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         obs = outputs.OPDDisturbance[timerange]
         obsBar = np.std(obs,axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
                                   obsName='OPD [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'opd' in args:
         generalTitle = 'True OPDs'
         obsType = "OPDtrue"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -2047,154 +2111,176 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         obs = outputs.OPDTrue[timerange]
         obsBar = np.std(obs,axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaselineNIN,
                                   obsName='OPD [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-    
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'pd' in args:
         generalTitle = 'Phase-delays'
         obsType='PD'
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
 
         obs = PDmic
-        obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        obsBar = np.sqrt(outputs.VarPDEst)*config.wlOfTrack/2/np.pi
+        
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='PD [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-    
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'pd2' in args:
         generalTitle = 'Phase-delays 2'
         obsType = "PD2"
-        obs = PDmic2
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
-            
+        
+        obs = PDmic2    
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='PD [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gd' in args:
 
         generalTitle = 'Group-delays'
         obsType = "GD"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDmic
-        obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        obsBar = np.sqrt(outputs.VarGDEst)*config.FS['R']*config.wlOfTrack/2/np.pi
+        
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='GD [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gd2' in args:
         generalTitle = 'Group-delays 2'
         obsType = "GD2"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDmic2
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='GD2 [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdLsq' in args:
         generalTitle = 'Group-delays error'
         obsType = "GDerr"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDerrmic
-        obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        obsBar = np.sqrt(outputs.VarGDRes)*config.FS['R']*config.wlOfTrack/2/np.pi
+        
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='GDerr [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)    
-    
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdErr' in args:
         generalTitle = 'Group-delays filtered'
         obsType = "GDerr2"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = GDerrmic2
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='GDerr2 [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
             
     if 'trueVis' in args:
         generalTitle = 'True visibilities'
         obsType = "SquaredVisTrue"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = np.abs(outputs.VisibilityTrue[timerange,wlIndex,:])**2
         obsBar = np.std(np.abs(outputs.VisibilityTrue[timerange,wlIndex,:])**2,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='Square Vis True',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'estVis' in args:
         generalTitle = 'Estimated visibilities'
         obsType = "SquaredVisEst"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = np.abs(outputs.VisibilityEstimated[timerange,wlIndex,:])**2
         obsBar = np.std(np.abs(outputs.VisibilityEstimated[timerange,wlIndex,:])**2,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='Square Vis Estimated',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-    
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if 'snr' in args:
         generalTitle = 'SNR'
         obsType = "SNR"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''        
             
         obs = SNR
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='SNR',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-                
+        if mergedPdf:
+            pdf.savefig(fig)        
         
     if 'snrPd' in args:
 
         generalTitle = 'SNR PD'
         obsType="SNRPD"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
@@ -2202,80 +2288,87 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         obs = SNR_pd
         obsBar = np.std(obs,axis=0)
         
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='SNR',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-                
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'snrGd' in args:
         generalTitle = 'SNR GD'
         obsType="SNRGD"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = SNR_gd
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='SNR',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdCmd' in args:
         generalTitle = 'GD Commands'
         obsType="GDCmd"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.GDCommand[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='Commands [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if 'pdCmd' in args:
         generalTitle = 'PD Commands'
         obsType="PDCmd"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.PDCommand[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='Commands [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if 'cmdOpd' in args:
         generalTitle = 'OPD Commands'
         obsType="OPDCmd"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.OPDCommand[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
+        fig = display_module.simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotBaseline,
                                   obsName='Commands [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     """ PISTONS-SPACE (flux, pistons) """    
     
     if 'estFlux' in args:
         generalTitle = 'Estimated Flux'
         obsType = "estFlux"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -2287,15 +2380,21 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
             obs = outputs.PhotometryEstimated[timerange]
             obsBar = np.mean(obs,axis=0)
         
-        display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+        if smoothObs:
+            obs = ct.moving_average(obs, smoothObs)
+        
+        fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                   obsName='Flux [ph]',barName='Average',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
+    
     
     if 'trueFlux' in args:
         generalTitle = 'True Flux'
         obsType = "trueFlux"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''
@@ -2307,109 +2406,181 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
             obs = outputs.PhotometryDisturbance[timerange]
             obsBar = np.mean(obs,axis=0)
         
-        display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+        fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                   obsName='Flux [ph]',barName='Average',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-    
+        if mergedPdf:
+            pdf.savefig(fig)
     
     if 'distPis' in args:
         generalTitle = 'Piston Disturbances'
         obsType="pisDist"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.PistonDisturbance[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+        fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                   obsName='Disturbances [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'cmdPis' in args:
         generalTitle = 'Piston Commands'
         obsType="pisCmd"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.CommandODL[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+        fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                   obsName='Commands [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'gdCmdPis' in args:
         generalTitle = 'Piston GD Commands'
         obsType="gdPisCmd"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.PistonGDCommand[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+        fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                   obsName='Commands [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'pdCmdPis' in args:
         generalTitle = 'Piston PD Commands'
         obsType="pdCmdPis"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.PistonPDCommand[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+        fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                   obsName='Commands [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
-        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if 'truePis' in args:
         generalTitle = 'Piston True'
         obsType="pisTrue"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename=''     
             
         obs = outputs.PistonTrue[timerange]
         obsBar = np.std(obs,axis=0)
-        display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,PlotTel,
+        fig = display_module.simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotTel,
                                   obsName='Piston [µm]',display=display,
                                   filename=filename,ext=ext,infos=infos,
                                   verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
         
+    if 'gdEstMatricial' in args:
+        plt.rcParams.update(rcParamsForBaselines)
+        generalTitle='Group-Delays'
+        obsType="gdEstMatrix"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename='' 
+            
+        obs = GDmic
+        obsBar = np.sqrt(outputs.VarPDEst)*config.FS['R']*config.wlOfTrack/2/np.pi
+        
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,xQuantity=timestamps, 
+                                     obsName='GD [µm]',obsBar=obsBar,
+                                     whichFormat='standard', infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)        
+        if mergedPdf:
+            pdf.savefig(fig)
+            
+    if 'gdCmdMatricial' in args:
+        generalTitle = 'GD Commands'
+        obsType="GDCmdMatrix"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename=''     
+            
+        obs = outputs.GDCommand[timerange] - outputs.GDCommand[0]
+        
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,
+                                           xQuantity=timestamps, obsName='GD Command\n[µm]',
+                                         whichFormat='standard', infos=infos,
+                                         display=display,filename=filename,ext=ext,
+                                         verbose=verbose)    
+        if mergedPdf:
+            pdf.savefig(fig)
+            
+    if 'pdEstMatricial' in args:
+        plt.rcParams.update(rcParamsForBaselines)
+        generalTitle='Phase-Delays'
+        obsType="pdEstMatrix"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename=''
+            
+        obs = PDmic
+        obsBar = np.sqrt(outputs.VarPDEst)*config.wlOfTrack/2/np.pi
+        
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,xQuantity=timestamps, 
+                                     obsName='PD [µm]',obsBar=obsBar,
+                                     whichFormat='standard', infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)
+        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if "gdHist" in args:
         plt.rcParams.update(rcParamsForBaselines)
         generalTitle='Histogram GD'
         obsType="gdHist"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename='' 
             
         obs = GDmic
         
-        display_module.plotHisto(obs,generalTitle,plotBaseline,obsName='GD [µm]',
-                      display=True,filename=filename,ext=ext,infos=infos,
-                      verbose=False)
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,obsName='GD [µm]',
+                                     whichFormat='hist',infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)
+        
+        if mergedPdf:
+            pdf.savefig(fig)
         
     if "fluxHist" in args:
         plt.rcParams.update(rcParamsForBaselines)
         generalTitle='Histogram Flux'
         obsType="fluxHist"
-        if len(savedir):
+        if saveIndividualFigs:
             filename= savedir+f"{filenamePrefix}_{obsType}"
         else:
             filename='' 
@@ -2418,11 +2589,111 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         if obs.ndim==3:
             obs = np.mean(obs,axis=1)
         
-        display_module.plotHisto(obs,generalTitle,plotBaseline,obsName='Flux [ADU]',
-                      display=True,filename=filename,ext=ext,infos=infos,
-                      verbose=False)
-                   
+        fig = display_module.plotMatricial(obs,generalTitle,plotTel,obsName='Flux [ADU]',
+                                     whichFormat='hist',infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
+             
+    if 'pdPsd' in args:
+        generalTitle="Phase-Delay PSD"
+        obsType="pdPsd"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename='' 
+
+        obs = pdPsd ; obs2 = pdPsdSmoothed
+        xQuantity = frequencySampling ; xQuantity2 = frequencySamplingSmoothed
         
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,xQuantity=xQuantity,
+                                     obs2=obs2,xQuantity2=xQuantity2,
+                                     obsName='PSD [µm²/Hz]',
+                                     whichFormat='standard loglog',infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
+            
+    if 'gdPsd' in args:
+        generalTitle="Group-Delay PSD"
+        obsType="gdPsd"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename='' 
+
+        obs = gdPsd ; obs2 = gdPsdSmoothed
+        xQuantity = frequencySampling ; xQuantity2 = frequencySamplingSmoothed
+        
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,xQuantity=xQuantity,
+                                     obs2=obs2,xQuantity2=xQuantity2,
+                                     obsName='PSD [µm²/Hz]',
+                                     whichFormat='standard loglog',infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
+            
+    if 'cmdPsd' in args:
+        generalTitle="FT commands PSD"
+        obsType="cmdPsd"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename='' 
+
+        obs = cmdPsd ; obs2 = cmdPsdSmoothed
+        xQuantity = frequencySampling ; xQuantity2 = frequencySamplingSmoothed
+        
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,xQuantity=xQuantity,
+                                     obs2=obs2,xQuantity2=xQuantity2,
+                                     obsName='PSD [µm²/Hz]',
+                                     whichFormat='standard loglog',infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)    
+        if mergedPdf:
+            pdf.savefig(fig)
+        
+    if 'pdCumStd' in args:
+        generalTitle='PD Cumulative STD'
+        obsType="pdCumStd"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename='' 
+            
+        obs = pdCumStd
+        xQuantity = frequencySampling
+        
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,xQuantity=xQuantity,
+                                     obsName='PD Cumulative STD [µm]',
+                                     whichFormat='standard xlog',infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
+            
+    if 'gdCumStd' in args:
+        generalTitle='GD Cumulative STD'
+        obsType="gdCumStd"
+        if saveIndividualFigs:
+            filename= savedir+f"{filenamePrefix}_{obsType}"
+        else:
+            filename='' 
+            
+        obs = gdCumStd
+        xQuantity = frequencySampling
+        
+        fig = display_module.plotMatricial(obs,generalTitle,plotBaseline,xQuantity=xQuantity,
+                                     obsName='GD Cumulative STD [µm]',
+                                     whichFormat='standard xlog',infos=infos,
+                                     display=display,filename=filename,ext=ext,
+                                     verbose=verbose)
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     """ GRAPH OF PERFORMANCE OF THE COPHASING (need to be updated) """
         
     if 'perfarray' in args:
@@ -2504,10 +2775,14 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
                                   orientation='horizontal')
 
-        if len(savedir):
+        if saveIndividualFigs:
             if verbose:
                 print("Saving perfarray figure.")
             plt.savefig(savedir+f"{filenamePrefix}_perfarray.{ext}")
+        
+        if mergedPdf:
+            pdf.savefig(fig)
+
 
     plt.rcParams.update(plt.rcParamsDefault)
 
@@ -2580,9 +2855,11 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
             plt.show()
         config.newfig+=1
         
-        if len(savedir):
+        if saveIndividualFigs:
             fig.savefig(savedir+f"{filenamePrefix}_cp.{ext}")
-
+        if mergedPdf:
+            pdf.savefig(fig)
+            
     if 'detector' in args:
         """
         DETECTOR VIEW
@@ -2682,9 +2959,10 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
                 plt.pause(0.1)
             else:
                 plt.show()
-        if len(savedir):
+        if saveIndividualFigs:
             fig.savefig(savedir+f"{filenamePrefix}_detector.{ext}")
-            
+        if mergedPdf:
+            pdf.savefig(fig)
     
     if ('state' in args):
         # ylim=[-0.1,2*config.FT['ThresholdGD']**2]
@@ -2719,8 +2997,11 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         ax.legend()
         if display:
             fig.show()
-   
-    pass
+        if mergedPdf:
+            pdf.savefig(fig)
+            
+    if mergedPdf:
+        pdf.close()
 
 
 def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
@@ -2780,12 +3061,9 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
         trueTelemetries = True
         
     if trueTelemetries:
-        
         outputs.OPDTrue = np.unwrap(outputs.PDEstimated,period=config.wlOfTrack/2)
         outputs.TrackedBaselines = np.ones([NT,NINmes])
         outputs.PistonTrue = np.zeros([NT,NA])
-        outputs.GD
-        
         
     """
     LOAD COHERENT FLUX IN SPECTRAL BAND FOR SNR COMPUTATION
@@ -2810,7 +3088,6 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     Lc = R*SpectraForScience      # Vector or float
     
     DIT_NumberOfFrames = int(DIT/dt)
-    
     if TimeBonds[1]==-1:
         TimeBonds = (TimeBonds[0],outputs.timestamps[-1])
     if isinstance(TimeBonds,(float,int)):
@@ -2855,6 +3132,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     outputs.VarPDRes=np.zeros(NINmes)
     outputs.VarGDEst=np.zeros(NINmes)
     outputs.VarPDEst=np.zeros(NINmes)
+    outputs.VarDispersion = np.zeros(NINmes)        # in microns
     outputs.VarPiston=np.zeros(NA)
     outputs.VarPistonGD=np.zeros(NA)
     outputs.VarPistonPD=np.zeros(NA)
@@ -2882,13 +3160,13 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
         OutFrame=InFrame+DIT_NumberOfFrames
         timerange = range(InFrame,OutFrame)
         OPDVar = np.var(outputs.OPDTrue[timerange,:],axis=0)
-        # print(outputs.OPDTrue[InFrame:OutFrame,:])
         OPDptp = np.ptp(outputs.OPDTrue[timerange,:],axis=0)
         
         GDResVar = np.var(outputs.GDResidual2[timerange,:],axis=0)
         PDResVar = np.var(outputs.PDResidual2[timerange,:],axis=0)
         GDEstVar = np.var(outputs.GDEstimated[timerange,:],axis=0)
         PDEstVar = np.var(outputs.PDEstimated[timerange,:],axis=0)
+        DispersionVar = np.var(outputs.GDEstimated[timerange,:]*config.FS['R']*config.wlOfTrack/2/np.pi-outputs.PDEstimated[timerange,:]*config.wlOfTrack/2/np.pi,axis=0)
         PistonVar = np.var(outputs.PistonTrue[timerange,:],axis=0)
         PistonVarGD = np.var(outputs.GDPistonResidual[timerange,:],axis=0)
         PistonVarPD = np.var(outputs.PDPistonResidual[timerange,:],axis=0)
@@ -2903,6 +3181,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
         outputs.VarGDRes += 1/Ndit*GDResVar
         outputs.VarPDEst += 1/Ndit*PDEstVar
         outputs.VarGDEst += 1/Ndit*GDEstVar
+        outputs.VarDispersion += 1/Ndit*DispersionVar
         outputs.VarPiston += 1/Ndit*PistonVar
         outputs.VarPistonGD += 1/Ndit*PistonVarGD
         outputs.VarPistonPD += 1/Ndit*PistonVarPD
@@ -2945,9 +3224,17 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     outputs.fringeJumpsPeriod = np.divide(periodSecondsArr,nJumps,out=periodSecondsArr,where=nJumps!=0)
     # outputs.fringeJumpsPeriod[outputs.fringeJumpsPeriod==np.inf] = periodSeconds
     
+    gdCmdDiff = outputs.PistonGDCommand[1:] - outputs.PistonGDCommand[:-1]
+    gdCmdDiff[-1] = 0
+    
+    nJumps = np.sum(np.abs(gdCmdDiff),axis=0)
+    periodSecondsArr = np.ones_like(nJumps)*periodSeconds
+    outputs.fringeJumpsPeriodTel = np.divide(periodSecondsArr,nJumps,out=periodSecondsArr,where=nJumps!=0)
+    # outputs.fringeJumpsPeriodTel[outputs.fringeJumpsPeriodTel==np.inf] = periodSeconds
+    
+    
     # if 'ThresholdGD' in config.FT.keys():
     #     outputs.WLR3 = np.mean(outputs.TrackedBaselines * outputs.SquaredSNRMovingAveragePD, axis=0)
-
 
     if not display:
         return
@@ -3429,7 +3716,7 @@ def BodeDiagrams(Input,Output,Command,timestamps,
 
     Returns
     -------
-    FrequencySampling : ARRAY
+    frequencySampling : ARRAY
         Frequencies associated with the transfert function arrays.
     FTrej : ARRAY
         Rejection Tranfer Function.
@@ -3442,17 +3729,17 @@ def BodeDiagrams(Input,Output,Command,timestamps,
      
     nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
 
-    FrequencySampling1 = np.fft.fftfreq(nNT, dt)
+    frequencySampling1 = np.fft.fftfreq(nNT, dt)
     if len(fbonds):
         fmin, fmax = fbonds
     else:
         fmin=0
-        fmax=np.max(FrequencySampling1)
+        fmax=np.max(frequencySampling1)
     
-    PresentFrequencies = (FrequencySampling1 > fmin) \
-        & (FrequencySampling1 < fmax)
+    PresentFrequencies = (frequencySampling1 > fmin) \
+        & (frequencySampling1 < fmax)
         
-    FrequencySampling = FrequencySampling1[PresentFrequencies]
+    frequencySampling = frequencySampling1[PresentFrequencies]
     
     if window =='hanning':
         windowsequence = np.hanning(nNT)
@@ -3478,17 +3765,17 @@ def BodeDiagrams(Input,Output,Command,timestamps,
         fig.suptitle(title)
         ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
         
-        ax1.plot(FrequencySampling, np.abs(FTrej),color='k')           
+        ax1.plot(frequencySampling, np.abs(FTrej),color='k')           
 
-        # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
+        # plt.plot(frequencySampling, frequencySampling*10**(-2), linestyle='--')
         ax1.set_yscale('log') #; ax1.set_ylim(1e-3,5)
         ax1.set_ylabel('FTrej')
         
-        ax2.plot(FrequencySampling, np.abs(FTBO),color='k')
+        ax2.plot(frequencySampling, np.abs(FTBO),color='k')
         ax2.set_yscale('log') #; ax2.set_ylim(1e-3,5)
         ax2.set_ylabel("FTBO")
         
-        ax3.plot(FrequencySampling, np.abs(FTBF),color='k')
+        ax3.plot(frequencySampling, np.abs(FTBF),color='k')
     
         ax3.set_xlabel('Frequencies [Hz]')
         ax3.set_ylabel('FTBF')
@@ -3511,7 +3798,7 @@ def BodeDiagrams(Input,Output,Command,timestamps,
         ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
         
         ax1.plot(timestamps, Input,'k')
-        # plt.plot(FrequencySampling, FrequencySampling*10**(-2), linestyle='--')
+        # plt.plot(frequencySampling, frequencySampling*10**(-2), linestyle='--')
     
         ax1.set_ylabel('Open loop')
         
@@ -3525,7 +3812,7 @@ def BodeDiagrams(Input,Output,Command,timestamps,
         
         fig.show()
         
-    return FrequencySampling, FTrej, FTBO, FTBF
+    return frequencySampling, FTrej, FTBO, FTBF
 
 
 
@@ -3564,9 +3851,9 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0, details='', window='hanning',
     
     SampleIndices = range(BeginSample,EndSample) ; nNT = len(SampleIndices)
     
-    FrequencySampling = np.fft.fftfreq(nNT, dt*1e-3)
-    PresentFrequencies = (FrequencySampling >= 0) & (FrequencySampling < 200)
-    FrequencySampling = FrequencySampling[PresentFrequencies]
+    frequencySampling = np.fft.fftfreq(nNT, dt*1e-3)
+    PresentFrequencies = (frequencySampling >= 0) & (frequencySampling < 200)
+    frequencySampling = frequencySampling[PresentFrequencies]
     
     Residues = outputs.OPDTrue[SampleIndices,ib]
     Turb = outputs.OPDDisturbance[SampleIndices,ib]
@@ -3592,13 +3879,13 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0, details='', window='hanning',
     fig = plt.figure('Rejection Transfer Function')
     ax1,ax2,ax3 = fig.subplots(nrows=3,sharex=True)
     
-    ax1.plot(FrequencySampling, 20*np.log10(np.abs(FTrej)))
+    ax1.plot(frequencySampling, 20*np.log10(np.abs(FTrej)))
     ax1.set_ylabel('FTrej\nGain [dB]')
     
-    ax2.plot(FrequencySampling, 20*np.log10(np.abs(FTBO)))
+    ax2.plot(frequencySampling, 20*np.log10(np.abs(FTBO)))
     ax2.set_ylabel("FTBO\nGain [dB]")
     
-    ax3.plot(FrequencySampling, 20*np.log10(np.abs(FTBF)))
+    ax3.plot(frequencySampling, 20*np.log10(np.abs(FTBF)))
 
     ax3.set_xlabel('Frequencies [Hz]')
     ax3.set_ylabel('FTBF\nGain [dB]')

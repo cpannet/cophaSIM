@@ -82,6 +82,7 @@ FT = {'ThresholdGD':np.zeros(NIN), 'ThresholdPD':0}
 """Other parameters"""
 TELref=0            # For display only: reference delay line
 newfig=0
+baselineArrangement=0
 
 verbose,vebose2=False,False
 

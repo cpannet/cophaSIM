@@ -51,6 +51,23 @@ rcParamsForBaselines = {"font.size":SS,
                                    'figure.subplot.right':0.95
                                    }
 
+rcParamsForMatricial = {"font.size":SS,
+                                   "axes.titlesize":SS,
+                                   "axes.labelsize":MS,
+                                   "axes.grid":True,
+                                   "xtick.labelsize":SS,
+                                   "ytick.labelsize":SS,
+                                   "legend.fontsize":SS,
+                                   "figure.titlesize":BS,
+                                   "figure.constrained_layout.use": False,
+                                   #"figure.constrained_layout.h_pad": 0.08,
+                                   "figure.figsize":figsize,
+                                   'figure.subplot.hspace': 0.,
+                                   'figure.subplot.wspace': 0,
+                                   'figure.subplot.left':0.1,
+                                   'figure.subplot.right':0.95
+                                   }
+
 rcParamsForOneAxe = {"font.size":SS,
                                    "axes.titlesize":SS,
                                    "axes.labelsize":MS,
@@ -106,7 +123,7 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
               filename='',ext='pdf',infos={"details":''},verbose=False):
     
     global telescopes, baselines, closures,wl,\
-        PlotTel,PlotTelOrigin,plotBaselineNIN,plotBaseline,PlotClosure#,TelNameLength
+        PlotTel,PlotTelOrigin,plotBaselineNIN,plotBaseline,PlotClosure#,telNameLength
                 
     nObs = NINmes
     nCurvesMaxPerFigure = NINdisp
@@ -133,7 +150,6 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
         plotTopAxe=True ; plotDispersion=True
         topAxeRatio = 3
         topObs = dispersion ; topAxeLabel = "Dispersion [µm]"
-        
     
     # Each figure only shows 15 baselines, distributed on two subplots
     # If there are more than 15 baselines, multiple figures will be created
@@ -154,17 +170,22 @@ def perftable(timestamps, PDobs,GDobs,GDrefmic,PDrefmic,RMSgdobs,RMSpdobs,
         oneAxe = False
         if nObsToPlot <= 6:
             oneAxe=True
+            
+        if len(infos["details"]):
+            generalTitle += f" - {infos['details']}"
     
-        if not oneAxe:
-            rangeCurves = f"{curvesNames[iFirstCurve]}-{curvesNames[iLastBase]}"
-            title=f'{generalTitle}: {rangeCurves}'
+        plt.close(generalTitle)
+        fig=plt.figure(generalTitle, clear=True)
+        if len(infos["details"]):
+            figureSuptitle = f"{generalTitle} - {infos['details']}"
         else:
-            rangeCurves = ""
-            title=generalTitle
+            figureSuptitle = generalTitle
+            
+        fig.suptitle(figureSuptitle)
 
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
-        fig.suptitle(title)
+        plt.close(generalTitle)
+        fig=plt.figure(generalTitle, clear=True)
+        fig.suptitle(generalTitle)
         
         if plotTopAxe:
             axGhost=[0]*5       # will contain axes that I remove directly after creation
@@ -244,33 +265,43 @@ to {curvesNames[iLastBase]}")
         else:
             FirstSet = range(iFirstCurve,iFirstCurve+len1)
             SecondSet = range(iFirstCurve+len1,iLastBase+1)
+            colorsArrayTwoAxes = ['grey']*nCurvesToDisplay
             iColor=0
             for iCurve in FirstSet:   # First serie
-                if plotTopAxe:
-                    ax1.plot(timestamps,topObs[:,iCurve],color=colorsArray[iColor])
-                if plotSnr:
-                    ax1.hlines(config.FT['ThresholdGD'][iCurve], timestamps[0],timestamps[-1], color=colorsArray[iColor], linestyle='dashed')
-                ax2.plot(timestamps,GDobs[:,iCurve],color=colorsArray[iColor])
-                ax2.plot(timestamps,GDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
-                ax3.plot(timestamps,PDobs[:,iCurve],color=colorsArray[iColor])
-                ax3.plot(timestamps,PDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
-                iColor+=1
+                if plotObs[iCurve]:
+                    if plotTopAxe:
+                        ax1.plot(timestamps,topObs[:,iCurve],color=colorsArray[iColor])
+                    if plotSnr:
+                        ax1.hlines(config.FT['ThresholdGD'][iCurve], timestamps[0],timestamps[-1], color=colorsArray[iColor], linestyle='dashed')
+                    ax2.plot(timestamps,GDobs[:,iCurve],color=colorsArray[iColor])
+                    ax2.plot(timestamps,GDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
+                    ax3.plot(timestamps,PDobs[:,iCurve],color=colorsArray[iColor])
+                    ax3.plot(timestamps,PDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
+                    colorsArrayTwoAxes[iCurve] = colorsArray[iColor]
+                    iColor+=1
             for iCurve in SecondSet:   # Second serie
-                if plotTopAxe:
-                    ax6.plot(timestamps,topObs[:,iCurve],color=colorsArray[iColor])
-                if plotSnr:
-                    ax6.hlines(config.FT['ThresholdGD'][iCurve],timestamps[0],timestamps[-1],color=colorsArray[iColor], linestyle='dashed')
-                ax7.plot(timestamps,GDobs[:,iCurve],color=colorsArray[iColor])
-                ax7.plot(timestamps,GDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
-                ax8.plot(timestamps,PDobs[:,iCurve],color=colorsArray[iColor])
-                ax8.plot(timestamps,PDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
-                iColor+=1
+                if plotObs[iCurve]:
+                    if plotTopAxe:
+                        ax6.plot(timestamps,topObs[:,iCurve],color=colorsArray[iColor])
+                    if plotSnr:
+                        ax6.hlines(config.FT['ThresholdGD'][iCurve],timestamps[0],timestamps[-1],color=colorsArray[iColor], linestyle='dashed')
+                    ax7.plot(timestamps,GDobs[:,iCurve],color=colorsArray[iColor])
+                    ax7.plot(timestamps,GDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
+                    ax8.plot(timestamps,PDobs[:,iCurve],color=colorsArray[iColor])
+                    ax8.plot(timestamps,PDrefmic[:,iCurve],color=colorsArray[iColor],linewidth=1, linestyle=':')
+                    colorsArrayTwoAxes[iCurve] = colorsArray[iColor]
+                    iColor+=1
         
-            p1=ax4.bar(curvesNames[FirstSet],RMSgdobs[FirstSet], color=colorsArray[:len1])
-            p3=ax5.bar(curvesNames[FirstSet],RMSpdobs[FirstSet], color=colorsArray[:len1])
+            p1=ax4.bar(curvesNames[FirstSet],RMSgdobs[FirstSet], color=colorsArrayTwoAxes[:len1])
+            ax4.bar(curvesNames[FirstSet],np.ones(len(FirstSet))*np.max(RMSgdobs),fill=False,edgecolor=colorsArrayTwoAxes[:len1])
+            p3=ax5.bar(curvesNames[FirstSet],RMSpdobs[FirstSet], color=colorsArrayTwoAxes[:len1])
+            ax5.bar(curvesNames[FirstSet],np.ones(len(FirstSet))*np.max(RMSpdobs),fill=False,edgecolor=colorsArrayTwoAxes[:len1])
             
-            p2=ax9.bar(curvesNames[SecondSet],RMSgdobs[SecondSet], color=colorsArray[len1:])
-            p4=ax10.bar(curvesNames[SecondSet],RMSpdobs[SecondSet], color=colorsArray[len1:])
+            p2=ax9.bar(curvesNames[SecondSet],RMSgdobs[SecondSet], color=colorsArrayTwoAxes[len1:])
+            ax9.bar(curvesNames[SecondSet],np.ones(len(SecondSet))*np.max(RMSgdobs),fill=False, edgecolor=colorsArrayTwoAxes[len1:])
+            p4=ax10.bar(curvesNames[SecondSet],RMSpdobs[SecondSet], color=colorsArrayTwoAxes[len1:])
+            ax10.bar(curvesNames[SecondSet],np.ones(len(SecondSet))*np.max(RMSpdobs),fill=False, edgecolor=colorsArrayTwoAxes[len1:])
+            
         
         """
         Tune the axis
@@ -348,7 +379,7 @@ to {curvesNames[iLastBase]}")
                 ax6.get_shared_x_axes().join(ax6,ax7,ax8)
                 ax1.get_shared_y_axes().join(ax1,ax6)
                 ax6.tick_params(labelbottom=False, labelleft=False) ;
-                ax1.tick_params(labelbottom=False, labelleft=False) ;
+                ax1.tick_params(labelbottom=False) ;
                 
                 ax7b=ax7.twinx() ; ax7b.set_ylabel('Group-Delays\n[µm]',
                                                    rotation=1,labelpad=50)
@@ -402,9 +433,9 @@ to {curvesNames[iLastBase]}")
                 print("Saving perftable figure.")
             if isinstance(ext,list):
                 for extension in ext:
-                    plt.savefig(filename+f"_{rangeCurves}.{extension}", dpi=300)
+                    plt.savefig(filename+f".{extension}", dpi=300)
             else:
-                plt.savefig(filename+f"_{rangeCurves}.{ext}", dpi=300)
+                plt.savefig(filename+f".{ext}", dpi=300)
 
     plt.rcParams.update(plt.rcParamsDefault)
 
@@ -579,7 +610,6 @@ def simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotObs,
     If there are less than 6 baselines, only one axe is plotted.
     In between, two axes on a unique figure are plotted.
 
-
     Parameters
     ----------
     timestamps : TYPE
@@ -646,18 +676,21 @@ def simpleplot_bases(timestamps, obs,obsBar,generalTitle,plotObs,
         if nObsToPlot <= 6:
             oneAxe=True
     
+        if len(infos["details"]):
+            generalTitle = generalTitle+f" - {infos['details']}"
+    
         if not oneAxe:
             rangeCurves = f"{curvesNames[iFirstCurve]}-{curvesNames[iLastBase]}"
-            title=f'{generalTitle}: {rangeCurves}'
+            figTitle=generalTitle+f": {rangeCurves}"
         else:
             rangeCurves = ""
-            title=generalTitle
+            figTitle=generalTitle
         
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
+        plt.close(figTitle)
+        fig=plt.figure(figTitle, clear=True)
     
         if len(infos["details"]):
-            fig.suptitle(title)
+            fig.suptitle(generalTitle)
         
 
         if oneAxe:
@@ -763,7 +796,8 @@ to {curvesNames[iLastBase]}")
                 plt.savefig(filename+f"_{rangeCurves}.{ext}", dpi=300)                
                 
 def simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotObs,mov_average=0,
-                    obsName='PD [µm]',barName='RMS',display=True,filename='',ext='pdf',infos={"details":''},
+                    obsName='PD [µm]',barName='RMS',display=True,filename='',ext='pdf',
+                    infos={"details":''},
                     verbose=False):
     """
     Each figure only shows up to 10 telescopes, distributed on two subplots
@@ -808,7 +842,8 @@ def simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotObs,mov_average=0,
     nObs = NA
     nCurvesMaxPerFigure = NAdisp
     nFigures = nTelFigures
-    
+    curvesNames = telescopes
+
     if mov_average:
         obs = ct.moving_average(obs, mov_average)
         timestamps = ct.moving_average(timestamps, mov_average)
@@ -840,24 +875,27 @@ def simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotObs,mov_average=0,
                 nCurvesToDisplay = nCurvesOnLastFigure
                 
         iFirstCurve= nCurvesMaxPerFigure*iFig                         # Index of first baseline to display
-        iLastTel= iFirstCurve + nCurvesToDisplay - 1          # Index of last baseline to display
+        iLastCurve= iFirstCurve + nCurvesToDisplay - 1          # Index of last baseline to display
         
         oneAxe = False
         if nObsToPlot <= 6:
             oneAxe=True
             
+        if len(infos["details"]):
+            generalTitle = generalTitle+f" - {infos['details']}"
+    
         if not oneAxe:
-            rangeTels= f"{telescopes[iFirstCurve]}-{telescopes[iLastTel]}"
-            title=f'{generalTitle}: {rangeTels}'
+            rangeCurves = f"{curvesNames[iFirstCurve]}-{curvesNames[iLastCurve]}"
+            figTitle=generalTitle+f": {rangeCurves}"
         else:
-            rangeTels=""
-            title=generalTitle
-            
-        plt.close(title)
-        fig=plt.figure(title, clear=True)
+            rangeCurves = ""
+            figTitle=generalTitle
+        
+        plt.close(figTitle)
+        fig=plt.figure(figTitle, clear=True)
     
         if len(infos["details"]):
-            fig.suptitle(title)
+            fig.suptitle(generalTitle)
 
         if oneAxe:
             telcolors = colors[:nObsToPlot]
@@ -888,13 +926,13 @@ def simpleplot_tels(timestamps, obs,obsBar,generalTitle,plotObs,mov_average=0,
             telcolors = colors[:len1]+colors[:len2]
             telcolors = np.array(telcolors)
             (ax1,ax3),(ax2,ax4) = fig.subplots(nrows=2,ncols=2, sharey='row',gridspec_kw={"height_ratios":[3,1]})
-            ax1.set_title(f"From {telescopes[iFirstCurve]} \
-to {telescopes[iFirstCurve+len1-1]}")
-            ax3.set_title(f"From {telescopes[iFirstCurve+len1]} \
-to {telescopes[iLastTel]}")
+            ax1.set_title(f"From {curvesNames[iFirstCurve]} \
+to {curvesNames[iFirstCurve+len1-1]}")
+            ax3.set_title(f"From {curvesNames[iFirstCurve+len1]} \
+to {curvesNames[iLastCurve]}")
             
             FirstSet = range(iFirstCurve,iFirstCurve+len1)
-            SecondSet = range(iFirstCurve+len1,iLastTel+1)
+            SecondSet = range(iFirstCurve+len1,iLastCurve+1)
             NbOfObs = len(FirstSet)+len(SecondSet)
             barcolors = ['grey']*NbOfObs
             
@@ -976,9 +1014,9 @@ to {telescopes[iLastTel]}")
                 print("Saving perftable figure.")
             if isinstance(ext,list):
                 for extension in ext:
-                    plt.savefig(filename+f"_{rangeTels}.{extension}", dpi=300)
+                    plt.savefig(filename+f"_{rangeCurves}.{extension}", dpi=300)
             else:
-                plt.savefig(filename+f"_{rangeTels}.{ext}", dpi=300)
+                plt.savefig(filename+f"_{rangeCurves}.{ext}", dpi=300)
 
 
 # def simpleplot_cp(timestamps, obs,obsBar,generalTitle,plotObs,
@@ -1065,7 +1103,7 @@ def plotHisto(obs,generalTitle,plotObs,obsName='GD [µm]',
     fig=plt.figure(generalTitle, clear=True)
     fig.suptitle(generalTitle)
     
-    if np.sum(plotObs) == 0:        # Put to 0 means it nevers enter this loop.
+    if np.sum(plotObs) == 1:        # Put to 0 means it nevers enter this loop.
         ax = fig.subplots()
         plottedCurve = f"_{curvesNames[plotObs][0]}"
         
@@ -1115,7 +1153,7 @@ def plotHisto(obs,generalTitle,plotObs,obsName='GD [µm]',
                 axes[iCurve].set_xlabel(obsName)
             
         for iCurve in range(nCurves):
-            addtext(axes[iCurve],curvesNames[iCurve],loc="upper right",fontsize='x-large')
+            addtext(axes[iCurve],curvesNames[iCurve],loc="upper right",fontsize='medium')
         
         axes[0].set_ylim(0,1.1*pmax)
         axes[0].set_xlim(rangeX,rangeY)
@@ -1134,114 +1172,438 @@ def plotHisto(obs,generalTitle,plotObs,obsName='GD [µm]',
             plt.savefig(filename+f"{plottedCurve}.{ext}", dpi=300)
 
 
+def plotMatricial(obs,generalTitle,plotObs,xQuantity=[],obs2=[],xQuantity2=[],
+                  obsBar=[],obsBar2=[],
+                  obsName='GD [µm]',
+                  display=True,filename='',ext='pdf',infos={"details":''},
+                  verbose=False,whichFormat='hist'):
 
-
-def axPerfarray(ax,lsObs,colorObs,axTitle,lwObs=[]):
+    plt.rcParams.update(rcParamsForMatricial)
     
-    for ia in range(NA):
-        name1,(x1,y1) = telescopes[ia],InterfArray.TelCoordinates[ia,:2]
-        ax.scatter(x1,y1,color='k',linewidth=10)
-        ax.annotate(name1, (x1+6,y1+1),color="k")
-        ax.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
-        for iap in range(ia+1,NA):
-            ib=ct.posk(ia,iap,NA)
-            x2,y2 = InterfArray.TelCoordinates[iap,:2]
-            im=ax1.plot([x1,x2],[y1,y2],linestyle='solid',
-                    linewidth=1,
-                    color=cm(int(vismod[ib]*nShades)))
-    ax.set_xlabel("X [m]")
-    ax.tick_params(labelleft=False)
+    """ CREATE AND FORMAT THE FIGURE """
     
-    for ia in range(NA):
-        name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
-        ax2.scatter(x1,y1,color='k',linewidth=10)
-        ax2.annotate(name1, (x1+6,y1+1),color="k")
-        ax2.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
-        for iap in range(ia+1,NA):
-            ib=ct.posk(ia,iap,NA)
-            x2,y2 = InterfArray.TelCoordinates[iap,:2]
-            ls = (0,(10*lsObs[ib],np.max([0,10*(1-lsObs[ib])])))
-            if PhotometricBalance[ib]>0:
-                im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
-                        linewidth=3,
-                        color=cm(int(outputs.FringeContrast[ib]*nShades)))
-            else:
-                im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
-                        linewidth=1,
-                        color=cm(int(outputs.FringeContrast[ib]*nShades)))
-    ax2.set_xlabel("X [m]")
-    ax2.set_ylabel("Y [m]")
-    ax2.set_xlim([-210,160]) ; ax2.set_ylim([-50,350])
-
-
-
-def perfarray(lsObs,colorObs,generalTitle,lwObs1=[],axTitle="Standard deviation",
-              lsObs2=[],colorObs2=[],lwObs2=[],axTitle2="Standard deviation",
-              infos={}):
-    
-    plt.rcParams.update(rcParamsForBaselines)
-    
-    from .tol_colors import tol_cmap as tc
-    import matplotlib as mpl
-    from .config import NA,NIN,InterfArray,wlOfTrack
-    
-    twoAxes=False
-    if len(lsObs2):
-        twoAxes = True
+    if len(plotObs)==len(baselines):
+        curvesNames = baselines
+    elif len(plotObs)==len(telescopes):
+        curvesNames = telescopes
         
-    #visibilities, _,_,_=ct.VanCittert(wlOfScience,config.Obs,config.Target)
-    #outputs.VisibilityAtPerfWL = visibilities
-    # visibilities = np.ones(NIN)  #ct.NB2NIN(outputs.VisibilityObject[wlIndex])
-    # vismod = np.abs(visibilities) ; #visangle = np.angle(visibilities)
-    # PhotometricBalance = config.FS['PhotometricBalance']
+    if 'hist' in whichFormat:
+        if "gd".casefold() in obsName.casefold():
+            rangeX,rangeY = -2.5*wl,2.5*wl
+        elif "flux".casefold() in obsName.casefold():
+            rangeX,rangeY = np.min(obs),np.max(obs)*1.1
+
+    elif whichFormat == 'standard':
+        if len(xQuantity) == 0:
+            print(Exception(f"For {obsName}, the plotMatricial method has been called in 'standard' format but no \
+xQuantity has been given. {obsName} is not plotted."))
+            return
     
-    cm = tc('rainbow_PuRd').reversed() ; nShades = 256
-    
-    # plt.rcParams['figure.figsize']=(16,12)
-    # font = {'family' : 'DejaVu Sans',
-    #         'weight' : 'normal',
-    #         'size'   : 22}
-    
-    # plt.rc('font', **font)
     plt.close(generalTitle)
-    fig=plt.figure(generalTitle)
-    if twoAxes:
-        (ax1,ax2)=fig.subplots(ncols=2, sharex=True, sharey=True)
-        ax2.set_title(axTitle2)
+    fig=plt.figure(generalTitle, clear=True)
+    if len(infos["details"]):
+        figureSuptitle = f"{generalTitle} - {infos['details']}"
     else:
-        ax1 = fig.subplots()
+        figureSuptitle = generalTitle
+        
+    fig.suptitle(figureSuptitle)
     
-    ax1.set_title(axTitle)
+    nCurves = 1
+    if np.sum(plotObs) == 1:        # Put to 0 means it nevers enter this loop.
+        ax = fig.subplots()
     
-    axPerfarray(lsObs,colorObs,axTitle,lsObs=lsObs)
+    else:
+        nCurves = np.shape(obs)[1]
+        nrows=int(np.sqrt(nCurves))# ; nrows = val+1
+        # minimalDivider = int(np.sqrt(nCurves)) ; nrows = minimalDivider
+        # for divider in range(minimalDivider,nCurves//minimalDivider+1):
+        #     if nCurves//divider > minimalDivider:
+        #         nrows = divider
+        otherAxe = nCurves//nrows ; remainder = nCurves%nrows
+        if remainder:
+            ncols = otherAxe+2
+        else:
+            ncols=otherAxe
+        axes = fig.subplots(nrows=nrows,ncols=ncols, sharex=True, sharey=True)
+        
+        if remainder:
+            for iAxe in range(1,nrows-remainder+1):
+                axes[-1,-iAxe].remove()
+        axes = axes.ravel()
     
-    if twoAxes:
-        axPerfarray(lsObs2,colorObs2,axTitle2,lsObs=lsObs2)
+    plotBar = False
+    if len(obsBar):
+        plotBar = True
+        fig.subplots_adjust(right=0.83)
+        axBar = fig.add_axes([0.9, 0.1, 0.05, 0.8])
     
-    
+    """ PLOT DATA IN AXES """
+    # print(nCurves); print(plotObs)
+    # print(obs)
+    if nCurves == 1:        # Put to 0 means it nevers enter this loop.
 
-    # fig.subplots_adjust(right=0.8)
-    # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
-    # mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
-    #                           orientation='vertical',
-    #                           label=f"Fringe Contrast at {wlOfScience:.3}µm")
+        plottedCurve = f"_{curvesNames[plotObs][0]}"
+        iCurve = np.argwhere(plotObs)[0][0]
+        
+        if whichFormat == 'hist':
+            p=ax.hist(obs[:,iCurve], bins=100, range=(rangeX,rangeY),color='k')
+            
+            ax.set_ylabel("Occurences")
+            ax.set_xlabel(obsName)
+        
+            ct.addtext(ax,curvesNames[iCurve],loc='upper left')#(-4,0.9*ymax))
+            ax.set_xlim(rangeX,rangeY)
+            ct.setaxelim(ax,ydata=p[0],ymin=0,ymargin=0.1)   
+            
+        elif 'standard' in whichFormat:
+            ax.plot(xQuantity,obs[:,iCurve],color='k')
+            if len(xQuantity2) and len(obs2):
+                ax.plot(xQuantity2,obs2[:,iCurve],color=colors[0])
+            elif len(xQuantity2) or len(obs2):
+                print(Exception("Only one of xQuantity2 or obs2 has been given. Please provide both."))
+            
+            if 'loglog'.casefold() in whichFormat:
+                ax.set_xscale('log') ; ax.set_yscale('log')
+            elif 'xlog'.casefold() in whichFormat:
+                ax.set_xscale('log')
+            elif 'ylog'.casefold() in whichFormat:
+                ax.set_yscale('log')
+                
+            # ct.setaxelim(ax,ydata=obs[:,iCurve])
+        
+    else:
+        plottedCurve = ""
+        nCurves = np.shape(obs)[1]
+        
+        pmax=0
+        for iCurve in range(nCurves):   # First serie
+            addtext(axes[iCurve],curvesNames[iCurve],loc="upper right",fontsize='medium')
+            
+            if whichFormat == 'hist':
+                p=axes[iCurve].hist(obs[:,iCurve], bins=100, range=(rangeX,rangeY),color='k')
+                if np.max(p[0]) > pmax:
+                    pmax = np.max(p[0])
+                
+                if iCurve%ncols == 0:
+                    axes[iCurve].set_ylabel("Occurences")
+                
+                if iCurve//ncols <= ncols:
+                    axes[iCurve].set_xlabel(obsName)
+                    
+            if 'standard' in whichFormat:
+                axes[iCurve].plot(xQuantity,obs[:,iCurve],color='k')
+                if len(xQuantity2) and len(obs2):
+                    axes[iCurve].plot(xQuantity2,obs2[:,iCurve],color=colors[0])
+                elif len(xQuantity2) or len(obs2):
+                    print(Exception("Only one of xQuantity2 or obs2 has been given. Please provide both."))
+                    
+                if 'loglog'.casefold() in whichFormat:
+                    axes[0].set_xscale('log') ; axes[0].set_yscale('log')
+                elif 'xlog'.casefold() in whichFormat:
+                    axes[0].set_xscale('log')
+                elif 'ylog'.casefold() in whichFormat:
+                    axes[0].set_yscale('log')
+                
+                if iCurve%ncols == 0:
+                    axes[iCurve].set_ylabel(obsName)
+                
+                if iCurve//ncols <= ncols:
+                    if ('loglog'.casefold() in whichFormat) or ('xlog'.casefold() in whichFormat):
+                        axes[iCurve].set_xlabel("Frequencies [Hz]")
+                    else:
+                        axes[iCurve].set_xlabel("Time [s]")
+        
+        if plotBar:
+            p1 = axBar.barh(curvesNames,obsBar, color='k')
+            ct.setaxelim(axBar,xdata=np.stack(obsBar),xmargin=0.2,xmin=0)
+            axBar.bar_label(p1,label_type='edge',fmt='%.2f')
+            axBar.set_xlabel("RMS")
+            axBar.set_ylabel("Baselines")
+        # axes[0].set_ylim(0,1.1*pmax)
+        # if whichFormat=='hist':
+        #     axes[0].set_xlim(rangeX,rangeY)
+        #     ct.setaxelim(axes[0],ydata=pmax,ymin=0,ymargin=0.1)
+        # elif 'psd' in obsName:
+        #     ct.setaxelim(axes[0],ydata=obs,ymin=0,ymargin=0.1)
 
-
-    
-    fig.subplots_adjust(bottom=0.2)
-    cbar_ax = fig.add_axes([0.1, 0.05, 0.85, 0.05])
-    mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
-                              orientation='horizontal')
-
-    if len(savedir):
+    if display:
+        fig.show()
+        
+    if len(filename):
+        
         if verbose:
-            print("Saving perfarray figure.")
-        plt.savefig(savedir+f"{filenamePrefix}_perfarray.{ext}")
+            print(f"Saving {obsName} figure.")
+        if isinstance(ext,list):
+            for extension in ext:
+                plt.savefig(filename+f"{plottedCurve}.{extension}", dpi=300)
+        else:
+            plt.savefig(filename+f"{plottedCurve}.{ext}", dpi=300)
 
-    plt.rcParams.update(plt.rcParamsDefault)
+    return fig
 
 
-def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True, 
+
+def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Signal [µm]',
+                         f1 = 0.3 , f2 = 5,
+                         fbonds=[], details='', window='no',mov_average=0,model=True,
+                         cumStd=False,
+                         display=True, figsave=False, figdir='',ext='pdf'):
+    
+    nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
+    T = timestamps[-1]
+    
+    FrequencySampling1 = np.fft.fftfreq(nNT, dt)
+    if len(fbonds):
+        fmin, fmax = fbonds
+    else:
+        fmin=0
+        fmax=np.max(FrequencySampling1)
+    
+    PresentFrequencies = (FrequencySampling1 > fmin) \
+        & (FrequencySampling1 < fmax)
+        
+    FrequencySampling = FrequencySampling1[PresentFrequencies]
+    
+    if window =='hanning':
+        windowsequence = np.hanning(nNT)
+    else:
+        windowsequence = np.ones(nNT)
+        
+    signal_filtered = signal*windowsequence
+    
+    PSD = 2*np.abs(np.fft.fft(signal_filtered,norm="forward")[PresentFrequencies])**2
+
+    if cumStd:
+        cumulativeStd = np.sqrt(np.cumsum(PSD))
+        cumFrequencySampling = np.copy(FrequencySampling)
+
+    if mov_average:
+        PSD = moving_average(PSD, mov_average)
+        FrequencySampling = moving_average(FrequencySampling,mov_average)
+
+    # print(np.var(signal)) ; print(np.var(signal_filtered))
+    # print(np.sum(np.abs(signal_filtered)**2*dt))
+    # print(np.sum(np.abs(PSD)))
+    
+    # f1 = 0.3 ; f2 = 10
+    logFrequencySampling = np.log10(FrequencySampling)
+    NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
+    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(PSD[NominalRegime]), 1)
+    poly1d_fn = np.poly1d(coefs)
+    psdFit = 10**poly1d_fn(logFrequencySampling)   # model sampled in direct space
+    powPsd=coefs[0]
+    # val0 = 10**coefs[0]#FTSignalfit[np.abs(np.argmin(logFrequencySampling-1))]
+    
+    if len(AdditionalSignals):
+        addSig=[] ; addPSD=[] ; addCumStd=[]
+    
+    for sig in AdditionalSignals:
+        addSig.append(sig)
+        tempPSD = 2*np.abs(np.fft.fft(sig*windowsequence, norm="forward")[PresentFrequencies])**2
+        
+        if mov_average:
+            addPSD.append(ct.moving_average(tempPSD, mov_average))
+        else:
+            addPSD.append(tempPSD)
+    
+        addCumStd.append(np.cumsum(tempPSD))
+    
+    if display:
+        
+        linestyles = [mlines.Line2D([],[],color='k',label="Signal"),
+                      mlines.Line2D([],[],color='k',linestyle='--', label="Window")]
+                      
+        plt.rcParams.update(rcParamsForBaselines)
+        # plt.rcParams.update({"figure.subplot.hspace":0.2})
+        title = f'{details} - PSD'
+        plt.close(title)
+        fig = plt.figure(title)
+        fig.suptitle(title)
+        
+        if not cumStd:
+            ax1,ax2 = fig.subplots(nrows=2)
+            
+            ax1.plot(FrequencySampling, PSD,'k')
+            ax2.plot(timestamps, signal, 'k')
+            
+            for i in range(len(AdditionalSignals)):
+                ax1.plot(FrequencySampling, addPSD[i],color=colors[i])
+                ax2.plot(timestamps, addSig[i], colors[i])
+            
+            if model:
+                ax1.plot(FrequencySampling, psdFit)#10*FrequencySampling**(-8/3))
+                annX = 2
+                annYindex = np.argmin(np.abs(FrequencySampling-annX))
+                annY = psdFit[annYindex]*2
+                ax1.annotate(f"{round(powPsd*3,2)}/3",(annX,annY),color=colors[0])
+            # ax3.plot(timestamps, windowsequence,'k--', label='Window')
+            
+            # ct.setaxelim(ax1, 
+            ax1.set_yscale('log') ; ax1.set_xscale('log')
+            ax1.set_ylabel('PSD [µm²/Hz]')
+            ax2.set_ylabel(SignalName)
+            #ax2.legend()#handles=linestyles)
+            
+            ax1.set_xlabel('Frequencies [Hz]')
+            ax2.set_xlabel('Time (s)')
+            #ax3.set_ylabel("Window amplitude")
+            ax1.grid(True); ax2.grid(True);# ax3.grid(False)
+
+        else:
+            ax1,ax2,axGhost,ax3 = fig.subplots(nrows=4,gridspec_kw={"height_ratios":[5,5,1.5,5]})
+            axGhost.axis("off")
+            ax1.plot(FrequencySampling, PSD,'k')
+            ax2.plot(cumFrequencySampling, cumulativeStd, 'k')
+            ax3.plot(timestamps, signal, 'k')
+            
+            for i in range(len(AdditionalSignals)):
+                ax1.plot(FrequencySampling, addPSD[i],color=colors[i])
+                ax2.plot(cumFrequencySampling, addCumStd[i],color=colors[i])
+                ax3.plot(timestamps, addSig[i], colors[i])
+            
+            if model:
+                ax1.plot(FrequencySampling, psdFit)#10*FrequencySampling**(-8/3))
+                annX = 2
+                annYindex = np.argmin(np.abs(FrequencySampling-annX))
+                annY = psdFit[annYindex]*2
+                ax1.annotate(f"{round(powPsd*3,2)}/3",(annX,annY),color=colors[0])
+            # ax3.plot(timestamps, windowsequence,'k--', label='Window')
+            
+            ax1.set_yscale('log') ; ax1.set_xscale('log')
+            ax2.set_xscale('log')
+            ax2.sharex(ax1) ;# ax1.tick_params.labelbottom(False)
+            ax1.set_ylabel('PSD [µm²/Hz]')
+            ax2.set_ylabel("Cumulative STD [µm]")
+            ax3.set_ylabel(SignalName)
+            
+            ax2.set_xlabel('Frequencies [Hz]')
+            ax3.set_xlabel('Time (s)')
+            ax1.grid(True); ax2.grid(True); ax3.grid(True)
+
+        if figsave:
+            prefix = details.replace("=","").replace(";","").replace(" ","").replace(".","").replace('\n','_').replace('Phase-delay','PD').replace('Group-delay','GD')
+            figname = "PSD"
+            if isinstance(ext,list):
+                for extension in ext:
+                    plt.savefig(figdir+f"{prefix}_{figname}.{extension}")
+            else:
+                plt.savefig(figdir+f"{prefix}_{figname}.{ext}")
+        
+        fig.show()
+    
+    if cumStd:
+        return FrequencySampling, PSD, cumStd, psdFit
+
+    else:
+        return FrequencySampling, PSD, psdFit
+
+
+# def axPerfarray(ax,lsObs,colorObs,axTitle,lwObs=[]):
+    
+#     for ia in range(NA):
+#         name1,(x1,y1) = telescopes[ia],InterfArray.TelCoordinates[ia,:2]
+#         ax.scatter(x1,y1,color='k',linewidth=10)
+#         ax.annotate(name1, (x1+6,y1+1),color="k")
+#         ax.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+#         for iap in range(ia+1,NA):
+#             ib=ct.posk(ia,iap,NA)
+#             x2,y2 = InterfArray.TelCoordinates[iap,:2]
+#             im=ax1.plot([x1,x2],[y1,y2],linestyle='solid',
+#                     linewidth=1,
+#                     color=cm(int(vismod[ib]*nShades)))
+#     ax.set_xlabel("X [m]")
+#     ax.tick_params(labelleft=False)
+    
+#     for ia in range(NA):
+#         name1,(x1,y1) = InterfArray.TelNames[ia],InterfArray.TelCoordinates[ia,:2]
+#         ax2.scatter(x1,y1,color='k',linewidth=10)
+#         ax2.annotate(name1, (x1+6,y1+1),color="k")
+#         ax2.annotate(f"({ia+1})", (x1+21,y1+1),color=colors[0])
+#         for iap in range(ia+1,NA):
+#             ib=ct.posk(ia,iap,NA)
+#             x2,y2 = InterfArray.TelCoordinates[iap,:2]
+#             ls = (0,(10*lsObs[ib],np.max([0,10*(1-lsObs[ib])])))
+#             if PhotometricBalance[ib]>0:
+#                 im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+#                         linewidth=3,
+#                         color=cm(int(outputs.FringeContrast[ib]*nShades)))
+#             else:
+#                 im=ax2.plot([x1,x2],[y1,y2],linestyle=ls,
+#                         linewidth=1,
+#                         color=cm(int(outputs.FringeContrast[ib]*nShades)))
+#     ax2.set_xlabel("X [m]")
+#     ax2.set_ylabel("Y [m]")
+#     ax2.set_xlim([-210,160]) ; ax2.set_ylim([-50,350])
+
+
+
+# def perfarray(lsObs,colorObs,generalTitle,lwObs1=[],axTitle="Standard deviation",
+#               lsObs2=[],colorObs2=[],lwObs2=[],axTitle2="Standard deviation",
+#               infos={}):
+    
+#     plt.rcParams.update(rcParamsForBaselines)
+    
+#     from .tol_colors import tol_cmap as tc
+#     import matplotlib as mpl
+#     from .config import NA,NIN,InterfArray,wlOfTrack
+    
+#     twoAxes=False
+#     if len(lsObs2):
+#         twoAxes = True
+        
+#     #visibilities, _,_,_=ct.VanCittert(wlOfScience,config.Obs,config.Target)
+#     #outputs.VisibilityAtPerfWL = visibilities
+#     # visibilities = np.ones(NIN)  #ct.NB2NIN(outputs.VisibilityObject[wlIndex])
+#     # vismod = np.abs(visibilities) ; #visangle = np.angle(visibilities)
+#     # PhotometricBalance = config.FS['PhotometricBalance']
+    
+#     cm = tc('rainbow_PuRd').reversed() ; nShades = 256
+    
+#     # plt.rcParams['figure.figsize']=(16,12)
+#     # font = {'family' : 'DejaVu Sans',
+#     #         'weight' : 'normal',
+#     #         'size'   : 22}
+    
+#     # plt.rc('font', **font)
+#     plt.close(generalTitle)
+#     fig=plt.figure(generalTitle)
+#     if twoAxes:
+#         (ax1,ax2)=fig.subplots(ncols=2, sharex=True, sharey=True)
+#         ax2.set_title(axTitle2)
+#     else:
+#         ax1 = fig.subplots()
+    
+#     ax1.set_title(axTitle)
+    
+#     axPerfarray(lsObs,colorObs,axTitle,lsObs=lsObs)
+    
+#     if twoAxes:
+#         axPerfarray(lsObs2,colorObs2,axTitle2,lsObs=lsObs2)
+    
+    
+
+#     # fig.subplots_adjust(right=0.8)
+#     # cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+#     # mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+#     #                           orientation='vertical',
+#     #                           label=f"Fringe Contrast at {wlOfScience:.3}µm")
+
+
+    
+#     fig.subplots_adjust(bottom=0.2)
+#     cbar_ax = fig.add_axes([0.1, 0.05, 0.85, 0.05])
+#     mpl.colorbar.ColorbarBase(cbar_ax, cmap=cm,
+#                               orientation='horizontal')
+
+#     if len(savedir):
+#         if verbose:
+#             print("Saving perfarray figure.")
+#         plt.savefig(savedir+f"{filenamePrefix}_perfarray.{ext}")
+
+#     plt.rcParams.update(plt.rcParamsDefault)
+
+
+def addtext(ax, text, loc = 'best', fontsize='medium',fancybox=True, 
             framealpha=0.7, handlelength=0, handletextpad=0):
     """
     Add a text in a legend box. Enables to use the very useful "loc" parameter 
@@ -1286,6 +1648,6 @@ def addtext(ax, text, loc = 'best', fontsize='small',fancybox=True,
     
     # create the legend, supressing the blank space of the empty line symbol and the
     # padding between symbol and label by setting handlelenght and handletextpad
-    ax.legend(handles, labels, loc=loc, fontsize='small', 
+    ax.legend(handles, labels, loc=loc, fontsize=fontsize, 
               fancybox=True, framealpha=0.7, 
               handlelength=0, handletextpad=0)

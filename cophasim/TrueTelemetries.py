@@ -11,7 +11,6 @@ It formats the data to display it using display function.
 
 import struct
 import numpy as np
-import time
 import matplotlib.pyplot as plt
 import mmap
 import os
@@ -25,14 +24,12 @@ from scipy.special import binom
 import matplotlib.lines as mlines
 from astropy.io import fits
 
-from . import config
+from . import config,outputs
 
 colors=['blue','red','green','brown','yellow','orange','pink','grey','cyan','black','magenta','lightblue','darkblue','darkgrey','lightgrey','indigo']
 
 colors = tol_cset('muted')
 telcolors = tol_cset('bright')
-
-
 
 """
 Parameters of the script
@@ -431,15 +428,8 @@ def readDump(file, version='current'):
 
     return data
 
-def ReadFits(file,computeCp=False,verbose=True):
-    from cophasim import outputs
-    from cophasim import coh_tools as ct
+def ReadFits(file,oldFits=False,computeCp=False,give_names=False,newDateFormat=True):
     global NT, NA, NINmes, TimeID, dt, timestamps,ich,whichSNR
-    # GainPD,GainGD,\
-    #     PDEstimated,GDEstimated,PDResidual2, GDResidual2,\
-    #         PhotometryEstimated,ClosurePhasePD, ClosurePhaseGD,PDref,GDref,\
-    #             PistonPDCommand,PistonGDCommand,SearchCommand, CommandODL,\
-    #                 varPD, SquaredSNRMovingAverage, VisibilityEstimated
     
     with fits.open(file) as hduL:
 
@@ -451,19 +441,25 @@ def ReadFits(file,computeCp=False,verbose=True):
         config.NB = int(NA**2) 
         config.NC = int(binom(NA,3))           # Number of closure phases
         config.ND = int((NA-1)*(NA-2)/2)       # Number of independant closure phases
+        config.wlOfTrack = 1.6              # By default, it is spica-ft data from mircx.
         
         reload(outputs)
         
-        outputs.outputsFile = file.split('/')[-1]
-        timestr = outputs.outputsFile.split('.fits')[0][-20:]
+        outputs.outputsFile = file.split('\\')[-1].split('/')[-1]
         
-        # Handle the fact that it can be 'Aug__8_07h08m18_2023' or 'Aug_13_07h08m18_2023'
-        if len(timestr.split('__'))==2:
-            timestr = timestr.split('__')[0] + "_0"+timestr.split('__')[1]
+        if not newDateFormat:
+            timestr = outputs.outputsFile.split('.fits')[0][-20:]
         
-        recordTime = datetime.datetime.strptime(timestr, '%b_%d_%Hh%Mm%S_%Y')
+            # Handle the fact that it can be 'Aug__8_07h08m18_2023' or 'Aug_13_07h08m18_2023'
+            if len(timestr.split('__'))==2:
+                timestr = timestr.split('__')[0] + "_0"+timestr.split('__')[1]
+                
+            recordTime = datetime.datetime.strptime(timestr, '%b_%d_%Hh%Mm%S_%Y')
+        else:
+            timestr = outputs.outputsFile.split('.fits')[0].split('.TELEMETRY.')[1]
+            recordTime = datetime.datetime.strptime(timestr, '%Y-%m-%dT%H-%M-%S')
         
-        outputs.TimeID = recordTime.strftime("%Y%m%d_%Hh%Mm%Ss")
+        outputs.TimeID = recordTime.strftime("%Y-%m-%dT%H-%M-%S")
         
         outputs.simulatedTelemetries = False
         
@@ -546,6 +542,20 @@ def ReadFits(file,computeCp=False,verbose=True):
                            "curRefPD","curRefGD","Photometry","curPdVar",
                            "avPdVar","VisiNorm","pdDlCmdMicrons","gdDlCmdMicrons",
                            "curFsPosFromStartMicrons","MetBoxCurrentOffsetMicrons"]
+        commonOutputsAssociatedNames = ["GainPD","GainGD","timestamps",
+                                        "PD","GD","PDResidual","GDResidual",
+                                        "ClosurePhasePD","ClosurePhaseGD",
+                                        "PDref","GDref","PhotometryEstimated",
+                                        "varPD","varGD","SquaredSnrGD","SquaredSnrPD",
+                                        "SquaredSNRMovingAveragePD","SquaredSNRMovingAverageGD",
+                                        "singularValuesSqrt","ThresholdPD","ThresholdGD",
+                                        "VisibilityEstimated","PistonGDcorr",
+                                        "PistonPDCommand","PistonGDCommand","CommandRelock",
+                                        "CommandODL","PistonPDCommand","PistonGDCommand",
+                                        "PistonGDcorr","PistonPDcorr",
+                                        "GDPistonResidual","PDPistonResidual",
+                                        "ClosurePhaseGDafter","ClosurePhasePDafter",
+                                        "PDCommand","GDCommand","OPDCommand","OPDCommandRelock"]
         
         AdditionalOutputs = []
         for key in hduL[1].data.names:
@@ -566,13 +576,23 @@ def ReadFits(file,computeCp=False,verbose=True):
         
         if (np.std(outputs.GainPD,axis=0) == 0).all():
             config.FT['GainPD'] = outputs.GainPD[0]
+        else:   # add 1 for knowing that gain has changed, but add mean for knowing around what value it was
+            config.FT['GainPD'] = 1+np.mean(outputs.GainPD)
         if (np.std(outputs.GainGD,axis=0) == 0).all():
             config.FT['GainGD'] = outputs.GainGD[0]
+        else:   # add 1 for knowing that gain has changed, but add mean for knowing around what value it was
+            config.FT['GainGD'] = 1+np.mean(outputs.GainGD)
             
         outputs.PDEstimated = np.matmul(sortBases2Conventional,hduL[1].data["PD"].T).T # Estimated baselines PD [NTxNINmes - rad]
         outputs.GDEstimated = np.matmul(sortBases2Conventional,hduL[1].data["GD"].T).T # Estimated baselines GD [NTxNINmes - rad]
-        outputs.PDResidual = np.matmul(sortBases2Conventional,hduL[1].data["curPdErrBaseMicrons"].T).T/lmbda*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
-        outputs.GDResidual = np.matmul(sortBases2Conventional,hduL[1].data["curGdErrBaseMicrons"].T).T/R/lmbda*2*np.pi # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - rad]
+        
+        pdmic = outputs.PDEstimated*config.wlOfTrack/2/np.pi
+        gdmic = outputs.GDEstimated*config.FS['R']*config.wlOfTrack/2/np.pi
+        
+        outputs.OPDTrue = np.unwrap(outputs.PDEstimated,axis=0)*config.wlOfTrack/2/np.pi
+        outputs.reconstructedOPD = ct.reconstructOpenLoop(pdmic, gdmic, config.wlOfTrack)
+        outputs.PDResidual = np.matmul(sortBases2Conventional,hduL[1].data["curPdErrBaseMicrons"].T).T/config.wlOfTrack*2*np.pi # Estimated residual PD = PD-PDref after Ipd (eq.35) [NTxNINmes - rad]
+        outputs.GDResidual = np.matmul(sortBases2Conventional,hduL[1].data["curGdErrBaseMicrons"].T).T/R/config.wlOfTrack*2*np.pi # Estimated residual GD = GD-GDref after Ipd (eq.35) [NTxNINmes - rad]
         outputs.ClosurePhasePD = hduL[1].data["PdClosure"] # PD closure phase [NTxNC - rad]
         outputs.ClosurePhaseGD = hduL[1].data["GdClosure"] # GD closure phase [NTxNC - rad]
         outputs.PDref = np.matmul(sortBases2Conventional,hduL[1].data["curRefPD"].T).T/lmbda*2*np.pi # PD reference vector [NTxNINmes - rad]
@@ -598,11 +618,11 @@ def ReadFits(file,computeCp=False,verbose=True):
         outputs.SquaredSnrGD = 1/outputs.varGD
         outputs.SquaredSnrPD = 1/outputs.varPD
         
+        outputs.SquaredSNRMovingAveragePD = np.nan_to_num(np.matmul(sortBases2Conventional,1/hduL[1].data["averagePdVar"].T).T,posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
         # outputs.whichVar = hduL[1].data['whichCurPdVar'][0]    # 0: varPd ; 1:varGd
-        if config.FT['whichSNR']=="pd":
-            outputs.SquaredSNRMovingAveragePD = np.nan_to_num(np.matmul(sortBases2Conventional,1/hduL[1].data["averagePdVar"].T).T,posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
-        else:
-            outputs.SquaredSNRMovingAverageGD = np.nan_to_num(1/np.matmul(sortBases2Conventional,hduL[1].data["averagePdVar"].T).T,posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        if config.FT['whichSNR']=="gd":
+            outputs.SquaredSNRMovingAverageGD = np.copy(outputs.SquaredSNRMovingAveragePD)
+            
         outputs.singularValuesSqrt = np.sqrt(hduL[1].data["sPdSingularValues"])
         
         config.FT['ThresholdPD'] = hduL[1].data['pdThreshold'][0]
@@ -610,7 +630,7 @@ def ReadFits(file,computeCp=False,verbose=True):
         outputs.ThresholdPD = hduL[1].data['pdThreshold']
         outputs.ThresholdGD = hduL[1].data['gdThresholds']
         
-        outputs.VisibilityEstimated = np.nan_to_num(1/np.matmul(sortBases2Conventional,hduL[1].data["VisiNorm"].T).T,posinf=0) # Estimated fringe visibility [NTxNINmes]
+        outputs.VisibilityEstimated = np.nan_to_num(np.matmul(sortBases2Conventional,hduL[1].data["VisiNorm"].T).T,posinf=0) # Estimated fringe visibility [NTxNINmes]
         
         outputs.PistonGDcorr = hduL[1].data["gdDlCorMicrons"] # GD before round [NTxNA - microns]
         
@@ -622,8 +642,10 @@ def ReadFits(file,computeCp=False,verbose=True):
         outputs.PistonPDCommand[:-1] = hduL[1].data["pdDlCmdMicrons"] # PD command [NTxNA - microns]
         outputs.PistonGDCommand[:-1] = hduL[1].data["gdDlCmdMicrons"] # GD command [NTxNA - microns]
         outputs.CommandRelock[:-1] = hduL[1].data["curFsPosFromStartMicrons"] # Search command [NTxNA - microns]
-        outputs.CommandODL[:-1] = hduL[1].data["MetBoxCurrentOffsetMicrons"] # ODL command [NTxNA - microns] A VERIFIER
-        
+        if not oldFits:
+            outputs.CommandODL[:-1] = hduL[1].data["fullDlCmdMicrons"] # ODL command [NTxNA - microns] A VERIFIER
+        else:
+            outputs.CommandODL[:-1] = outputs.PistonPDCommand[:-1] + outputs.PistonGDCommand[:-1] # ODL command [NTxNA - microns]
     
     # #ALL DATA WHICH ARE COMMANDS-RELATED NEED TO BE SORTED IN SAME ORDER
     # THAN OPD, i.e. in the order of Beam2Tel
@@ -634,8 +656,8 @@ def ReadFits(file,computeCp=False,verbose=True):
         outputs.CommandRelock[it] = np.dot(sortBeams2Tels,outputs.CommandRelock[it])
         outputs.CommandODL[it] = np.dot(sortBeams2Tels,outputs.CommandODL[it])
         outputs.PistonGDcorr[it] = np.dot(sortBeams2Tels,outputs.PistonGDcorr[it])
-        outputs.GDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.GDResidual2[it])
-        outputs.PDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.PDResidual2[it])
+        outputs.GDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.GDResidual[it])
+        outputs.PDPistonResidual[it] = np.dot(config.FS['OPD2Piston'],outputs.PDResidual[it])
     
     if computeCp:
         
@@ -672,9 +694,9 @@ def ReadFits(file,computeCp=False,verbose=True):
     # Reload outputs parameters.
     # reload(outputs)
     
-    if verbose:
+    if give_names:
         print("Load telemetries into outputs module:")
-        for key in CommonOutputs+AdditionalOutputs:
+        for key in commonOutputsAssociatedNames+AdditionalOutputs:
             print(f"- {key}")
     
     return
@@ -977,7 +999,6 @@ def BodeDiagrams(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5,
             ax3.annotate(f"{round(2*coefDisturb*3,2)}/3",(annX,annY),color=colors[0])
             
             addtext(ax3,"Disturbance",loc='upper center',fontsize='x-large')
-            
             
             ax3.set_xlabel('Frequencies [Hz]')
             ax3.set_xscale('log')
@@ -1596,8 +1617,6 @@ def BodeDiagrams_pseudoloop(Output,Command,timestamps,Input=[],f1 = 0.3 , f2 = 5
     return results
 
 
-
-
 def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Signal [µm]',
                          f1 = 0.3 , f2 = 5,
                          fbonds=[], details='', window='no',mov_average=0,model=True,
@@ -1605,7 +1624,6 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
                          display=True, figsave=False, figdir='',ext='pdf'):
     
     nNT = len(timestamps) ; dt = np.mean(timestamps[1:]-timestamps[:-1])
-    T = timestamps[-1]
     
     FrequencySampling1 = np.fft.fftfreq(nNT, dt)
     if len(fbonds):
@@ -1664,9 +1682,6 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
         addCumStd.append(np.cumsum(tempPSD))
     
     if display:
-        
-        linestyles = [mlines.Line2D([],[],color='k',label="Signal"),
-                      mlines.Line2D([],[],color='k',linestyle='--', label="Window")]
                       
         plt.rcParams.update(rcParamsForBaselines)
         # plt.rcParams.update({"figure.subplot.hspace":0.2})
@@ -1753,7 +1768,6 @@ def PowerSpectralDensity(signal, timestamps, *AdditionalSignals, SignalName='Sig
         return FrequencySampling, PSD, psdFit
 
 
-
 def FitAtmospherePsd(signal, timestamps, *AdditionalSignals, SignalName='Signal [µm]',
                      fbonds=[], details='', window='no',mov_average=0,model=True,
                      cumStd=False,
@@ -1806,13 +1820,13 @@ def FitAtmospherePsd(signal, timestamps, *AdditionalSignals, SignalName='Signal 
     
     pows = atmParams["pows"]
     filtre = modelAtmosphere(FrequencySampling,nu1,nu2, pows)
-    
-    f1 = 0.3 ; f2 = 10
-    logFrequencySampling = np.log10(FrequencySampling)
-    NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
-    coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(PSD[NominalRegime]), 1)
-    poly1d_fn = np.poly1d(coefs)
-    psdFit = 10**poly1d_fn(logFrequencySampling)   # model sampled in direct space
+    psdFit = filtre
+    # f1 = 0.3 ; f2 = 10
+    # logFrequencySampling = np.log10(FrequencySampling)
+    # NominalRegime = (FrequencySampling>f1)*(FrequencySampling<f2)
+    # coefs = np.polyfit(logFrequencySampling[NominalRegime], np.log10(PSD[NominalRegime]), 1)
+    # poly1d_fn = np.poly1d(coefs)
+    # psdFit = 10**poly1d_fn(logFrequencySampling)   # model sampled in direct space
     # val0 = 10**coefs[0]#FTSignalfit[np.abs(np.argmin(logFrequencySampling-1))]
     
     if len(AdditionalSignals):
@@ -1852,7 +1866,7 @@ def FitAtmospherePsd(signal, timestamps, *AdditionalSignals, SignalName='Signal 
                 ax2.plot(timestamps, addSig[i], colors[i])
             
             if model:
-                ax1.plot(FrequencySampling, psdFit)#10*FrequencySampling**(-8/3))
+                ax1.plot(FrequencySampling, filtre)#10*FrequencySampling**(-8/3))
             # ax3.plot(timestamps, windowsequence,'k--', label='Window')
             
             # ct.setaxelim(ax1, 

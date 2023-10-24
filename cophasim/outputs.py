@@ -58,6 +58,7 @@ ClosurePhaseGD = np.zeros([NT,NC])                  # GD closure phase
 OPDDisturbance = np.zeros([NT,NIN])                 # OPD-space disturbance
 EffectiveOPDMove = np.zeros([NT+latency,NIN])       # Effective move of the delay lines in OPD-space
 OPDTrue = np.zeros([NT,NIN])                        # True Optical Path Delay
+reconstructedOPD = np.zeros([NT,NIN])               # OPD estimated from gd and pd measurement (for open-loop estimation)
 
 # Commands
 OPDCommand = np.zeros([NT+1,NIN])                   # OPD-space command ODL
@@ -222,6 +223,5 @@ last_usaw = np.zeros([NT,NA])
 
 del NA,NB,NC,NT,dt,MW,NW,NIN,FS
 
-    
     
     
