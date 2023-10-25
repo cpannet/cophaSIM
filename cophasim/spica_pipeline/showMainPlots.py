@@ -26,8 +26,11 @@ def writeInFits(filepath,fileHdr, hdr_dico, df_bases,df_tels):
 
     Parameters
     ----------
-    fits_file : STRING
+    
+    filepath : STRING
         Path of the fits file to create.
+    fileHdr : FITS header
+        Header of the PrimaryHDU on which adding hdr_dico items.
     hdr_dico : DICTIONNARY
         Dictionnary with keys and values to put in the header.
     df_bases : DICTIONNARY
@@ -41,7 +44,31 @@ def writeInFits(filepath,fileHdr, hdr_dico, df_bases,df_tels):
 
     """
     
-    # ## Add performance in fits file
+    # Create the PrimaryHDU and add items to the heander
+    hdu0 = fits.PrimaryHDU() ; hdu0.header = fileHdr
+    
+    fileHdr["Kpd"] = (hdr_dico["Kpd"],"Gain PD")
+    fileHdr["Kgd"] = (hdr_dico["Kgd"],"Gain GD")
+    fileHdr["Spd"] = (hdr_dico["Spd"],"Threshold PD")
+    fileHdr["start"] = (hdr_dico["timebonds"][0],"Start of sequence, in seconds, on which perf are computed.")
+    fileHdr["stop"] = (hdr_dico["timebonds"][1],"End of sequence, in seconds, on which perf are computed.")
+    fileHdr['nTrackedBaselines'] = (hdr_dico["nTrackedBaselines"],"Number of tracked baselines (SNR>Sgd, 80% of the time)")
+    fileHdr['DIT in science'] = (hdr_dico["DIT"],"DIT for computing the rms and other performance quantities")
+    fileHdr['min Rms Pd'] = (hdr_dico["minRmsPd"],"Best rms(PD) in microns among tracked baselines")
+    fileHdr['max Rms Pd'] = (hdr_dico["maxRmsPd"], "Worst rms(PD) in microns among tracked baselines")
+    fileHdr['median Rms Pd'] = (hdr_dico["medianRmsPd"],"Median rms(PD) in microns among tracked baselines")
+    fileHdr['median Rms Disp'] = (hdr_dico["medianRmsDisp"], "Median rms(disp) in microns among tracked baselines")
+    fileHdr['min Gamma'] = (hdr_dico["minGamma"], "Minimal contrast loss in science instrument among tracked baselines, due to OPD residuals")
+    fileHdr['median Gamma'] = (hdr_dico["medianGamma"], "Median contrast loss in science instrument among tracked baselines, due to OPD residuals")
+    fileHdr['median T0'] = (hdr_dico["medianT0"], "Median t0 in ms among tracked baselines")
+    fileHdr['median FJP'] = (hdr_dico["medianFjpBases"], "Median FJP in seconds among tracked baselines")
+    fileHdr['nInjectedTels'] = (hdr_dico["nInjectedTels"],"Number of injected tels (flux >0, 80% of the time)")
+    fileHdr['min Flux'] = (hdr_dico["minFlux"],"Lowest median flux among injected tels")
+    fileHdr['max Flux'] = (hdr_dico["maxFlux"], "Highest median flux among injected tels")
+    fileHdr['median Flux'] = (hdr_dico["medianFluxTels"], "Median flux among injected tels")
+    
+    
+    # Create the secondary HDUs for baselines and telescopes performance
     hdr = fits.Header()
     
     colsList=[]
@@ -74,50 +101,11 @@ def writeInFits(filepath,fileHdr, hdr_dico, df_bases,df_tels):
     
     hduTel = fits.BinTableHDU.from_columns(cols,header=hdr)
     hduTel.name = "tels performance"
-    
-    hdu0 = fits.PrimaryHDU() ; hdu0.header = fileHdr
-    
-    fileHdr["Kpd"] = (hdr_dico["Kpd"],"Gain PD")
-    fileHdr["Kgd"] = (hdr_dico["Kgd"],"Gain GD")
-    fileHdr["Spd"] = (hdr_dico["Spd"],"Threshold PD")
-    fileHdr["start"] = (hdr_dico["timebonds"][0],"Start of sequence, in seconds, on which perf are computed.")
-    fileHdr["stop"] = (hdr_dico["timebonds"][1],"End of sequence, in seconds, on which perf are computed.")
-    fileHdr['nTrackedBaselines'] = (hdr_dico["nTrackedBaselines"],"Number of tracked baselines (SNR>Sgd, 80% of the time)")
-    fileHdr['DIT in science'] = (hdr_dico["DIT"],"DIT for computing the rms and other performance quantities")
-    fileHdr['min Rms Pd'] = (hdr_dico["minRmsPd"],"Best rms(PD) in microns among tracked baselines")
-    fileHdr['max Rms Pd'] = (hdr_dico["maxRmsPd"], "Worst rms(PD) in microns among tracked baselines")
-    fileHdr['median Rms Pd'] = (hdr_dico["medianRmsPd"],"Median rms(PD) in microns among tracked baselines")
-    fileHdr['median Rms Disp'] = (hdr_dico["medianRmsDisp"], "Median rms(disp) in microns among tracked baselines")
-    fileHdr['min Gamma'] = (hdr_dico["minGamma"], "Minimal contrast loss in science instrument among tracked baselines, due to OPD residuals")
-    fileHdr['median Gamma'] = (hdr_dico["medianGamma"], "Median contrast loss in science instrument among tracked baselines, due to OPD residuals")
-    fileHdr['median T0'] = (hdr_dico["medianT0"], "Median t0 in ms among tracked baselines")
-    fileHdr['median FJP'] = (hdr_dico["medianFjpBases"], "Median FJP in seconds among tracked baselines")
-    fileHdr['nInjectedTels'] = (hdr_dico["nInjectedTels"],"Number of injected tels (flux >0, 80% of the time)")
-    fileHdr['min Flux'] = (hdr_dico["minFlux"],"Lowest median flux among injected tels")
-    fileHdr['max Flux'] = (hdr_dico["maxFlux"], "Highest median flux among injected tels")
-    fileHdr['median Flux'] = (hdr_dico["medianFluxTels"], "Median flux among injected tels")
 
     newhduL = fits.HDUList([hdu0,hduBase,hduTel])
     newhduL.writeto(filepath)
-        # listExtensions = np.array([hdu.name for hdu in hduL])
-        # extensionsToReplace = np.where((listExtensions=='BASES PERFORMANCE')+(listExtensions=='TELS PERFORMANCE'))[0]
-        # if len(extensionsToReplace):
-        #     baseCol = hduL["BASES PERFORMANCE"]
-        #     for key,value in df_bases.items():
-        #         if "°" in key:
-        #             key=key.replace("°","deg")
-        #         baseCol.data[key] = value
-                
-        #     telCol = hduL["TELS PERFORMANCE"]
-        #     for key,value in df_tels.items():
-        #         telCol.data[key] = value
 
-
-
-    # if not len(extensionsToReplace):
-    #     with fits.open(filepath,mode="append") as hduL:
-    #         hduL.append(hduBase) ; hduL.append(hduTel)
-
+    return
 
 if __name__ == '__main__':
 
@@ -226,12 +214,6 @@ help for a detail of which data can be plotted.")
     
     for filepath in filesOrDir:
 
-        
-            # fileHdr = {}
-            # for key,value in fileHdr.items():
-            #     fileHdr[key] = value
-                
-        # hduL = fits.open(filepath)
         TT.ReadFits(filepath)
         sk.display(*specialData, outputsData=outputsData, timebonds=timebonds, DIT=dit,mergedPdf=mergedPdf,
                    savedir=dir0+'/figures/',display=args.display)
@@ -290,9 +272,6 @@ help for a detail of which data can be plotted.")
                      "minGamma":minGamma,"maxGamma":maxGamma,"medianGamma":medianGamma,
                      "minFlux":minFlux,"maxFlux":maxFlux,"medianFluxTels":medianFluxTels}
             
-            # for key, value in dict2.items():
-            #     hdr_dico[key] = value
-            
             if args.print:
                 print("DIT of which te performance are computed:",dit,"seconds.")
                 print(nTrackedBaselines,"tracked baselines:",trackedBaselines)
@@ -318,6 +297,7 @@ help for a detail of which data can be plotted.")
                 os.makedirs(dir0+"/perf/")
             identifier = filepath.split("SPICAFT.")[-1].split(".fits")[0]
             perfFileName = dir0+"/perf/SPICAFT."+identifier +"_perf.fits"
+            
             with fits.open(filepath) as hduL:
                 fileHdr = hduL[0].header
                 
