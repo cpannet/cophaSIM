@@ -226,9 +226,7 @@ help for a detail of which data can be plotted.")
     
     for filepath in filesOrDir:
 
-        with fits.open(filepath) as hduL:
-            fileHdr = hduL[0].header
-            
+        
             # fileHdr = {}
             # for key,value in fileHdr.items():
             #     fileHdr[key] = value
@@ -320,6 +318,8 @@ help for a detail of which data can be plotted.")
                 os.makedirs(dir0+"/perf/")
             identifier = filepath.split("SPICAFT.")[-1].split(".fits")[0]
             perfFileName = dir0+"/perf/SPICAFT."+identifier +"_perf.fits"
-            
+            with fits.open(filepath) as hduL:
+                fileHdr = hduL[0].header
+                
             writeInFits(perfFileName, fileHdr, hdr_dico, df_bases, df_tels)
 
