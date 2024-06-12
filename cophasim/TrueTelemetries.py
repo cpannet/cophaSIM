@@ -445,7 +445,7 @@ def ReadFits(file,oldFits=False,computeCp=False,give_names=False,newDateFormat=T
         reload(outputs)
         
         outputs.outputsFile = file.split('\\')[-1].split('/')[-1]
-        
+        print(outputs.outputsFile)
         if not newDateFormat:
             timestr = outputs.outputsFile.split('.fits')[0][-20:]
         
