@@ -45,8 +45,8 @@ NT=512
 MT=NT
 NW=5
 OW=1
-dt = 3                              # Frame time
-timestamps = np.arange(NT)*dt       # Timestamps in [ms]
+dt = 3e-3                               # Frame time [s]
+timestamps = np.arange(NT)*dt           # Timestamps in [s]
 starttracking = 0
 
 """Source"""

@@ -1,0 +1,10 @@
+matplotlib
+numpy
+scipy
+astropy
+pandas
+sympy
+tabulate
+bode_utils
+joblib
+psutil

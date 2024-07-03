@@ -51,11 +51,11 @@ def initialize(Interferometer, ObsFile, DisturbanceFile, NT=512, OT=1, MW = 5,
                ND=1,
                spectra = [], spectraM=[],wlOfTrack=0, spectrum = [],
                mode = 'search',
-               fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1,sigmap=[],imsky=[],
+               fs='default', TELref=0, FSfitsfile='', R = 0.5, dt=1e-3,sigmap=[],imsky=[],
                ft = 'integrator', state = 0,
                noise=True, phnoise = 0, noiseParams = {},
                seedPh=100, seedRon=100, seedDist=100,seedDark=100,
-               starttracking=50, latencytime=0,
+               starttracking=50e-3, latencytime=0,
                piston_average=0, foreground=[], display=False,
                checktime=True, checkperiod=10):
     """
@@ -223,8 +223,8 @@ SOURCE:
     
     # TEMPORAL PARAMETERS
     
-    MT=int(NT/OT)                        # Total number of temporal samples
-    timestamps = np.arange(NT)*dt       # Time sampling in [ms]
+    MT=int(NT/OT)                           # Total number of temporal samples
+    timestamps = np.arange(NT)*dt           # Time sampling in [s]
     
     # SPECTRAL PARAMETERS
     
@@ -278,7 +278,7 @@ SOURCE:
     config.NX=0
     config.NY=0
     config.ND=ND
-    config.dt=dt   # ms
+    config.dt=dt   # s
 
     # Noises
     config.noise=noise
@@ -451,7 +451,7 @@ def save_config():
         print(a_dict, file=f)
 
 def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
-                            spectra=[], RefLambda=0, NT=1000,NTend=0,dt=1,
+                            spectra=[], RefLambda=0, NT=1000,NTend=0,dt=1e-3,
                             ampl=0, seed=100, dist='step', startframe = 10, 
                             f_fin=300, value_start=0, value_end=0,
                             r0=0.15,t0=10, L0=25, direction=0, d=1,
@@ -538,8 +538,8 @@ def MakeAtmosphereCoherence(filepath, InterferometerFile, overwrite=False,
         ArrayParams = hdu[0].header
         NA = ArrayParams['NA']
     
-    obstime = NT*dt                     # Observation time [ms]
-    timestamps = np.arange(NT)*dt        # Time sampling [ms]
+    obstime = NT*dt                         # Observation time [s]
+    timestamps = np.arange(NT)*dt           # Time sampling [s]
     
     # lmbdamin = 1/np.max(spectra)
     
@@ -740,7 +740,7 @@ Longueur timestamps: {len(timestamps)}")
         if 'old' in kwargs.keys():
             rmsOPD = ampl
             rmsPiston = rmsOPD/np.sqrt(2)
-            freq = np.fft.fftshift(np.fft.fftfreq(NT,d=dt*1e-3))
+            freq = np.fft.fftshift(np.fft.fftfreq(NT,d=dt))
             freqfft=freq
 
             filtre = np.zeros(NT)
@@ -811,13 +811,13 @@ Longueur timestamps: {len(timestamps)}")
                 if verbose:
                     print(f'Piston on pupil {ia}')
     
-                dfreq = np.min([0.008,1/(2.2*NT*dt*1e-3)]) # Minimal sampling wished
-                freqmax = 1/(2*dt*1e-3)                  # Maximal frequency derived from given temporal sampling
+                dfreq = np.min([0.008,1/(2.2*NT*dt)]) # Minimal sampling wished
+                freqmax = 1/(2*dt)                  # Maximal frequency derived from given temporal sampling
                 
                 Npix = int(freqmax/dfreq)*2         # Array length (taking into account aliasing)
                 
                 freqfft = (np.arange(Npix)-Npix//2)*dfreq
-                timefft = (np.arange(Npix)-Npix//2)*dt  #ms
+                timefft = (np.arange(Npix)-Npix//2)*dt  #s
             
                 #nu0 = 0.2*V/B                      # Very low cut-off frequency
                 nu1 = V/L0                          # Low cut-off frequency
@@ -874,7 +874,7 @@ Longueur timestamps: {len(timestamps)}")
                 
                 motif0 = np.real(np.fft.ifft(np.fft.ifftshift(signalTF), norm="ortho"))
                 keeptime = (timefft>=0)*(timefft<obstime)
-                stdtime = (timefft>=0)#*(timefft<30000)              # We'll compute the standard deviation on a sample of 10s
+                stdtime = (timefft>=0)#*(timefft<30)              # We'll compute the standard deviation on a sample of 10s
                             
                 motif = motif0[keeptime]
     
@@ -920,8 +920,8 @@ Longueur timestamps: {len(timestamps)}")
                 if verbose:
                     print(f'Piston on pupil {ia}')
     
-                dfreq = np.min([0.008,1/(2*NT*dt*1e-3)]) # Minimal sampling wished
-                freqmax = 1/(2*dt*1e-3)                  # Maximal frequency derived from given temporal sampling
+                dfreq = np.min([0.008,1/(2*NT*dt)]) # Minimal sampling wished
+                freqmax = 1/(2*dt)                  # Maximal frequency derived from given temporal sampling
                 
                 Npix = int(freqmax/dfreq)*2         # Array length (taking into account aliasing)
                 
@@ -998,7 +998,7 @@ Longueur timestamps: {len(timestamps)}")
                 
                 motif0 = np.real(np.fft.ifft(np.fft.ifftshift(newdsp), norm="ortho"))
                 keeptime = (timefft>=0)*(timefft<obstime)
-                stdtime = (timefft>=0)#*(timefft<30000)              # We'll compute the standard deviation on a sample of 10s
+                stdtime = (timefft>=0)#*(timefft<30)              # We'll compute the standard deviation on a sample of 10s
                             
                 motif = motif0[keeptime]
     
@@ -1013,7 +1013,6 @@ Longueur timestamps: {len(timestamps)}")
         
     elif dist == 'chirp':
         
-        f_fin = f_fin*1e-3   # Conversion to kHz
         omega_fin = 2*np.pi*f_fin
         t_fin = timestamps[-1]
         a = omega_fin/(2*t_fin)
@@ -1151,7 +1150,7 @@ def loop(*args, LightSave=True, overwrite=False, verbose=False,verbose2=True):
     delta_wav = np.abs(spectra[1]-spectra[2])
     
     CfObj = CfObj * delta_wav           # Photons/spectralchannel/second at the entrance of the FS
-    CfObj = CfObj * config.dt*1e-3      # Photons/spectralchannel/DIT at the entrance of the FS
+    CfObj = CfObj * config.dt      # Photons/spectralchannel/DIT at the entrance of the FS
     
     if NA>=3:
         outputs.ClosurePhaseObject = CPObj
@@ -1318,7 +1317,7 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
         Enables to plot only a part of the sequence.
         Quantities must be given is seconds.
         If (0,-1), plots all sequence.
-    DIT : FLOAT, optional. The default is 10.
+    DIT : FLOAT, optional. The default is 100.
         Integration time for the variances, averages, etc...
     wlOfScience : FLOAT, optional. The default is 0.75.
         Wavelength at which the science instrument is working, for SNR computation.
@@ -1466,13 +1465,13 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
 
     if len(timebonds)==2:
         if timebonds[1]==-1:
-            timerange = range(np.argmin(np.abs(timestamps-timebonds[0])),NT)
+            timerange = range(np.argmin(np.abs(timestamps-timebonds[0])),NT-1)
         else:
             timerange = range(np.argmin(np.abs(timestamps-timebonds[0])),np.argmin(np.abs(timestamps-timebonds[1])))
     else:
         stationaryregim_start = config.starttracking+(config.NT-config.starttracking)*1//3
         if stationaryregim_start >= NT: stationaryregim_start=config.NT*1//3
-        timerange = np.arange(stationaryregim_start,NT)
+        timerange = np.arange(stationaryregim_start,NT-1)
         
     display_module.timerange = timerange
     
@@ -1480,11 +1479,10 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
 
     if not ('opdcontrol' in args):
         timeBonds = [timestamps[timerange][0],timestamps[timerange][-1]]
-        ShowPerformance(timeBonds, wlOfScience, effDIT, display=False)
+        ShowPerformance(timeBonds, wlOfScience, effDIT, display=False,verbose=verbose)
     else:
         if verbose:
             print("don't compute performances")
-            
             
     timestamps = timestamps[timerange]
     t = timestamps*ms # time in ms
@@ -3053,7 +3051,8 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     
     NINmes = config.FS['NINmes']
     
-    
+    # if verbose:
+    #     print("Entry parameters ShowPerformance function:",TimeBonds, SpectraForScience,DIT)
     """ Modify some outputs data for compatibility between simu and true data """
     
     trueTelemetries = False
@@ -3087,7 +3086,10 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
 
     Lc = R*SpectraForScience      # Vector or float
     
+    
     DIT_NumberOfFrames = int(DIT/dt)
+    if verbose:
+        print("deuxième:",dt,DIT,DIT/dt,DIT_NumberOfFrames)
     if TimeBonds[1]==-1:
         TimeBonds = (TimeBonds[0],outputs.timestamps[-1])
     if isinstance(TimeBonds,(float,int)):
@@ -3115,7 +3117,7 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
             else:
                 CoherentFluxObject = ct.create_CfObj(MeanWavelength,
                                                      config.Obs,config.Target,InterfArraySI,R=R)
-            CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
+            CoherentFluxObject = CoherentFluxObject*dt  # [MW,:] whether it is multiWL or not
         
         
         from cophasim.SCIENTIFIC_INSTRUMENTS import SPICAVIS
@@ -3461,7 +3463,7 @@ def ShowPerformance_multiDITs(TimeBonds,SpectraForScience,IntegrationTimes=[],
         else:
             CoherentFluxObject = ct.create_CfObj(MeanWavelength,
                                                  config.Obs,config.Target,InterfArray,R=R)
-        CoherentFluxObject = CoherentFluxObject*dt*1e-3  # [MW,:] whether it is multiWL or not
+        CoherentFluxObject = CoherentFluxObject*dt  # [MW,:] whether it is multiWL or not
     
     from cophasim.SCIENTIFIC_INSTRUMENTS import SPICAVIS
    
@@ -3851,7 +3853,7 @@ def SpectralAnalysis(OPD = (1,2),TimeBonds=0, details='', window='hanning',
     
     SampleIndices = range(BeginSample,EndSample) ; nNT = len(SampleIndices)
     
-    frequencySampling = np.fft.fftfreq(nNT, dt*1e-3)
+    frequencySampling = np.fft.fftfreq(nNT, dt)
     PresentFrequencies = (frequencySampling >= 0) & (frequencySampling < 200)
     frequencySampling = frequencySampling[PresentFrequencies]
     

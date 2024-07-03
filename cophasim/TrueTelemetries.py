@@ -562,10 +562,10 @@ def ReadFits(file,oldFits=False,computeCp=False,give_names=False,newDateFormat=T
                 setattr(outputs,key,hduL[1].data[key])
                 AdditionalOutputs.append(key)
                 
-        tBefore = hduL[1].data['tBeforeProcessFrameCall'][:,0] + hduL[1].data['tBeforeProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)*
-        tAfter = hduL[1].data['tAfterProcessFrameCall'][:,0] + hduL[1].data['tAfterProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)
-        outputs.timestamps = tBefore-tBefore[0]
-        outputs.tAfter = tAfter - tAfter[0] 
+        tBefore = hduL[1].data['tBeforeProcessFrameCall'][:,0] + hduL[1].data['tBeforeProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (at frame reception)
+        tAfter = hduL[1].data['tAfterProcessFrameCall'][:,0] + hduL[1].data['tAfterProcessFrameCall'][:,1]*1e-9  #Timestamps of the data (after process)
+        outputs.timestamps = tBefore[:-1]-tBefore[0]
+        outputs.tAfter = tAfter[:-1] - tAfter[0]
         config.dt = np.mean(outputs.timestamps[1:]-outputs.timestamps[:-1])
         
         """Global variables analog to outputs module"""
@@ -600,28 +600,41 @@ def ReadFits(file,oldFits=False,computeCp=False,give_names=False,newDateFormat=T
         outputs.PhotometryEstimated = hduL[1].data["Photometry"] # Estimated photometries [NTxNA - ADU]
         
         """ Before 2023-07-11 """
-        
         # outputs.varPD = hduL[1].data["curPdVar"] # Estimated "PD variance" = 1/SNR² [NTxNINmes]
         # outputs.varGD = hduL[1].data["alternatePdVar"] # Estimated "GD variance" = 1/SNR² [NTxNINmes]
         # outputs.SquaredSNRMovingAveragePD = np.nan_to_num(1/hduL[1].data["avPdVar"],posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        """ END """
         
         """ After 2023-07-11 """
-        whichCurPdVar = hduL[0].header['whichCurPdVar']
-        if whichCurPdVar == "Sylvestre":
-            config.FT['whichSNR'] = "pd"
-        else:
-            config.FT['whichSNR'] = "gd"
+        # whichCurPdVar = hduL[0].header['whichCurPdVar']
+        # if whichCurPdVar == "Sylvestre":
+        #     config.FT['whichSNR'] = "pd"
+        # else:
+        #     config.FT['whichSNR'] = "gd"
             
-        outputs.varPD = np.matmul(sortBases2Conventional,hduL[1].data["pdVar"].T).T # Estimated "PD variance" = 1/SNR² [NTxNINmes]
-        outputs.varGD = np.matmul(sortBases2Conventional,hduL[1].data["alternatePdVar"].T).T # Estimated "GD variance" = 1/SNR² [NTxNINmes]
-        outputs.SquaredSnrGD = 1/outputs.varGD
-        outputs.SquaredSnrPD = 1/outputs.varPD
+        # outputs.varPD = np.matmul(sortBases2Conventional,hduL[1].data["pdVar"].T).T # Estimated "PD variance" = 1/SNR² [NTxNINmes]
+        # outputs.varGD = np.matmul(sortBases2Conventional,hduL[1].data["alternatePdVar"].T).T # Estimated "GD variance" = 1/SNR² [NTxNINmes]
+        # outputs.SquaredSnrGD = 1/outputs.varGD
+        # outputs.SquaredSnrPD = 1/outputs.varPD
         
-        outputs.SquaredSNRMovingAveragePD = np.nan_to_num(np.matmul(sortBases2Conventional,1/hduL[1].data["averagePdVar"].T).T,posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
-        # outputs.whichVar = hduL[1].data['whichCurPdVar'][0]    # 0: varPd ; 1:varGd
-        if config.FT['whichSNR']=="gd":
-            outputs.SquaredSNRMovingAverageGD = np.copy(outputs.SquaredSNRMovingAveragePD)
-            
+        # outputs.SquaredSNRMovingAveragePD = np.nan_to_num(np.matmul(sortBases2Conventional,1/hduL[1].data["averagePdVar"].T).T,posinf=0) # Estimated SNR² averaged over N dit [NTxNINmes]
+        # # outputs.whichVar = hduL[1].data['whichCurPdVar'][0]    # 0: varPd ; 1:varGd
+        # if config.FT['whichSNR']=="gd":
+        #     outputs.SquaredSNRMovingAverageGD = np.copy(outputs.SquaredSNRMovingAveragePD)
+        """ END """
+        
+
+        """ After 2024-05 """
+        # whichCurPdVar = hduL[1].data['pdVarEstimator'] # Now, this variable is an array [NT]
+        
+        outputs.varPD = np.matmul(sortBases2Conventional,hduL[1].data["averagePdVarSyl"].T).T # Estimated "PD variance" = 1/SNR² [NTxNINmes]
+        outputs.varGD = np.matmul(sortBases2Conventional,hduL[1].data["averagePdVarCyr"].T).T # Estimated "GD variance" = 1/SNR² [NTxNINmes]
+        
+        outputs.SquaredSNRMovingAveragePD = np.nan_to_num(np.matmul(sortBases2Conventional,1/hduL[1].data["averagePdVarSyl"].T).T,posinf=0)
+        outputs.SquaredSNRMovingAverageGD = np.nan_to_num(np.matmul(sortBases2Conventional,1/hduL[1].data["averagePdVarCyr"].T).T,posinf=0)
+
+        """ END """
+        
         outputs.singularValuesSqrt = np.sqrt(hduL[1].data["sPdSingularValues"])
         
         config.FT['ThresholdPD'] = hduL[1].data['pdThreshold'][0]
