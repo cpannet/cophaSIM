@@ -1479,6 +1479,8 @@ def display(*args, outputsData=[],timebonds=(0,-1),DIT=10,wlOfScience=0.75,
 
     if not ('opdcontrol' in args):
         timeBonds = [timestamps[timerange][0],timestamps[timerange][-1]]
+        if effDIT > timeBonds[-1]:
+            print("\n WARNING: you asked a DIT higher than the sample length. Variances will be null. Decrease DIT.\n")
         ShowPerformance(timeBonds, wlOfScience, effDIT, display=False,verbose=verbose)
     else:
         if verbose:
@@ -3051,8 +3053,6 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     
     NINmes = config.FS['NINmes']
     
-    # if verbose:
-    #     print("Entry parameters ShowPerformance function:",TimeBonds, SpectraForScience,DIT)
     """ Modify some outputs data for compatibility between simu and true data """
     
     trueTelemetries = False
@@ -3088,8 +3088,6 @@ def ShowPerformance(TimeBonds, SpectraForScience,DIT,FileInterferometer='',
     
     
     DIT_NumberOfFrames = int(DIT/dt)
-    if verbose:
-        print("deuxième:",dt,DIT,DIT/dt,DIT_NumberOfFrames)
     if TimeBonds[1]==-1:
         TimeBonds = (TimeBonds[0],outputs.timestamps[-1])
     if isinstance(TimeBonds,(float,int)):
